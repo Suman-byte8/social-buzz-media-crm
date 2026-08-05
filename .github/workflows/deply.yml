@@ -1,0 +1,60 @@
+name: Deploy to Hostinger
+
+on:
+  push:
+    branches:
+      - main   # change to your production branch name if different
+
+# Prevents two deploys running at the same time and stepping on each other
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Build & Deploy
+    runs-on: ubuntu-latest
+    environment: production   # optional: set up an "environment" in repo Settings for manual approval + secrets
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ---- OPTIONAL BUILD STEP ----
+      # Remove this block if your site is plain static/PHP with no build process.
+      # Keep it if you use npm to compile assets (Tailwind, Vite, Sass, bundlers, etc.)
+      - name: Setup Node.js
+        if: hashFiles('package.json') != ''
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install dependencies
+        if: hashFiles('package.json') != ''
+        run: npm ci
+
+      - name: Build project
+        if: hashFiles('package.json') != ''
+        run: npm run build
+      # ---- END OPTIONAL BUILD STEP ----
+
+      - name: Deploy via FTP
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          protocol: ftps                     # Hostinger supports FTPS (encrypted) - keep this unless it fails, then try 'ftp'
+          local-dir: ./dist/                 # change to './' if no build step, or your output folder (e.g. ./build/, ./public/)
+          server-dir: ./public_html/crm       # change to the correct subfolder if deploying to an addon domain/subdomain
+          exclude: |
+            **/.git*
+            **/.git*/**
+            **/node_modules/**
+            **/.github/**
+            **/README.md
+            **/.env
+            **/.env.*
+          dangerous-clean-slate: false        # keep false unless you intentionally want to wipe the server dir first
+          log-level: standard
