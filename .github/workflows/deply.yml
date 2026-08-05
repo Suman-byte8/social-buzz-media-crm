@@ -47,7 +47,7 @@ jobs:
           password: ${{ secrets.FTP_PASSWORD }}
           protocol: ftps                     # Hostinger supports FTPS (encrypted) - keep this unless it fails, then try 'ftp'
           local-dir: ./dist/                 # change to './' if no build step, or your output folder (e.g. ./build/, ./public/)
-          server-dir: ./public_html/crm          # change to the correct subfolder if deploying to an addon domain/subdomain
+          server-dir: ./public_html/crm/          # change to the correct subfolder if deploying to an addon domain/subdomain
           exclude: |
             **/.git*
             **/.git*/**
