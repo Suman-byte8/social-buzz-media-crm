@@ -24,19 +24,21 @@ jobs:
       # Remove this block if your site is plain static/PHP with no build process.
       # Keep it if you use npm to compile assets (Tailwind, Vite, Sass, bundlers, etc.)
       - name: Setup Node.js
-        if: hashFiles('package.json') != ''
+        if: hashFiles('client/package.json') != ''
         uses: actions/setup-node@v4
         with:
           node-version: 24
           cache: 'npm'
 
       - name: Install dependencies
-        if: hashFiles('package.json') != ''
+        if: hashFiles('client/package.json') != ''
+        working-directory: client
         run: npm ci
 
-      - name: Build project
-        if: hashFiles('package.json') != ''
-        run: npm run build
+      - name: Build and export client
+        if: hashFiles('client/package.json') != ''
+        working-directory: client
+        run: npm run export
       # ---- END OPTIONAL BUILD STEP ----
 
       - name: Deploy via FTP
@@ -46,7 +48,7 @@ jobs:
           username: ${{ secrets.FTP_USERNAME }}
           password: ${{ secrets.FTP_PASSWORD }}
           protocol: ftps                     # Hostinger supports FTPS (encrypted) - keep this unless it fails, then try 'ftp'
-          local-dir: ./dist/                 # change to './' if no build step, or your output folder (e.g. ./build/, ./public/)
+          local-dir: ./client/out/            # static export output folder from Next.js
           server-dir: ./public_html/crm/          # change to the correct subfolder if deploying to an addon domain/subdomain
           exclude: |
             **/.git*
