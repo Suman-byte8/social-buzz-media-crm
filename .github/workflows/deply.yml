@@ -48,9 +48,9 @@ jobs:
           server: ${{ secrets.FTP_SERVER }}
           username: ${{ secrets.FTP_USERNAME }}
           password: ${{ secrets.FTP_PASSWORD }}
-          protocol: ftps                     # Hostinger supports FTPS (encrypted) - keep this unless it fails, then try 'ftp'
-          local-dir: ./client/out/            # static export output folder from Next.js
-          server-dir: domains/socialbuzzmedia.in/public_html/crm/  # deploy to actual Hostinger path under FTP home
+          protocol: ftps                     
+          local-dir: ./client/out/            
+          server-dir: ./  
           exclude: |
             **/.git*
             **/.git*/**
