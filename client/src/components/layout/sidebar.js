@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 
 const navItems = [
   { label: "Dashboard", href: "/dashboard", icon: "dashboard" },
-  { label: "Sales CRM", href: "/crm", icon: "leaderboard" },
+//   { label: "Sales CRM", href: "/crm", icon: "leaderboard" },
   { label: "Clients", href: "/clients", icon: "group" },
   { label: "Content Calendar", href: "/calendar", icon: "calendar_month" },
   { label: "Google Ads", href: "/google-ads", icon: "ads_click" },
