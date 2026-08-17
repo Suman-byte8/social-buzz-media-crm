@@ -5,6 +5,7 @@ import ProposalTab from "@/components/clients/ProposalTab";
 import Overview from "@/components/clients/Overview";
 import Credentials from "@/components/clients/Credentials";
 import AdsTab from "@/components/clients/AdsTab";
+import MetaAdsTab from "@/components/clients/MetaAdsTab";
 import SocialMedia from "@/components/clients/SocialMedia";
 import Reports from "@/components/clients/Reports";
 import Invoices from "@/components/clients/Invoices";
@@ -18,7 +19,8 @@ const tabs = [
   // { id: "nda", label: "NDA", icon: "lock" },
   // { id: "brand_assets", label: "Brand Assets", icon: "photo_library" },
   { id: "credentials", label: "Credentials", icon: "key" },
-  { id: "ads", label: "Ads", icon: "ads_click" },
+  { id: "google_ads", label: "Google Ads", icon: "ads_click" },
+  { id: "meta_ads", label: "Meta Ads", icon: "campaign" },
   { id: "social", label: "Social", icon: "thumb_up" },
   { id: "reports", label: "Reports", icon: "bar_chart" },
   { id: "invoices", label: "Invoices", icon: "receipt_long" },
@@ -105,8 +107,10 @@ export default function ClientDetailContent({ activeTab, setActiveTab }) {
         <Overview />
       ) : activeTab === "credentials" ? (
         <Credentials />
-      ) : activeTab === "ads" ? (
+      ) : activeTab === "google_ads" ? (
         <AdsTab />
+      ) : activeTab === "meta_ads" ? (
+        <MetaAdsTab />
       ) : activeTab === "social" ? (
         <SocialMedia />
       ) : activeTab === "reports" ? (

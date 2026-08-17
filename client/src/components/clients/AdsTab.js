@@ -1,7 +1,6 @@
 import React from "react";
-import MetaAdsOverview from "@/components/clients/MetaAdsOverview";
+import Ads from "@/components/clients/Ads";
 
 export default function AdsTab() {
-  // Use the more detailed MetaAdsOverview if available
-  return <MetaAdsOverview />;
+  return <Ads />;
 }
