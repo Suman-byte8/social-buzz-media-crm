@@ -86,4 +86,29 @@
   .card-panel {
     @apply bg-surface-container border border-surface-container-high rounded-lg shadow-card p-card-padding;
   }
+
+  .card-bg {
+    @apply bg-white border border-outline-variant shadow-xs;
+  }
+
+  .table-header-bg {
+    @apply bg-[#FAFAFA] border-b border-[#F0F0F0];
+  }
+
+  .table-row-border {
+    @apply border-b border-[#F0F0F0];
+  }
+
+  .table-row-hover {
+    @apply hover:bg-[#F9F9F9];
+  }
+
+  .toggle-checkbox:checked {
+    right: 0;
+    border-color: #e32227;
+  }
+
+  .toggle-checkbox:checked + .toggle-label {
+    background-color: #e32227;
+  }
 }

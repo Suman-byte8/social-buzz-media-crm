@@ -14,8 +14,6 @@ const navItems = [
   { label: "Agreements", href: "/agreements", icon: "description" },
   { label: "Meeting Notes", href: "/notes", icon: "event_note" },
   { label: "Reports", href: "/reports", icon: "bar_chart" },
-  { label: "SOP Library", href: "/sop", icon: "menu_book" },
-  { label: "HR", href: "/hr", icon: "badge" },
   { label: "Settings", href: "/settings", icon: "settings", mtAuto: true },
 ];
 
