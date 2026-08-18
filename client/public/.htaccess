@@ -1,11 +1,11 @@
-# ============= Agency OS / Social Buzz Media CRM .htaccess =============
-# Next.js Static Export routing for Hostinger shared hosting (LiteSpeed / Apache)
+# ============= Agency OS .htaccess =============
+# Next.js static export on Hostinger LiteSpeed
 
 <IfModule mod_rewrite.c>
   RewriteEngine On
   RewriteBase /
 
-  # 1. Serve existing files directly (CSS, JS, images, etc.)
+  # 1. Serve existing files directly
   RewriteCond %{REQUEST_FILENAME} -f
   RewriteRule ^ - [L]
 
@@ -14,46 +14,37 @@
   RewriteCond %{REQUEST_FILENAME}/index.html -f
   RewriteRule ^(.*)$ $1/index.html [L]
 
-  # 3. Route route paths (e.g., /clients or /dashboard) to /route/index.html if directory exists
+  # 3. Route paths to /route/index.html if folder exists
   RewriteCond %{DOCUMENT_ROOT}/$1/index.html -f
   RewriteRule ^(.*)$ /$1/index.html [L]
 
-  # 4. Route route paths to .html file if file exists (e.g., /clients.html)
+  # 4. Route paths to .html file if file exists
   RewriteCond %{REQUEST_FILENAME}.html -f
   RewriteRule ^(.*)$ $1.html [L]
 
   # 5. Redirect root URL (/) to /dashboard/
   RewriteRule ^$ /dashboard/ [L,R=301]
 
-  # 6. Fallback to /index.html for client-side routing
+  # 6. Fallback to index.html
   RewriteCond %{REQUEST_FILENAME} !-f
   RewriteCond %{REQUEST_FILENAME} !-d
   RewriteRule ^ /index.html [L]
 </IfModule>
 
-# ============= Security Headers =============
-<IfModule mod_headers.c>
-  Header set X-Content-Type-Options "nosniff"
-  Header set X-Frame-Options "SAMEORIGIN"
-  Header set Referrer-Policy "strict-origin-when-cross-origin"
-</IfModule>
-
 # ============= Disable Directory Listing =============
-<IfModule mod_autoindex.c>
-  Options -Indexes
-</IfModule>
+Options -Indexes
 
 # ============= Block Access to Sensitive Files =============
 <FilesMatch "^\.env|package\.json|package-lock\.json|yarn\.lock|\.git">
   Deny from all
 </FilesMatch>
 
-# ============= UTF-8 Encoding & MIME Types =============
-AddDefaultCharset UTF-8
-AddType text/html .html
-AddType text/css .css
-AddType application/javascript .js
-AddType application/json .json
-AddType image/svg+xml .svg
-AddType font/woff2 .woff2
-AddType font/woff .woff
+# ============= Prevent Double Compression / Encoding Conflicts =============
+<IfModule mod_deflate.c>
+  SetEnvIfNoCase Request_URI \.(html|js|css)$ no-gzip dont-vary
+</IfModule>
+
+<IfModule mod_headers.c>
+  Header append Vary Accept-Encoding
+  Header set Cache-Control "no-transform"
+</IfModule>
