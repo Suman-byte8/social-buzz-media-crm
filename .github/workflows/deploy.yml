@@ -42,13 +42,13 @@ jobs:
         run: npm run export
       # ---- END OPTIONAL BUILD STEP ----
 
-      - name: Deploy via SFTP
+      - name: Deploy via FTP
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
           server: ${{ secrets.FTP_SERVER }}
           username: ${{ secrets.FTP_USERNAME }}
           password: ${{ secrets.FTP_PASSWORD }}
-          protocol: sftp                      
+          protocol: ftps-legacy                      
           local-dir: ./client/out/            
           server-dir: ./  
           exclude: |
