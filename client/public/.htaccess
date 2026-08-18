@@ -48,3 +48,11 @@ Options -Indexes
   Header append Vary Accept-Encoding
   Header set Cache-Control "no-transform"
 </IfModule>
+
+
+# ============= LiteSpeed Compression Control =============
+<IfModule LiteSpeed>
+  # Disable LiteSpeed compression for HTML, JS, CSS
+  RewriteEngine On
+  Header set X-LiteSpeed-Cache-Control "no-store"
+</IfModule>
