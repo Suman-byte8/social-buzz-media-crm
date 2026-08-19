@@ -1,5 +1,6 @@
 import React from "react";
 import SearchBar from "@/components/dashboard/SearchBar";
+import MetricCard from "@/components/ui/MetricCard";
 
 export default function DashboardPage() {
   return (
@@ -64,118 +65,39 @@ export default function DashboardPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-stack-md lg:gap-stack-lg">
           {/* ROW 1: METRICS */}
           <div className="lg:col-span-12 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-stack-sm md:gap-stack-md">
-            {/* Metric Card 1 */}
-            <div className="bg-white rounded-lg border border-[#E5E5E7] p-card-padding shadow-[0px_2px_4px_rgba(0,0,0,0.05)] flex flex-col justify-between hover:-translate-y-1 transition-transform cursor-pointer">
-              <div className="flex justify-between items-start mb-2">
-                <span className="font-label-sm text-label-sm uppercase text-on-surface-variant tracking-wider">
-                  Active Clients
-                </span>
-                <span className="material-symbols-outlined text-primary opacity-80">
-                  domain
-                </span>
-              </div>
-              <div className="flex items-end justify-between mt-4">
-                <span className="font-display-lg text-display-lg text-on-surface">
-                  42
-                </span>
-                <span className="font-label-sm text-label-sm text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full flex items-center">
-                  <span className="material-symbols-outlined text-[14px] mr-1">
-                    trending_up
-                  </span>{" "}
-                  +3 this mo
-                </span>
-              </div>
-            </div>
-
-            {/* Metric Card 2 (MRR) */}
-            <div className="bg-white rounded-lg border border-[#E5E5E7] p-card-padding shadow-[0px_2px_4px_rgba(0,0,0,0.05)] flex flex-col justify-between hover:-translate-y-1 transition-transform cursor-pointer">
-              <div className="flex justify-between items-start mb-2">
-                <span className="font-label-sm text-label-sm uppercase text-on-surface-variant tracking-wider">
-                  MRR
-                </span>
-                <span className="material-symbols-outlined text-primary opacity-80">
-                  payments
-                </span>
-              </div>
-              <div className="flex items-end justify-between mt-4 relative">
-                <span className="font-display-lg text-display-lg text-on-surface">
-                  $128k
-                </span>
-                <div className="w-16 h-8 absolute right-0 bottom-1 opacity-60">
-                  <svg
-                    className="w-full h-full stroke-emerald-500 fill-none"
-                    strokeLinecap="round"
-                    strokeWidth="3"
-                    viewBox="0 0 100 30"
-                  >
-                    <path d="M0,25 Q15,15 25,20 T50,10 T75,15 T100,2"></path>
-                  </svg>
-                </div>
-              </div>
-            </div>
-
-            {/* Metric Card 3 */}
-            <div className="bg-white rounded-lg border border-[#E5E5E7] p-card-padding shadow-[0px_2px_4px_rgba(0,0,0,0.05)] flex flex-col justify-between hover:-translate-y-1 transition-transform cursor-pointer">
-              <div className="flex justify-between items-start mb-2">
-                <span className="font-label-sm text-label-sm uppercase text-on-surface-variant tracking-wider">
-                  Out. Invoices
-                </span>
-                <span className="material-symbols-outlined text-amber-600 opacity-80">
-                  receipt_long
-                </span>
-              </div>
-              <div className="flex items-end justify-between mt-4">
-                <span className="font-display-lg text-display-lg text-on-surface">
-                  $24.5k
-                </span>
-                <span className="font-label-sm text-label-sm text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full">
-                  4 Overdue
-                </span>
-              </div>
-            </div>
-
-            {/* Metric Card 4 */}
-            <div className="bg-white rounded-lg border border-[#E5E5E7] p-card-padding shadow-[0px_2px_4px_rgba(0,0,0,0.05)] flex flex-col justify-between hover:-translate-y-1 transition-transform cursor-pointer">
-              <div className="flex justify-between items-start mb-2">
-                <span className="font-label-sm text-label-sm uppercase text-on-surface-variant tracking-wider">
-                  Active Google Ads
-                </span>
-                <span className="material-symbols-outlined text-blue-600 opacity-80">
-                  ads_click
-                </span>
-              </div>
-              <div className="flex items-end justify-between mt-4">
-                <span className="font-display-lg text-display-lg text-on-surface">
-                  156
-                </span>
-                <span className="font-label-sm text-label-sm text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full flex items-center">
-                  <span className="material-symbols-outlined text-[14px] mr-1">
-                    check_circle
-                  </span>{" "}
-                  All Healthy
-                </span>
-              </div>
-            </div>
-
-            {/* Metric Card 5 */}
-            <div className="bg-white rounded-lg border border-[#E5E5E7] p-card-padding shadow-[0px_2px_4px_rgba(0,0,0,0.05)] flex flex-col justify-between hover:-translate-y-1 transition-transform cursor-pointer sm:col-span-2 lg:col-span-1">
-              <div className="flex justify-between items-start mb-2">
-                <span className="font-label-sm text-label-sm uppercase text-on-surface-variant tracking-wider">
-                  Active Meta Camp.
-                </span>
-                <span className="material-symbols-outlined text-[#1877F2] opacity-80">
-                  campaign
-                </span>
-              </div>
-              <div className="flex items-end justify-between mt-4">
-                <span className="font-display-lg text-display-lg text-on-surface">
-                  89
-                </span>
-                <span className="font-label-sm text-label-sm text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">
-                  $12k/day spend
-                </span>
-              </div>
-            </div>
+            <MetricCard
+              title="Active Clients"
+              value="42"
+              change="+3 this mo"
+              changeType="positive"
+              icon="domain"
+            />
+            <MetricCard
+              title="MRR"
+              value="$128k"
+              change="12%"
+              changeType="positive"
+              icon="payments"
+            />
+            <MetricCard
+              title="Out. Invoices"
+              value="$24.5k"
+              change="4 Overdue"
+              changeType="negative"
+              icon="receipt_long"
+            />
+            <MetricCard
+              title="Active Google Ads"
+              value="156"
+              change="All Healthy"
+              icon="ads_click"
+            />
+            <MetricCard
+              title="Active Meta Camp."
+              value="89"
+              change="$12k/day spend"
+              icon="campaign"
+            />
           </div>
 
           {/* ROW 2: CHARTS & PIPELINE */}
