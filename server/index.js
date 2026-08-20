@@ -38,7 +38,9 @@ sequelize.sync({ alter: process.env.NODE_ENV === "development" })
 
 // Routes
 import clientRoutes from "./src/routes/clientRoutes.js";
+import teamRoutes from "./src/routes/teamRoutes.js";
 app.use("/api", clientRoutes);
+app.use("/api", teamRoutes);
 
 app.get("/", (req, res) => {
   res.json({

@@ -289,6 +289,202 @@ Permanently deletes a client record.
 
 ---
 
+## Team Member Management
+
+### 1. Create Team Member
+Creates a new team member record.
+
+**Endpoint:** `POST /team-members`
+
+**Request Body:**
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| name | string | Yes | - | Team member full name |
+| email | string | No | null | Contact email address |
+| number / phoneNumber | string | No | null | Primary phone number |
+| whatsappNumber / whatsapp_number | string | No | null | WhatsApp contact number |
+| address | string | No | null | Physical address |
+| designation | string | No | null | Job title / designation |
+| department | string | No | designation | Department name (defaults to designation) |
+| employmentType / type_of_employment | string | No | null | Employment type (`full-time`, `internship`, `freelance`) |
+| hireDate / hire_date | string (YYYY-MM-DD) | No | null | Date of hire |
+| managerReportTo / manager_report_to | string | No | null | Manager name / reporting manager |
+| status | string | No | null | Employment status (e.g. `active`, `inactive`, default: null) |
+| assignedWorks / assigned_works | array / string | No | null | Multiple assigned works/tasks (default: null) |
+| clientHandling / client_handling | array / string | No | null | Managed client names or IDs (default: null) |
+
+**Example Request:**
+```json
+{
+  "name": "Sarah Connor",
+  "email": "sarah.connor@example.com",
+  "number": "+1234567890",
+  "whatsappNumber": "+1234567890",
+  "address": "123 Tech Park, Suite 400, San Francisco, CA",
+  "designation": "Senior Frontend Developer",
+  "department": "Engineering",
+  "employmentType": "full-time",
+  "hireDate": "2024-03-15",
+  "managerReportTo": "John Doe",
+  "status": null,
+  "assignedWorks": ["UI Refactoring", "Design System"],
+  "clientHandling": null
+}
+```
+
+**Success Response (201 Created):**
+```json
+{
+  "success": true,
+  "message": "Team member added successfully",
+  "data": {
+    "id": 1,
+    "name": "Sarah Connor",
+    "email": "sarah.connor@example.com",
+    "number": "+1234567890",
+    "whatsappNumber": "+1234567890",
+    "address": "123 Tech Park, Suite 400, San Francisco, CA",
+    "designation": "Senior Frontend Developer",
+    "department": "Engineering",
+    "employmentType": "full-time",
+    "hireDate": "2024-03-15",
+    "managerReportTo": "John Doe",
+    "status": null,
+    "assignedWorks": "[\"UI Refactoring\",\"Design System\"]",
+    "clientHandling": null,
+    "createdAt": "2026-08-20T12:00:00.000Z",
+    "updatedAt": "2026-08-20T12:00:00.000Z"
+  }
+}
+```
+
+---
+
+### 2. Get All Team Members
+Retrieves all team members ordered by creation date (newest first).
+
+**Endpoint:** `GET /team-members`
+
+**Success Response (200 OK):**
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": 1,
+      "name": "Sarah Connor",
+      "email": "sarah.connor@example.com",
+      "designation": "Senior Frontend Developer",
+      "department": "Engineering",
+      "employmentType": "full-time",
+      "status": null
+    }
+  ]
+}
+```
+
+---
+
+### 3. Get Team Member by ID
+Retrieves a single team member by ID.
+
+**Endpoint:** `GET /team-members/:id`
+
+**Success Response (200 OK):**
+```json
+{
+  "success": true,
+  "data": {
+    "id": 1,
+    "name": "Sarah Connor",
+    "email": "sarah.connor@example.com",
+    "number": "+1234567890",
+    "whatsappNumber": "+1234567890",
+    "address": "123 Tech Park, Suite 400, San Francisco, CA",
+    "designation": "Senior Frontend Developer",
+    "department": "Engineering",
+    "employmentType": "full-time",
+    "hireDate": "2024-03-15",
+    "managerReportTo": "John Doe",
+    "status": null,
+    "assignedWorks": "[\"UI Refactoring\",\"Design System\"]",
+    "clientHandling": null
+  }
+}
+```
+
+---
+
+### 4. Update Team Member
+Updates an existing team member record.
+
+**Endpoint:** `PUT /team-members/:id`
+
+**Example Request:**
+```json
+{
+  "status": "active",
+  "clientHandling": ["Acme Corp", "Global Tech"],
+  "assignedWorks": ["UI Refactoring", "API Integration"]
+}
+```
+
+**Success Response (200 OK):**
+```json
+{
+  "success": true,
+  "message": "Team member updated successfully",
+  "data": {
+    "id": 1,
+    "status": "active",
+    "clientHandling": "[\"Acme Corp\",\"Global Tech\"]",
+    "assignedWorks": "[\"UI Refactoring\",\"API Integration\"]"
+  }
+}
+```
+
+---
+
+### 5. Delete Team Member
+Permanently deletes a team member record.
+
+**Endpoint:** `DELETE /team-members/:id`
+
+**Success Response (200 OK):**
+```json
+{
+  "success": true,
+  "message": "Team member deleted successfully"
+}
+```
+
+---
+
+## Data Model: Team Member
+
+| Field | Type | Constraints | Description |
+|-------|------|-------------|-------------|
+| id | INTEGER | PK, Auto-increment | Unique identifier |
+| name | STRING | NOT NULL | Member full name |
+| email | STRING | NULLABLE | Contact email address |
+| number | STRING | NULLABLE | Primary phone number |
+| whatsappNumber | STRING | NULLABLE | WhatsApp contact number |
+| address | STRING | NULLABLE | Physical address |
+| designation | STRING | NULLABLE | Job title / designation |
+| department | STRING | NULLABLE | Department name (defaults to designation) |
+| employmentType | STRING | NULLABLE | Employment type (`full-time`, `internship`, `freelance`) |
+| hireDate | DATEONLY | NULLABLE | Hiring date |
+| managerReportTo | STRING | NULLABLE | Manager name / ID |
+| status | STRING | NULLABLE, DEFAULT null | Status (`active` or not, default null) |
+| assignedWorks | TEXT | NULLABLE, DEFAULT null | Assigned works (stored as JSON/text) |
+| clientHandling | TEXT | NULLABLE, DEFAULT null | Handled clients (stored as JSON/text) |
+| createdAt | TIMESTAMP | DEFAULT NOW() | Record creation timestamp |
+| updatedAt | TIMESTAMP | DEFAULT NOW() | Last update timestamp |
+
+**Table Name:** `team_members`
+
+---
+
 ## Data Model: Client
 
 | Field | Type | Constraints | Description |
