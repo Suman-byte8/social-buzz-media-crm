@@ -10,6 +10,7 @@ const navItems = [
   { label: "Clients", href: "/clients", icon: "group" },
   { label: "Content Calendar", href: "/calendar", icon: "calendar_month" },
   { label: "Tasks", href: "/tasks", icon: "assignment" },
+  { label: "Team", href: "/team", icon: "people" },
   { label: "Invoices", href: "/invoices", icon: "receipt_long" },
   { label: "Agreements", href: "/agreements", icon: "description" },
   { label: "Meeting Notes", href: "/notes", icon: "event_note" },
