@@ -23,19 +23,42 @@ Creates a new client record.
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | name | string | Yes | Client name |
-| category | string | No | Client category (e.g., Enterprise, SMB, Individual) |
-| responsibleUserId | integer | No | ID of user responsible for this client |
-| renewalDate | string (ISO 8601) | No | Contract renewal date |
-| invoiceNumber | string | No | Invoice reference number |
+| industry | string | No | Client industry (e.g., Technology, Healthcare, Retail) |
+| phoneNumber | string | No | Primary phone number |
+| whatsappNumber | string | No | WhatsApp contact number |
+| address | string | No | Client address |
+| email | string | No | Client email address |
+| servicesSelected | string | No | Services selected by the client (stored as text/JSON) |
+| clientManagedBy | integer | No | ID of user managing this client |
+| clientHealth | integer | No | Client health score (0-100) |
+| proposals | string | No | Proposals related to the client (stored as text/JSON) |
+| credentials | string | No | Client credentials (stored as text/JSON) |
+| campaigns | string | No | Campaigns associated with the client (stored as text/JSON) |
+| socialMediaAccounts | string | No | Social media accounts for the client (stored as text/JSON) |
+| reports | string | No | Reports related to the client (stored as text/JSON) |
+| invoices | string | No | Invoices for the client (stored as text/JSON) |
+| notes | string | No | Additional notes about the client |
+| renewal | string (ISO 8601) | No | Contract renewal date |
+| contentCalendar | string | No | Content calendar data (stored as text/JSON) |
 
 **Example Request:**
 ```json
 {
   "name": "Acme Corporation",
-  "category": "Enterprise",
-  "responsibleUserId": 1,
-  "renewalDate": "2026-12-31",
-  "invoiceNumber": "INV-2026-001"
+  "industry": "Technology",
+  "phoneNumber": "+1-555-123-4567",
+  "whatsappNumber": "+1-555-123-4567",
+  "address": "123 Tech Blvd, San Francisco, CA",
+  "email": "contact@acme.com",
+  "servicesSelected": "Social Media Management, SEO, PPC",
+  "clientManagedBy": 1,
+  "clientHealth": 85,
+  "proposals": "Q4 Marketing Strategy",
+  "campaigns": "Holiday Sale 2026",
+  "socialMediaAccounts": "Instagram: @acme, Twitter: @acme_corp",
+  "notes": "Key account - priority support",
+  "renewal": "2026-12-31",
+  "contentCalendar": "Monthly content plan for Aug-Dec 2026"
 }
 ```
 
@@ -47,10 +70,23 @@ Creates a new client record.
   "data": {
     "id": 1,
     "name": "Acme Corporation",
-    "category": "Enterprise",
-    "responsibleUserId": 1,
-    "renewalDate": "2026-12-31T00:00:00.000Z",
-    "invoiceNumber": "INV-2026-001",
+    "industry": "Technology",
+    "phoneNumber": "+1-555-123-4567",
+    "whatsappNumber": "+1-555-123-4567",
+    "address": "123 Tech Blvd, San Francisco, CA",
+    "email": "contact@acme.com",
+    "servicesSelected": "Social Media Management, SEO, PPC",
+    "clientManagedBy": 1,
+    "clientHealth": 85,
+    "proposals": "Q4 Marketing Strategy",
+    "credentials": null,
+    "campaigns": "Holiday Sale 2026",
+    "socialMediaAccounts": "Instagram: @acme, Twitter: @acme_corp",
+    "reports": null,
+    "invoices": null,
+    "notes": "Key account - priority support",
+    "renewal": "2026-12-31T00:00:00.000Z",
+    "contentCalendar": "Monthly content plan for Aug-Dec 2026",
     "createdAt": "2026-08-19T11:20:30.000Z",
     "updatedAt": "2026-08-19T11:20:30.000Z"
   }
@@ -78,10 +114,23 @@ Retrieves all clients ordered by creation date (newest first).
     {
       "id": 1,
       "name": "Acme Corporation",
-      "category": "Enterprise",
-      "responsibleUserId": 1,
-      "renewalDate": "2026-12-31T00:00:00.000Z",
-      "invoiceNumber": "INV-2026-001",
+      "industry": "Technology",
+      "phoneNumber": "+1-555-123-4567",
+      "whatsappNumber": "+1-555-123-4567",
+      "address": "123 Tech Blvd, San Francisco, CA",
+      "email": "contact@acme.com",
+      "servicesSelected": "Social Media Management, SEO, PPC",
+      "clientManagedBy": 1,
+      "clientHealth": 85,
+      "proposals": "Q4 Marketing Strategy",
+      "credentials": null,
+      "campaigns": "Holiday Sale 2026",
+      "socialMediaAccounts": "Instagram: @acme, Twitter: @acme_corp",
+      "reports": null,
+      "invoices": null,
+      "notes": "Key account - priority support",
+      "renewal": "2026-12-31T00:00:00.000Z",
+      "contentCalendar": "Monthly content plan for Aug-Dec 2026",
       "createdAt": "2026-08-19T11:20:30.000Z",
       "updatedAt": "2026-08-19T11:20:30.000Z"
     }
@@ -108,10 +157,23 @@ Retrieves a single client by its ID.
   "data": {
     "id": 1,
     "name": "Acme Corporation",
-    "category": "Enterprise",
-    "responsibleUserId": 1,
-    "renewalDate": "2026-12-31T00:00:00.000Z",
-    "invoiceNumber": "INV-2026-001",
+    "industry": "Technology",
+    "phoneNumber": "+1-555-123-4567",
+    "whatsappNumber": "+1-555-123-4567",
+    "address": "123 Tech Blvd, San Francisco, CA",
+    "email": "contact@acme.com",
+    "servicesSelected": "Social Media Management, SEO, PPC",
+    "clientManagedBy": 1,
+    "clientHealth": 85,
+    "proposals": "Q4 Marketing Strategy",
+    "credentials": null,
+    "campaigns": "Holiday Sale 2026",
+    "socialMediaAccounts": "Instagram: @acme, Twitter: @acme_corp",
+    "reports": null,
+    "invoices": null,
+    "notes": "Key account - priority support",
+    "renewal": "2026-12-31T00:00:00.000Z",
+    "contentCalendar": "Monthly content plan for Aug-Dec 2026",
     "createdAt": "2026-08-19T11:20:30.000Z",
     "updatedAt": "2026-08-19T11:20:30.000Z"
   }
@@ -138,16 +200,31 @@ Updates an existing client record. All fields are optional.
 | Field | Type | Description |
 |-------|------|-------------|
 | name | string | Client name |
-| category | string | Client category |
-| responsibleUserId | integer | Responsible user ID |
-| renewalDate | string (ISO 8601) | Contract renewal date |
-| invoiceNumber | string | Invoice reference number |
+| industry | string | Client industry |
+| phoneNumber | string | Primary phone number |
+| whatsappNumber | string | WhatsApp contact number |
+| address | string | Client address |
+| email | string | Client email address |
+| servicesSelected | string | Services selected by the client |
+| clientManagedBy | integer | ID of user managing this client |
+| clientHealth | integer | Client health score (0-100) |
+| proposals | string | Proposals related to the client |
+| credentials | string | Client credentials |
+| campaigns | string | Campaigns associated with the client |
+| socialMediaAccounts | string | Social media accounts |
+| reports | string | Reports related to the client |
+| invoices | string | Invoices for the client |
+| notes | string | Additional notes |
+| renewal | string (ISO 8601) | Contract renewal date |
+| contentCalendar | string | Content calendar data |
 
 **Example Request:**
 ```json
 {
-  "category": "SMB",
-  "renewalDate": "2027-06-30"
+  "clientHealth": 92,
+  "notes": "Client satisfaction improved after Q3 review",
+  "renewal": "2027-06-30",
+  "campaigns": "Holiday Sale 2026, New Year Promo"
 }
 ```
 
@@ -159,10 +236,23 @@ Updates an existing client record. All fields are optional.
   "data": {
     "id": 1,
     "name": "Acme Corporation",
-    "category": "SMB",
-    "responsibleUserId": 1,
-    "renewalDate": "2027-06-30T00:00:00.000Z",
-    "invoiceNumber": "INV-2026-001",
+    "industry": "Technology",
+    "phoneNumber": "+1-555-123-4567",
+    "whatsappNumber": "+1-555-123-4567",
+    "address": "123 Tech Blvd, San Francisco, CA",
+    "email": "contact@acme.com",
+    "servicesSelected": "Social Media Management, SEO, PPC",
+    "clientManagedBy": 1,
+    "clientHealth": 92,
+    "proposals": "Q4 Marketing Strategy",
+    "credentials": null,
+    "campaigns": "Holiday Sale 2026, New Year Promo",
+    "socialMediaAccounts": "Instagram: @acme, Twitter: @acme_corp",
+    "reports": null,
+    "invoices": null,
+    "notes": "Client satisfaction improved after Q3 review",
+    "renewal": "2027-06-30T00:00:00.000Z",
+    "contentCalendar": "Monthly content plan for Aug-Dec 2026",
     "createdAt": "2026-08-19T11:20:30.000Z",
     "updatedAt": "2026-08-19T11:35:45.000Z"
   }
@@ -205,10 +295,23 @@ Permanently deletes a client record.
 |-------|------|-------------|-------------|
 | id | INTEGER | PK, Auto-increment | Unique identifier |
 | name | STRING | NOT NULL | Client name |
-| category | STRING | NULLABLE | Client category |
-| responsibleUserId | INTEGER | NULLABLE | References User.id (FK - not enforced) |
-| renewalDate | DATE | NULLABLE | Contract renewal date |
-| invoiceNumber | STRING | NULLABLE | Invoice reference |
+| industry | STRING | NULLABLE | Client industry |
+| phoneNumber | STRING | NULLABLE | Primary phone number |
+| whatsappNumber | STRING | NULLABLE | WhatsApp contact number |
+| address | STRING | NULLABLE | Client address |
+| email | STRING | NULLABLE | Client email address |
+| servicesSelected | TEXT | NULLABLE | Services selected (stored as text/JSON) |
+| clientManagedBy | INTEGER | NULLABLE | References User.id (FK - not enforced) |
+| clientHealth | INTEGER | NULLABLE, 0-100 | Client health score |
+| proposals | TEXT | NULLABLE | Proposals (stored as text/JSON) |
+| credentials | TEXT | NULLABLE | Credentials (stored as text/JSON) |
+| campaigns | TEXT | NULLABLE | Campaigns (stored as text/JSON) |
+| socialMediaAccounts | TEXT | NULLABLE | Social media accounts (stored as text/JSON) |
+| reports | TEXT | NULLABLE | Reports (stored as text/JSON) |
+| invoices | TEXT | NULLABLE | Invoices (stored as text/JSON) |
+| notes | TEXT | NULLABLE | Additional notes |
+| renewal | DATE | NULLABLE | Contract renewal date |
+| contentCalendar | TEXT | NULLABLE | Content calendar (stored as text/JSON) |
 | createdAt | TIMESTAMP | DEFAULT NOW() | Record creation timestamp |
 | updatedAt | TIMESTAMP | DEFAULT NOW() | Last update timestamp |
 
@@ -218,19 +321,23 @@ Permanently deletes a client record.
 
 ## Important Notes
 
-1. **Foreign Key Constraint:** The `responsibleUserId` field references a `User` table that doesn't exist yet. The FK constraint is defined in the model but not enforced at DB level until User model is created.
+1. **Foreign Key Constraint:** The `clientManagedBy` field references a `User` table that doesn't exist yet. The FK constraint is defined in the model but not enforced at DB level until User model is created.
 
 2. **Timestamps:** `createdAt` and `updatedAt` are automatically managed by Sequelize.
 
 3. **Date Format:** All date fields accept and return ISO 8601 format (e.g., `2026-12-31` or `2026-12-31T00:00:00.000Z`).
 
-4. **Soft Deletes:** Not implemented. `DELETE` permanently removes the record.
+4. **Client Health:** The `clientHealth` field is validated to be between 0 and 100.
 
-5. **Validation:** Only `name` is validated as required. Add more validation as needed.
+5. **Text/JSON Fields:** Fields like `servicesSelected`, `proposals`, `credentials`, `campaigns`, `socialMediaAccounts`, `reports`, `invoices`, and `contentCalendar` are stored as TEXT but can hold JSON strings for structured data.
 
-6. **Pagination:** Not implemented for `GET /clients`. Will be added when dataset grows.
+6. **Soft Deletes:** Not implemented. `DELETE` permanently removes the record.
 
-7. **Rate Limiting:** Not implemented. Consider adding for production.
+7. **Validation:** Only `name` is validated as required. Add more validation as needed.
+
+8. **Pagination:** Not implemented for `GET /clients`. Will be added when dataset grows.
+
+9. **Rate Limiting:** Not implemented. Consider adding for production.
 
 ---
 
