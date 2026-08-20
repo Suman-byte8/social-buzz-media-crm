@@ -1,74 +1,185 @@
 import express from 'express';
+import { Op } from 'sequelize';
 
 const router = express.Router();
+
+// Helper to format array fields
+const formatArrayFields = (data) => ({
+  ...data,
+  servicesSelected: data.servicesSelected ? data.servicesSelected.split(',').filter(Boolean) : [],
+  proposals: data.proposals ? data.proposals.split(',').filter(Boolean) : [],
+  credentials: data.credentials ? JSON.parse(data.credentials) : {},
+  campaigns: data.campaigns ? data.campaigns.split(',').filter(Boolean) : [],
+  socialMediaAccounts: data.socialMediaAccounts ? data.socialMediaAccounts.split(',').filter(Boolean) : [],
+  reports: data.reports ? data.reports.split(',').filter(Boolean) : [],
+  invoices: data.invoices ? data.invoices.split(',').filter(Boolean) : [],
+  contentCalendar: data.contentCalendar ? data.contentCalendar.split(',').filter(Boolean) : [],
+});
+
+// Helper to prepare data for DB
+const prepareClientData = (body) => ({
+  name: body.name,
+  industry: body.industry,
+  phoneNumber: body.phoneNumber,
+  whatsappNumber: body.whatsappNumber,
+  address: body.address,
+  email: body.email,
+  servicesSelected: body.servicesSelected ? body.servicesSelected.join(',') : null,
+  clientManagedBy: body.clientManagedBy,
+  clientHealth: body.clientHealth,
+  proposals: body.proposals ? body.proposals.join(',') : null,
+  credentials: body.credentials ? JSON.stringify(body.credentials) : null,
+  campaigns: body.campaigns ? body.campaigns.join(',') : null,
+  socialMediaAccounts: body.socialMediaAccounts ? body.socialMediaAccounts.join(',') : null,
+  reports: body.reports ? body.reports.join(',') : null,
+  invoices: body.invoices ? body.invoices.join(',') : null,
+  notes: body.notes,
+  renewal: body.renewal ? new Date(body.renewal) : null,
+  contentCalendar: body.contentCalendar ? body.contentCalendar.join(',') : null,
+});
 
 // POST /api/clients - Create a new client
 router.post('/clients', async (req, res) => {
   try {
     const { Client } = req.app.locals.models;
-    const {
-      name,
-      industry,
-      phoneNumber,
-      whatsappNumber,
-      address,
-      email,
-      servicesSelected,
-      clientManagedBy,
-      clientHealth,
-      proposals,
-      credentials,
-      campaigns,
-      socialMediaAccounts,
-      reports,
-      invoices,
-      notes,
-      renewal,
-      contentCalendar
-    } = req.body;
+    const clientData = prepareClientData(req.body);
 
-    if (!name) {
+    if (!clientData.name) {
       return res.status(400).json({ success: false, message: 'Client name is required' });
     }
 
-    const clientData = {
-      name,
-      industry,
-      phoneNumber,
-      whatsappNumber,
-      address,
-      email,
-      servicesSelected: servicesSelected ? servicesSelected.join(',') : null,
-      clientManagedBy: clientManagedBy || 0,
-      clientHealth: clientHealth || 0,
-      proposals: proposals ? proposals.join(',') : null,
-      credentials: credentials ? JSON.stringify(credentials) : null,
-      campaigns: campaigns ? campaigns.join(',') : null,
-      socialMediaAccounts: socialMediaAccounts ? socialMediaAccounts.join(',') : null,
-      reports: reports ? reports.join(',') : null,
-      invoices: invoices ? invoices.join(',') : null,
-      notes,
-      renewal: renewal ? new Date(renewal) : null,
-      contentCalendar: contentCalendar ? contentCalendar.join(',') : null,
-    };
-
     const client = await Client.create(clientData);
-
-    res.status(201).json({ success: true, message: 'Client created successfully', data: client });
+    res.status(201).json({ success: true, message: 'Client created successfully', data: formatArrayFields(client.toJSON()) });
   } catch (error) {
     console.error('Error creating client:', error);
     res.status(500).json({ success: false, message: 'Error creating client', error: error.message });
   }
 });
 
-// GET /api/clients - Get all clients
+// GET /api/clients - Get all clients with pagination, search, sort
 router.get('/clients', async (req, res) => {
   try {
     const { Client } = req.app.locals.models;
-    const clients = await Client.findAll({ order: [['createdAt', 'DESC']] });
-    res.json({ success: true, data: clients });
+    const {
+      page = 1,
+      limit = 10,
+      search = '',
+      sortBy = 'createdAt',
+      sortOrder = 'DESC',
+      industry,
+      healthMin,
+      healthMax,
+    } = req.query;
+
+    const offset = (page - 1) * limit;
+    const where = {};
+
+    if (search) {
+      where[Op.or] = [
+        { name: { [Op.iLike]: `%${search}%` } },
+        { email: { [Op.iLike]: `%${search}%` } },
+        { industry: { [Op.iLike]: `%${search}%` } },
+      ];
+    }
+
+    if (industry) where.industry = industry;
+    if (healthMin || healthMax) {
+      where.clientHealth = {};
+      if (healthMin) where.clientHealth[Op.gte] = parseInt(healthMin);
+      if (healthMax) where.clientHealth[Op.lte] = parseInt(healthMax);
+    }
+
+    const { count, rows } = await Client.findAndCountAll({
+      where,
+      order: [[sortBy, sortOrder.toUpperCase()]],
+      limit: parseInt(limit),
+      offset: parseInt(offset),
+    });
+
+    const formattedRows = rows.map((c) => formatArrayFields(c.toJSON()));
+
+    res.json({
+      success: true,
+      data: formattedRows,
+      pagination: {
+        total: count,
+        page: parseInt(page),
+        limit: parseInt(limit),
+        totalPages: Math.ceil(count / limit),
+      },
+    });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Error fetching clients', error: error.message });
+  }
+});
+
+// GET /api/clients/export - Export clients to CSV
+router.get('/clients/export', async (req, res) => {
+  try {
+    const { Client } = req.app.locals.models;
+    const { search = '', industry, healthMin, healthMax } = req.query;
+
+    const where = {};
+    if (search) {
+      where[Op.or] = [
+        { name: { [Op.iLike]: `%${search}%` } },
+        { email: { [Op.iLike]: `%${search}%` } },
+        { industry: { [Op.iLike]: `%${search}%` } },
+      ];
+    }
+    if (industry) where.industry = industry;
+    if (healthMin || healthMax) {
+      where.clientHealth = {};
+      if (healthMin) where.clientHealth[Op.gte] = parseInt(healthMin);
+      if (healthMax) where.clientHealth[Op.lte] = parseInt(healthMax);
+    }
+
+    const clients = await Client.findAll({
+      where,
+      order: [['createdAt', 'DESC']],
+    });
+
+    const headers = [
+      'ID', 'Name', 'Industry', 'Phone Number', 'WhatsApp Number', 'Address', 'Email',
+      'Services Selected', 'Managed By', 'Client Health', 'Proposals', 'Credentials',
+      'Campaigns', 'Social Media Accounts', 'Reports', 'Invoices', 'Notes',
+      'Renewal Date', 'Content Calendar', 'Created At', 'Updated At'
+    ];
+
+    const rows = clients.map((c) => {
+      const d = c.toJSON();
+      return [
+        d.id,
+        d.name,
+        d.industry || '',
+        d.phoneNumber || '',
+        d.whatsappNumber || '',
+        d.address || '',
+        d.email || '',
+        d.servicesSelected || '',
+        d.clientManagedBy || '',
+        d.clientHealth || '',
+        d.proposals || '',
+        d.credentials || '',
+        d.campaigns || '',
+        d.socialMediaAccounts || '',
+        d.reports || '',
+        d.invoices || '',
+        d.notes || '',
+        d.renewal ? new Date(d.renewal).toISOString().split('T')[0] : '',
+        d.contentCalendar || '',
+        d.createdAt ? new Date(d.createdAt).toISOString() : '',
+        d.updatedAt ? new Date(d.updatedAt).toISOString() : '',
+      ];
+    });
+
+    const csv = [headers.join(','), ...rows.map((r) => r.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(','))].join('\n');
+
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename="clients-export-${new Date().toISOString().split('T')[0]}.csv"`);
+    res.send(csv);
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Error exporting clients', error: error.message });
   }
 });
 
@@ -80,7 +191,7 @@ router.get('/clients/:id', async (req, res) => {
     if (!client) {
       return res.status(404).json({ success: false, message: 'Client not found' });
     }
-    res.json({ success: true, data: client });
+    res.json({ success: true, data: formatArrayFields(client.toJSON()) });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Error fetching client', error: error.message });
   }
@@ -95,51 +206,10 @@ router.put('/clients/:id', async (req, res) => {
       return res.status(404).json({ success: false, message: 'Client not found' });
     }
 
-    const {
-      name,
-      industry,
-      phoneNumber,
-      whatsappNumber,
-      address,
-      email,
-      servicesSelected,
-      clientManagedBy,
-      clientHealth,
-      proposals,
-      credentials,
-      campaigns,
-      socialMediaAccounts,
-      reports,
-      invoices,
-      notes,
-      renewal,
-      contentCalendar
-    } = req.body;
-
-    const updateData = {
-      name: name ?? client.name,
-      industry: industry ?? client.industry,
-      phoneNumber: phoneNumber ?? client.phoneNumber,
-      whatsappNumber: whatsappNumber ?? client.whatsappNumber,
-      address: address ?? client.address,
-      email: email ?? client.email,
-      servicesSelected: servicesSelected !== undefined ? servicesSelected.join(',') : client.servicesSelected,
-      clientManagedBy: clientManagedBy ?? client.clientManagedBy,
-      clientHealth: clientHealth ?? client.clientHealth,
-      proposals: proposals !== undefined ? proposals.join(',') : client.proposals,
-      credentials: credentials ? JSON.stringify(credentials) : client.credentials,
-      campaigns: campaigns !== undefined ? campaigns.join(',') : client.campaigns,
-      socialMediaAccounts: socialMediaAccounts !== undefined ? socialMediaAccounts.join(',') : client.socialMediaAccounts,
-      reports: reports !== undefined ? reports.join(',') : client.reports,
-      invoices: invoices !== undefined ? invoices.join(',') : client.invoices,
-      notes: notes ?? client.notes,
-      renewal: renewal !== undefined ? new Date(renewal) : client.renewal,
-      contentCalendar: contentCalendar !== undefined ? contentCalendar.join(',') : client.contentCalendar,
-    };
-
+    const updateData = prepareClientData(req.body);
     await client.update(updateData);
 
-    res.json({ success: true, message: 'Client updated successfully', data: client });
+    res.json({ success: true, message: 'Client updated successfully', data: formatArrayFields(client.toJSON()) });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Error updating client', error: error.message });
   }
