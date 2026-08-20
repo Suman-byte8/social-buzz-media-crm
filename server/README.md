@@ -460,6 +460,104 @@ Permanently deletes a team member record.
 
 ---
 
+## Agency General Settings Management
+
+### 1. Get Agency Settings
+Retrieves agency basic details, logo, website, contact info, and GST number.
+
+**Endpoints:** `GET /settings` or `GET /settings/general`
+
+**Success Response (200 OK):**
+```json
+{
+  "success": true,
+  "data": {
+    "id": 1,
+    "logo": "https://example.com/logo.png",
+    "name": "Social Buzz Media Agency",
+    "email": "agency@socialbuzz.com",
+    "website": "https://socialbuzz.com",
+    "address": "456 Media Avenue, New York, NY",
+    "gstNumber": "22AAAAA0000A1Z5",
+    "password": "hashed_or_plain_password",
+    "createdAt": "2026-08-20T12:00:00.000Z",
+    "updatedAt": "2026-08-20T12:00:00.000Z"
+  }
+}
+```
+
+---
+
+### 2. Update Agency Settings
+Creates or updates the agency basic details.
+
+**Endpoints:** `PUT /settings`, `PUT /settings/general`, `POST /settings`, `POST /settings/general`
+
+**Request Body:**
+| Field | Type | Description |
+|-------|------|-------------|
+| logo | string | Agency logo image URL or path |
+| name | string | Agency name |
+| email | string | Agency contact email |
+| website | string | Agency official website URL |
+| address | string | Agency physical address |
+| gstNumber / gst_number | string | Agency GST registration number |
+| password | string | Agency password / credential |
+
+**Example Request:**
+```json
+{
+  "logo": "https://example.com/assets/logo.png",
+  "name": "Social Buzz Media Agency",
+  "email": "contact@socialbuzzmedia.com",
+  "website": "https://socialbuzzmedia.com",
+  "address": "100 Marketing Blvd, Suite 200, Los Angeles, CA",
+  "gstNumber": "07AABCS1429B1Z0",
+  "password": "SecurePassword123!"
+}
+```
+
+**Success Response (200 OK):**
+```json
+{
+  "success": true,
+  "message": "Agency settings updated successfully",
+  "data": {
+    "id": 1,
+    "logo": "https://example.com/assets/logo.png",
+    "name": "Social Buzz Media Agency",
+    "email": "contact@socialbuzzmedia.com",
+    "website": "https://socialbuzzmedia.com",
+    "address": "100 Marketing Blvd, Suite 200, Los Angeles, CA",
+    "gstNumber": "07AABCS1429B1Z0",
+    "password": "SecurePassword123!",
+    "createdAt": "2026-08-20T12:00:00.000Z",
+    "updatedAt": "2026-08-20T13:00:00.000Z"
+  }
+}
+```
+
+---
+
+## Data Model: Agency Setting
+
+| Field | Type | Constraints | Description |
+|-------|------|-------------|-------------|
+| id | INTEGER | PK, Auto-increment | Settings record ID |
+| logo | STRING | NULLABLE | Agency logo image URL or path |
+| name | STRING | NULLABLE | Agency name |
+| email | STRING | NULLABLE | Agency email address |
+| website | STRING | NULLABLE | Agency website URL |
+| address | STRING | NULLABLE | Agency physical address |
+| gstNumber | STRING | NULLABLE | Agency GST number |
+| password | STRING | NULLABLE | Agency account password |
+| createdAt | TIMESTAMP | DEFAULT NOW() | Record creation timestamp |
+| updatedAt | TIMESTAMP | DEFAULT NOW() | Last update timestamp |
+
+**Table Name:** `agency_settings`
+
+---
+
 ## Data Model: Team Member
 
 | Field | Type | Constraints | Description |
