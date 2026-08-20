@@ -539,6 +539,58 @@ Creates or updates the agency basic details.
 
 ---
 
+### 3. Upload Agency Logo to Google Drive
+Uploads an image file (max 5MB limit) to Google Drive and sets public read access, storing the direct link in agency settings.
+
+**Endpoint:** `POST /settings/upload-logo`
+**Content-Type:** `multipart/form-data`
+
+**Form Body:**
+- `logo`: Image File (PNG, JPG, WEBP, SVG, Max 5MB)
+
+**Success Response (200 OK):**
+```json
+{
+  "success": true,
+  "message": "Logo uploaded to Google Drive successfully",
+  "logoUrl": "https://lh3.googleusercontent.com/d/FILE_ID",
+  "webViewLink": "https://drive.google.com/file/d/FILE_ID/view"
+}
+```
+
+---
+
+### 4. Verify Password Matching
+Verifies an entered password against the Bcrypt-hashed password stored in settings.
+
+**Endpoint:** `POST /settings/verify-password`
+**Content-Type:** `application/json`
+
+**Request Body:**
+```json
+{
+  "password": "PasswordToTest"
+}
+```
+
+**Success Response (200 OK):**
+```json
+{
+  "success": true,
+  "isMatch": true,
+  "message": "Password matches successfully"
+}
+```
+
+---
+
+### 5. Google Drive Logo Stream Proxy
+Proxies Google Drive file streams directly to render logo images in HTML `<img>` tags without CORS or authentication issues.
+
+**Endpoint:** `GET /settings/logo-proxy/:fileId`
+
+---
+
 ## Data Model: Agency Setting
 
 | Field | Type | Constraints | Description |

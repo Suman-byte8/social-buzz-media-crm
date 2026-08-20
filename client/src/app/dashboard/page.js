@@ -30,13 +30,13 @@ export default function DashboardPage() {
           <button className="hidden sm:block font-label-md text-label-md text-on-surface-variant hover:text-primary transition-colors cursor-pointer active:opacity-80 px-3 py-1.5 border border-transparent hover:border-outline-variant rounded-md">
             Support
           </button>
-          <div className="w-8 h-8 rounded-full bg-primary/10 border border-primary/20 overflow-hidden cursor-pointer flex items-center justify-center flex-shrink-0">
-            <img
-              alt="User Avatar"
-              className="w-full h-full object-cover"
-              src="https://lh3.googleusercontent.com/aida-public/AB6AXuAxlCty2_Af9penWh8MVBtpGsaID39zkGrL7kmIc4vLkblF2BMIMlib6JsASuRUEMp1wnvlFrcCYbM9vvixr3qmOG-nPGfbJQ4we5BahPggWzl0O6MaLu-1O2bNfPB9JFl0NylOMHfiVAbcfinXQvlCn6e4iMB20zLM8i6U33NB9bXnY2AURtsOQiZCSFZ0_jacv17Dh2P9atcNUyke1PTir5rr92R6ONW5WIvK0ommKm5T7uaxOyYm"
-            />
-          </div>
+              <div className="w-8 h-8 rounded-full bg-primary/10 border border-primary/20 overflow-hidden cursor-pointer flex items-center justify-center flex-shrink-0">
+                <img
+                  alt="User Avatar"
+                  className="w-full h-full object-cover"
+                  src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80"
+                />
+              </div>
         </div>
       </header>
 
@@ -118,7 +118,7 @@ export default function DashboardPage() {
                   <img
                     alt="Creative director headshot"
                     className="w-full h-full object-cover"
-                    src="https://lh3.googleusercontent.com/aida-public/AB6AXuDu_sKLgGQA1hqeBFPSSEddYGdO6axVW3bPceSCHWo6sWsgqGcrblNlAWR7HsB861X909hqO6yFYly61TqqbDACdU-_cIv5NXZ8I4GmglcpcKfkZye38N56cjCfZHOEu9sKOJp4wssvN3M44b2wlQlfuIWsNOYXpcZRxWNDyaJI4tEby-Xbj2cgyyLde8aKM8wG3mXzjuk_AgxtuxXFXRrXr_XRu-bKhDp-B2mJh5YGEJSDtEjranZr"
+                    src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&auto=format&fit=crop&q=80"
                   />
                 </div>
                 <div className="flex-1">
@@ -145,7 +145,7 @@ export default function DashboardPage() {
                   <img
                     alt="Media buyer headshot"
                     className="w-full h-full object-cover"
-                    src="https://lh3.googleusercontent.com/aida-public/AB6AXuDm-TxcBtXV04OukvPN3gXxIUyQbw26sWK_DeC07IuiAWwdVzBUStINUpKSKyBejRrSEdxjbhL1vCK8d_CTFlZyS-TORHxqPUL-oC5CxD2FN4w-eRILVkrHWFxOocloNVmYg0EYBZGTIyDyqLfypNZdL3hTLDr6k-P2iur5XfM5WZqClWVtZnGD2Eb45OAAkcWh9YlE6WPWN9iTLsjTpUzbXzhxD8DJFvIcnt3WYn3wgY9MjnPtonJA"
+                    src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80"
                   />
                 </div>
                 <div className="flex-1">
@@ -172,7 +172,7 @@ export default function DashboardPage() {
                   <img
                     alt="SEO specialist headshot"
                     className="w-full h-full object-cover"
-                    src="https://lh3.googleusercontent.com/aida-public/AB6AXuAYmaoJlQxN6hdNvJ7MPyGUPXWdFOd44h_T8vqO2F931BBEbM9iE2R6-9GSM7tjm8GU2bYMH2lhbGHD304VOPfJ5OU2nLSk7m9qH3dYBJV6jIzGkS73Sin1bdRKveKo4x_xAx7a_N6wgySV1hZywW7WTYid9KaQI6GEUR5prgUUaSMQvJzRvWncGL_srs8McYktfVomL4XHQDrdFI1NKaXnqt9yUyPJDeWaR11igRDhpP-0jqMfX04H"
+                    src="https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=80"
                   />
                 </div>
                 <div className="flex-1">
@@ -199,7 +199,7 @@ export default function DashboardPage() {
                   <img
                     alt="Copywriter headshot"
                     className="w-full h-full object-cover"
-                    src="https://lh3.googleusercontent.com/aida-public/AB6AXuDx8nK1LqT1siqkZCAaLZfm2bhveds-LVFwHCeeWGpUAetclge9puSRvjM9MPus2WkVykvZ84c9VefSD8edHSCwga6IBg9TGngf6qVnIRexviC3NhlZdKJXJdQQ84pztVOTXorLZUM_eO_RwmHZ90Hm6yybjWuwsBVmeXHJieqU5TvXDdagyBfIdFrrZb6lRBJ0oGt7YLrtE2hH5XqL1RgA3m_DC7ZFhbUteZKjPZa4XeSqni1P3RGn"
+                    src="https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80"
                   />
                 </div>
                 <div className="flex-1">

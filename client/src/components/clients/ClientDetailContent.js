@@ -38,7 +38,7 @@ export default function ClientDetailContent({ activeTab, setActiveTab }) {
             <img
               alt="Client Logo"
               className="w-full h-full object-contain p-2"
-              src="https://lh3.googleusercontent.com/aida-public/AB6AXuBUMQoB0SMxr8qMMl9zeXcWu3raW9GC_ucBcxuqbOCsfd160xsZbrmQgb-ZIVPxfXC0AIuHN-PKlGMUInsmBTr55TnogwmE_Jpyew7V1GXYw90JInNpRCj7QlkW9t7nVBZwGZBmfuI5ME_LJ1hSYhddpT2ALpiE40ekPR8PWy3XiuK73gE5O1zNhMsSmjjgE_AseaeWIILfIkqLfZiKI_y0ScgXyRCVO_J70e2dd7lJE_ewC8vUo5NA"
+              src="https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=150"
             />
           </div>
           <div className="flex flex-col">
@@ -148,7 +148,7 @@ export default function ClientDetailContent({ activeTab, setActiveTab }) {
                   <div className="w-10 h-10 rounded-full overflow-hidden bg-surface-variant shrink-0">
                     <img
                       className="w-full h-full object-cover"
-                      src="https://lh3.googleusercontent.com/aida-public/AB6AXuBolUJ8A0m46bOScKDdidROOGAoCjDG42Xs-JFYFkO9hCa_wLxvNZBOUAMdh-rsPoPN7T6SviBFzFflXmI1-LANRu_tjg8z_HTUdhAn426BxZeUQc9icH_YXwkaV_kp6V9V0zvUvnr0yPOx3hxoqziejPMRPQIisHLGLti-UXc8iR2PeIZZcPc4u46t9iuiwlgl1GmAvWfiNPblLi9ataaQ9P0Hc3N5Qe_2O9BWmiT1Sq_oxsEIBwgP"
+                      src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150"
                     />
                   </div>
                   <div className="flex flex-col">
@@ -391,7 +391,7 @@ export default function ClientDetailContent({ activeTab, setActiveTab }) {
                 <div className="w-10 h-10 rounded-full overflow-hidden bg-surface-variant shrink-0 border border-outline-variant">
                   <img
                     className="w-full h-full object-cover"
-                    src="https://lh3.googleusercontent.com/aida-public/AB6AXuAn60_lsRzyCRxMrk1b8v0BQBsQdlUWCg5lWqSvvR_a4FcjUED-0l6nXBhVxjMwFY5D4X8J9IZtWrkkOiDR485T219QniajJoKO3DsqGlnJ2h44bsTFBIPvaUksNqBJcYL3kZWmmYM01YWIL76DL4kJ1ooC1nb_ATI1VRiVuQIvk17LPVd5ex0Wfg47qsORebmL5tQ3qdnhGuy3IBL_LO6pQH4lsVcWOwp34SZ7HcduKTQp0kmAqCvv"
+                    src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150"
                   />
                 </div>
                 <div className="flex flex-col">
@@ -407,7 +407,7 @@ export default function ClientDetailContent({ activeTab, setActiveTab }) {
                 <div className="w-10 h-10 rounded-full overflow-hidden bg-surface-variant shrink-0 border border-outline-variant">
                   <img
                     className="w-full h-full object-cover"
-                    src="https://lh3.googleusercontent.com/aida-public/AB6AXuAmFKtFs8EN8ajchmch6OhJhkQ-8EzyYNydX92Or0RPs-cKC20hq8e-742b-vi5lTxCZ5cC_2Z5rugZPbk1DbPi4qy5FE5ORun1wwVW9SQ6j8r_V7YsNDzFEK31Y9S-sJYrIl5IIcxfjzsfl1fhUQ5gg1rLThhMV8oHCuBUvTgDLrtgW0A1W7RDi2KQM9PB8L28SucrIcLplnJ8YaSH10vuswDdfF_PGOjeRl5SURGFmeztXm4eq7G8"
+                    src="https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150"
                   />
                 </div>
                 <div className="flex flex-col">
@@ -423,7 +423,7 @@ export default function ClientDetailContent({ activeTab, setActiveTab }) {
                 <div className="w-10 h-10 rounded-full overflow-hidden bg-surface-variant shrink-0 border border-outline-variant">
                   <img
                     className="w-full h-full object-cover"
-                    src="https://lh3.googleusercontent.com/aida-public/AB6AXuCDXslWjztBiA-jbjqr7G0n7u4QLyJlGKLWrI1vqx3nkd5Xm3MFSkE2dtAZWICP_bYtX6C_HZqwavS2gHvBE3dN16TQGfUZq3Yt8BV0-Y_5Bz32gGSiZBTxRngGpqHlKnitId-tfNP68xl-O_ss0OyDmDKX-XdwRaN-ORne_MlU_Bn_SeiSnhW4dcrCxTUswMCAJuuFpG3-38hjClmZvftmLVO0MTrMPYwSCd89fII2dhxvJNPYq0S-"
+                    src="https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150"
                   />
                 </div>
                 <div className="flex flex-col">

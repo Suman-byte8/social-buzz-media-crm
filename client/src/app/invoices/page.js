@@ -28,7 +28,7 @@ export default function InvoicesPage() {
           <img
             className="w-20 h-20 rounded-lg object-contain bg-white border border-outline-variant p-2 shadow-sm"
             alt="Acme Corp Logo"
-            src="https://lh3.googleusercontent.com/aida-public/AB6AXuA5wFK0ShNfFGs-Ki5ZSv8ErUl4_JqoVGs1MaFGDea9JrYWUtFbIeSUPZfFxEnF2zjB8GtK0xuG4jrd9kA7DLYvFUaph_xnDqug6--5t4IY_qdIaJWc4syL7hjjxAiXXgqKcJFf6IeQgNTEhU6N9ecMZEfxL8gfPHhBj1O3AIv3qr0j4JW347inFTLZx4pjMj8LBciBnI0E1Qv0ZUlx36I2ZaDHkdOWKfpC4pO6YVgirNH2G47WiQmB"
+            src="https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=150"
           />
           <div className="flex-1">
             <div className="flex items-center gap-3 mb-1">

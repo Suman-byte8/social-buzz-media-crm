@@ -68,7 +68,7 @@ const page = () => {
                     data-alt="A sleek, modern graphic design mockup of a smartphone displaying a conceptual 3D product teaser with abstract geometric shapes and vibrant red accents on a crisp white background."
                     style={{
                       backgroundImage:
-                        "url('https://lh3.googleusercontent.com/aida-public/AB6AXuD6Gh22TgcTTh6UNKsdY6szODa2nrYFf14V_t4118T8lwWoRvdbvRzpolcHkxUDB2-5A5v95rypwko0fbSXtkjz9Jpzh5TXCzzFOG9wA360QkodfoF9MXwApMOwrTIckqU63aAxECZliSt67HT-6oBPPSEQuvHLMUqnmN0R0DAAky2bl_2WLoWBqgKmskEFbl9nmBc7fGd8m-7NiuJwTnMJ8AKrW7mLkE1O572HFzf8feU_SlML5UbG')",
+                        "url('https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=150')",
                     }}
                   ></div>
                 </div>
@@ -79,7 +79,7 @@ const page = () => {
                         alt="Assignee"
                         className="w-full h-full object-cover"
                         data-alt="A tiny avatar portrait of a creative director."
-                        src="https://lh3.googleusercontent.com/aida-public/AB6AXuCobRjaYmkifLkOGxfidxUi_lJUzzLWQCU8nJPm8j6GLRf-OIIBiSG82JAEzQMcCWibWJu_TrVbvjCYUU0UbRwyW7BODUrF3D2ek2BlVRw5w616P76OjdK3vzg2WKkIoFUGyKyjsKuQAQT-3JUwJ8KPmUDSVC_SwZfk7-LaxSPlrt74x5fD1SU2vYJkK03X1fmKwTw4FL09IErwH-iY4IaFZZsOOF9U7WDu-BdQqWhg73qUhLcx96rz"
+                        src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150"
                       />
                     </div>
                   </div>
@@ -171,7 +171,7 @@ const page = () => {
                     data-alt="A still frame from an energetic behind-the-scenes video showing a modern production crew setting up lights in a sleek corporate office, bright lighting, high contrast."
                     style={{
                       backgroundImage:
-                        "url('https://lh3.googleusercontent.com/aida-public/AB6AXuATnJLikYwgdeLveKWKnJ_Z-ElR-N03RmPwohHROJbVC6Y8Wua_tqFbB73VdnzLHi-oaPucVJvHnETdBlApA4ieHy8Qi-AS-V9srBVuVWIymBc8UiSBspUf9JpjCsyX5Nqb1fCNwMVtKV0JwbOW-3TEL9Ep7H_xJL5438ZJlJTTAaWeJIaYfrZVxyhqig1HeQB-Tsckpw3feUh01h4QeSG70LKUrDMF0NITANWP-RBwsbmt0-hhG52B')",
+                        "url('https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?w=150')",
                     }}
                   ></div>
                   <div className="absolute inset-0 flex items-center justify-center bg-black/20">

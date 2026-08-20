@@ -120,7 +120,7 @@ export default function TasksPage() {
                 <img
                   className="w-5 h-5 rounded-full object-cover border border-outline-variant"
                   alt="Assignee Avatar"
-                  src="https://lh3.googleusercontent.com/aida-public/AB6AXuBuui3xmEtg-KQPt9XNBJ30MKmJ3GMrDPUqVLPODe_d4hue9-PQUhcRM6So6fYlKTP5QFrNxH2ScV-k2W_2gt2WErLeaS3nygvYW2HnVm073f1iiuISOELqBJFq6TFAB7QPHRYygitjZyDadaGIYHIgsCmONMXEKVM9-wTvz-jzDGsQXEtI6ru2bziPQ7Eg1X_B2jxyYrEDiRyJrhm0zPt-l74uG8UFlgE0Wld_Kisysg6Q1vAF0fIg"
+                  src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150"
                 />
               </div>
             </div>
@@ -172,7 +172,7 @@ export default function TasksPage() {
                 <img
                   className="w-5 h-5 rounded-full object-cover border border-outline-variant"
                   alt="Assignee Avatar"
-                  src="https://lh3.googleusercontent.com/aida-public/AB6AXuCW604EOnKmuh4GugCNwEGPvHtNwwubaj6g0kPoBT1CKmboQPumYIGxyAxgi_7yeNR4u7UU5b1xDBR_b6ZNgKPHj9NyeE0BXgfpKgK9-6Qyi7oNHZiLQb7otzTkv_Ty7BrcbExX_NA_BSyy9GbsV6dFhxoXraR7AaFU39oPqGYGpEtCmZ0o37uki-sdUDyndki4gyJ0Mb9SlVjFpWA5emDA06rrbyDE5tQz34CALKdRgLWjJGjEZmRj"
+                  src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150"
                 />
               </div>
             </div>
@@ -253,12 +253,12 @@ export default function TasksPage() {
                   <img
                     className="w-5 h-5 rounded-full object-cover border border-surface-container-lowest"
                     alt="Assignee 1"
-                    src="https://lh3.googleusercontent.com/aida-public/AB6AXuBTgTVGbIVQ127ngAmdoPfMF1LAqQBDIiKLcqNOpThSMkjTwpSX9IYmHWg0sDlyaERexfvBJtU7UHSusotaIxHnrkVJ6HFiFVR2PlgaRjLq0zsGhyYvWe-CplNWuVsjcKVicEfK9F1yMP8DdANDcZnzt3J1qN3MlM5K_UnpEzSbDW-c_RUUsH-Zfh9uWUaQbLjEUOqS_pvTUTB0hZNG8Kfkfhm4oTAFD2sKhsbA8musHpLk2cwsY4Pk"
+                    src="https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150"
                   />
                   <img
                     className="w-5 h-5 rounded-full object-cover border border-surface-container-lowest"
                     alt="Assignee 2"
-                    src="https://lh3.googleusercontent.com/aida-public/AB6AXuDdpcijoqu5kvtBavwxE_kJbuYQoF2nkBlOJExxy9em48Z4Sz0eFKV-4p2Q-A0cfpCRmivR1yV_ChZQTpZxqZ9lmoS6uXwg656nAmNIWE3X_kwTz2gkDRWMB8L_NSiuLviMnGMF72Nmr9slv4v-WYaO5G59xrk03of30LXlxpjNRScUJeDfmrueKrnLEploB7h8_IJeS9ICsrZVQjciF1eYUkEo1ZSV298pRpKS9iIBLB-bPEsbygA0"
+                    src="https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150"
                   />
                 </div>
               </div>
@@ -311,7 +311,7 @@ export default function TasksPage() {
                 <img
                   className="w-5 h-5 rounded-full object-cover border border-outline-variant"
                   alt="Assignee Avatar"
-                  src="https://lh3.googleusercontent.com/aida-public/AB6AXuAnHak8I9XnQi_cFd3KnU4DRN4yNals73e5bXcIkCuVPCSDkEG7Yrw6g4KIkFgP7w00zPsid5GktVi0bXaT0ep0sF8ZehuFJgS2sId42AuLEl2cAKSnq4Dw7Xh82owtX1UvHwu0W8dUPEZ5mgCfyDxWbxWEBui5E-3FeeHQzs1NXR5ksxua--UGmWs_d1CQ4D5e9x3xKMgea40a-td6X5lJSpPG5_0PIF0RFxMnJKfgUEARAhqc26nh"
+                  src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150"
                 />
               </div>
             </div>

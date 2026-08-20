@@ -44,7 +44,7 @@ const page = () => {
               alt="User Avatar"
               className="w-full h-full object-cover"
               data-alt="A professional headshot of a business user in a modern office environment, soft natural lighting, high quality."
-              src="https://lh3.googleusercontent.com/aida-public/AB6AXuBjr0grdyYdU7BvfST6vn_MQQLDMsQjNGOEIsStj7ifAzdQZq74Ekm5-R0b2covqyM8hIQuaqkgvDmZcZQ4An3O_CsRwzOkuxSCIBSshY9thfnGTLku6SZDWyjP3zjWNO2YuTy_Y47oTVlmL5jpCPoC1zwnj2puY1jar1Y0qocWwmxB7d-d41bO_ECl8yDqOsEmOXRwBUg9R-ACqAQjldoDemjuz_B8JOIEgp-I37hAjJb9kUVkWhZH"
+              src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80"
             />
           </div>
         </div>
@@ -147,7 +147,7 @@ const page = () => {
                         alt="TechCorp Logo"
                         className="w-full h-full object-cover"
                         data-alt="A stylized logo for a tech company named TechCorp, minimal geometric design in blue and gray, set against a clean white background."
-                        src="https://lh3.googleusercontent.com/aida-public/AB6AXuDaumpYL9oXFGQIN1OE8AUOLZzUS9P9_1MwtDAAP31q4_p7ZHrTqQa3wTUCej9VzYrJXaifl2uolqAKrIKB0Y-zAJVeWkxSJXijqvSHFNl5CByF7QKS3pJ2mrsj-W0FFUyENpDAt6kgKxxHPw-Do0BJDPPcCPf-GddDZMvM1gPHOCvaJjtAgFvJb61OGfNpw425qC78KXZFCizeIMMF0OQMwNKK9SsjPMr5rFL68z1z_8eCV3_aCBX8"
+                        src="https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=150&auto=format&fit=crop&q=80"
                       />
                     </div>
                     <div>
@@ -291,7 +291,7 @@ const page = () => {
                         alt="HealthPlus Logo"
                         className="w-full h-full object-cover"
                         data-alt="A modern abstract logo for a healthcare startup named HealthPlus, using green and teal organic shapes, minimal style."
-                        src="https://lh3.googleusercontent.com/aida-public/AB6AXuB944ntHJ_ya4c7MnqazyEORH-LZLRZoTP8OarsVAGRQjD2MzQ3D3Ux1-EQYVP0JkXnxnhGM0DRWqWOtlu4spAbng_8I88X-LhbVlF9Xd-d-4mibuKRdNNml8k3t2PNCmEbneVOLNx6p-uq-sPSAsuuIiCkU8Z3E7yGZsbRi3gY4zc-ulQtDBSlJ6Qbyh9Ep0XJZnXsFiOuWr6GipMlwbqlFapiydLdsOUYOXtPPdcq38HukyPegAKo"
+                        src="https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?w=150&auto=format&fit=crop&q=80"
                       />
                     </div>
                     <div>

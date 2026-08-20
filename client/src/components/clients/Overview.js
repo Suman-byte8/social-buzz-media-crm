@@ -13,7 +13,7 @@ export default function Overview() {
       healthStatus: "Excellent",
       healthColor: "green",
       mrr: "$12,500",
-      avatar: "https://lh3.googleusercontent.com/aida-public/AB6AXuDaumpYL9oXFGQIN1OE8AUOLZzUS9P9_1MwtDAAP31q4_p7ZHrTqQa3wTUCej9VzYrJXaifl2uolqAKrIKB0Y-zAJVeWkxSJXijqvSHFNl5CByF7QKS3pJ2mrsj-W0FFUyENpDAt6kgKxxHPw-Do0BJDPPcCPf-GddDZMvM1gPHOCvaJjtAgFvJb61OGfNpw425qC78KXZFCizeIMMF0OQMwNKK9SsjPMr5rFL68z1z_8eCV3_aCBX8",
+      avatar: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=150&auto=format&fit=crop&q=80",
     },
     {
       id: 2,
@@ -35,7 +35,7 @@ export default function Overview() {
       healthStatus: "At Risk",
       healthColor: "red",
       mrr: "$4,500",
-      avatar: "https://lh3.googleusercontent.com/aida-public/AB6AXuB944ntHJ_ya4c7MnqazyEORH-LZLRZoTP8OarsVAGRQjD2MzQ3D3Ux1-EQYVP0JkXnxnhGM0DRWqWOtlu4spAbng_8I88X-LhbVlF9Xd-d-4mibuKRdNNml8k3t2PNCmEbneVOLNx6p-uq-sPSAsuuIiCkU8Z3E7yGZsbRi3gY4zc-ulQtDBSlJ6Qbyh9Ep0XJZnXsFiOuWr6GipMlwbqlFapiydLdsOUYOXtPPdcq38HukyPegAKo",
+      avatar: "https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?w=150&auto=format&fit=crop&q=80",
     },
   ]);
 

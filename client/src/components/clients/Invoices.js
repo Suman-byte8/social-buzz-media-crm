@@ -8,7 +8,7 @@ const Invoices = () => {
       <section className="bg-surface-container-lowest rounded-xl border border-outline-variant p-card-padding mb-stack-lg shadow-[0_2px_4px_rgba(0,0,0,0.05)] relative overflow-hidden">
         <div className="absolute top-0 right-0 w-64 h-full bg-gradient-to-l from-surface-container to-transparent opacity-50"></div>
         <div className="flex flex-col md:flex-row items-start md:items-center gap-stack-lg relative z-10">
-          <img className="w-20 h-20 rounded-lg object-contain bg-white border border-outline-variant p-2 shadow-sm" data-alt="A sleek, modern corporate logo for a fictional tech company named Acme Corp, featuring sharp geometric shapes in dark blue and grey, set against a pristine white background. The image is rendered as a clean, high-resolution vector graphic style." src="https://lh3.googleusercontent.com/aida-public/AB6AXuA5wFK0ShNfFGs-Ki5ZSv8ErUl4_JqoVGs1MaFGDea9JrYWUtFbIeSUPZfFxEnF2zjB8GtK0xuG4jrd9kA7DLYvFUaph_xnDqug6--5t4IY_qdIaJWc4syL7hjjxAiXXgqKcJFf6IeQgNTEhU6N9ecMZEfxL8gfPHhBj1O3AIv3qr0j4JW347inFTLZx4pjMj8LBciBnI0E1Qv0ZUlx36I2ZaDHkdOWKfpC4pO6YVgirNH2G47WiQmB" />
+          <img className="w-20 h-20 rounded-lg object-contain bg-white border border-outline-variant p-2 shadow-sm" data-alt="A sleek logo" src="https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=150" />
           <div className="flex-1">
             <div className="flex items-center gap-3 mb-1">
               <h2 className="font-display-lg text-display-lg text-on-surface">Acme Corporation</h2>

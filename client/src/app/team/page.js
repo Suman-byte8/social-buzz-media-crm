@@ -125,7 +125,7 @@ export default function TeamPage() {
                   <div className="w-10 h-10 rounded-full bg-gray-200 overflow-hidden flex-shrink-0 border border-gray-300">
                     <img
                       className="w-full h-full object-cover"
-                      src="https://lh3.googleusercontent.com/aida-public/AB6AXuDaHWCbVnhIhPfFDQM_MiwSUMJ0UOLEhF9kMWxbTcoGBi5fHi3xntFa0_a23WgWh7qPQ3l-7P9cpwVB5tu7k3P7HAOsSJc983JSTvk4EF7E_-fx8XrwEgnJsCfJ9KOOHKtndRVFd9bhrhOKEJlEvhbN1zrCQAxas2cdDajj_kTxMV6jPXz_-1L_9ZCzSCjcGEa_h0t1qyltPV6LkMLWbOrlWoA3CPN-6RMsttw5D3WycNLHusF1KwSx"
+                      src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150"
                       alt="Sarah Jenkins"
                     />
                   </div>
@@ -174,7 +174,7 @@ export default function TeamPage() {
                   <div className="w-10 h-10 rounded-full bg-gray-200 overflow-hidden flex-shrink-0 border border-gray-300">
                     <img
                       className="w-full h-full object-cover"
-                      src="https://lh3.googleusercontent.com/aida-public/AB6AXuB_bM5-BpyqgKSpNePjlinVUY53_2a4tZ4B0p9e2cWZP96V03QaP9ud849sj6Sw6Bvqks8ly9-hER3OkAK8-GExdIj0EI_q6EyVbpuJm8gB5utS5y5hoEgNfNtgYhkXRWbHGoOWoO9k-BUNaLkPEHp_cM6tRTW8ys2HY9kjsnyBkh-w0VcXYe-npr8E4bPVQ6EomsNodFUASSzYXBcdGm9mQlC4yIKBIsSYCNfgR9c9YCjHgb2SSDkw"
+                      src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150"
                       alt="David Chen"
                     />
                   </div>

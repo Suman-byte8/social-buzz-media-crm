@@ -27,7 +27,7 @@ export default function TeamMemberProfilePage({ params }) {
                 <div className="w-32 h-32 rounded-xl border-4 border-surface bg-surface-container-high overflow-hidden shadow-sm shrink-0">
                   <img
                     className="w-full h-full object-cover"
-                    src="https://lh3.googleusercontent.com/aida-public/AB6AXuCsvKcYVgE29FLVGahNY6lKs15kZC2otvua9_lfCBSvdixm46BaoM0i4wlqIaGTfrEG-4IBLF9Jzq-O1FoZyAgajTaVWLPvHwBqqgMvygURWNHoj7k2ARVGrl1mRJe5BzcyMsnGjyx7ep0xJhMRzso6wAHZdo6AZKCpQR7CrNan7-5XQ7BMPzF8BEMq0nIcy9sWA9obFKDf_840MgD7eFw5eH-3cPMV4XC3vkcF25CmHAblWGWF3jE3"
+                    src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150"
                     alt="Marcus Allen"
                   />
                 </div>
@@ -116,7 +116,7 @@ export default function TeamMemberProfilePage({ params }) {
                   <div className="w-10 h-10 rounded-full bg-surface-variant overflow-hidden shrink-0">
                     <img
                       className="w-full h-full object-cover"
-                      src="https://lh3.googleusercontent.com/aida-public/AB6AXuCQQiJjkstq2yKSWOR9Xb8lmlQn4KT6eigH0mzRqT8Iy3m5tGmKg0w0G7ztVG6H0va3F2NAZB4WTxyne4qVGZZFn6h4QmqMhjxCckfsjqF9kilKUWuRhANUC44DY4aHrRFfQ0fjjWujOx-n2U56063ULfdQUzTQ3-f9Rg4Cqmrv2nqNL-oEfkkAAkjIoqJUCpMjI-lIUyC2J2UkW4cJcM1n2a81qPsH4jZTpV_VOKSXQVU8ENAzzlsT"
+                      src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150"
                       alt="Sarah Jenkins"
                     />
                   </div>

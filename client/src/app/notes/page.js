@@ -53,14 +53,14 @@ export default function MeetingNotesPage() {
                     <img
                       className="w-full h-full object-cover"
                       alt="Attendee 1"
-                      src="https://lh3.googleusercontent.com/aida-public/AB6AXuC53fJJjLvPvVQP0ykgL68EJQ8q1znHkirWZuIbnmLI6TE7BUJqnjf-JgzDdFVcSz0NRlyRlU5sdAtA3gidvgxs7Mz2_mbHvLvGpBu2TRqiMO4S5xtsVp-l75ql76hsxTHCfe7gv6U4KFRL7SLSyyOcVSdksShQWO6eP_GOBf4489LXlbJmlmAQTj1wTafWtoBuRINnzII8gAOpvg9SEcDbc01MZ9m4MvslNBGEu40Fmg_kf-znzy7D"
+                      src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150"
                     />
                   </div>
                   <div className="w-6 h-6 rounded-full border-2 border-white overflow-hidden bg-secondary-container">
                     <img
                       className="w-full h-full object-cover"
                       alt="Attendee 2"
-                      src="https://lh3.googleusercontent.com/aida-public/AB6AXuD0ClRLChmjzkpXJ66II86yUCNRoL9XDHzx6CEzhjXyoLxYur81Hih_0vMNs6T1GGCfMc2xGEjmEOr5A50fk1B48ByRw2ERM5NtfacXOzN1EzonPjR5k1WYEZSEBSXpil6KzCLmRwM0cYAT8Y_x-EToJS1CYGo7qIjcf3SUkqh0562_DOhpMHyPmgGMT0gSYhT_8QKgwnMfal0JI1zR5Tbr3sj4C0LtZDraFjNt3AtYhxiJHrlGGfs1"
+                      src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150"
                     />
                   </div>
                   <div className="w-6 h-6 rounded-full border-2 border-white overflow-hidden bg-secondary-container flex items-center justify-center">
@@ -139,14 +139,14 @@ export default function MeetingNotesPage() {
                     <img
                       className="w-full h-full object-cover"
                       alt="Attendee 1"
-                      src="https://lh3.googleusercontent.com/aida-public/AB6AXuBUjAzS1NGl4Zgcy0lhecpczU14mQC6twEWAWLUq6itzwBH4BqxF9zoa_HN9HMWyPzGClSuRhAr0xMU9JpRtDMJAF7xIbfjVi4G2yaIf-1FFRcfiIGJW4ri8gxN44ZqOVJJPenObRCOL3PFJ5H0i_DyhTniD3xjoB4IV34hm5zySY7s_-OmzVyH-5SkNSfep4gpOGrZpJwcSo1j8G5sXZmySIrQc-QgjDPHgxWOiw1QeDhsyYPNC37-"
+                      src="https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150"
                     />
                   </div>
                   <div className="w-6 h-6 rounded-full border-2 border-white overflow-hidden bg-secondary-container">
                     <img
                       className="w-full h-full object-cover"
                       alt="Attendee 2"
-                      src="https://lh3.googleusercontent.com/aida-public/AB6AXuCAMQ_wiXD5j84I5yd6AiHzDuaaC6LMLcZN_3_ijf6tagdJSlutuI1G06wuaONdmfp71l5FNC1mD7oI34JPv8mbE0IOnj4uzrbYxuaQRTq4ojzpPUmltDhLT7U_G2a7N1fx9nYPzwh_uSOjtCdzuZMoUycIkbtcrcNiEWs3zW_vAi5RMPb6RaUNqhhpphlqDZywrJkiRKIDDd-mCM2jtwZZ5sYU_vyH1TwdLgaYuO0QcSHwywtqL_Y9"
+                      src="https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150"
                     />
                   </div>
                 </div>

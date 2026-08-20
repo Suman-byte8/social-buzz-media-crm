@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@source "../**/*.{js,jsx,ts,tsx,mdx}";
 @config "../../tailwind.config.js";
 
 :root {
@@ -80,11 +81,11 @@
   }
 
   .badge-pill {
-    @apply inline-flex items-center rounded-full bg-surface-container px-3 py-1 text-label-sm font-semibold;
+    @apply inline-flex items-center rounded-full bg-surface-container px-3 py-1 text-xs font-semibold;
   }
 
   .card-panel {
-    @apply bg-surface-container border border-surface-container-high rounded-lg shadow-card p-card-padding;
+    @apply bg-surface-container border border-surface-container-high rounded-lg shadow-card p-4;
   }
 
   .card-bg {
