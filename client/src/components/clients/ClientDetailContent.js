@@ -11,6 +11,7 @@ import Reports from "@/components/clients/Reports";
 import Invoices from "@/components/clients/Invoices";
 import Notes from "@/components/clients/Notes";
 import Renewal from "@/components/clients/Renewal";
+import ContentCalendarTab from "@/components/clients/ContentCalendarTab";
 
 const tabs = [
   { id: "overview", label: "Overview", icon: "grid_view" },
@@ -26,6 +27,7 @@ const tabs = [
   { id: "invoices", label: "Invoices", icon: "receipt_long" },
   { id: "notes", label: "Notes", icon: "event_note" },
   { id: "renewal", label: "Renewal", icon: "autorenew" },
+  { id: "content_calendar", label: "Content Calendar", icon: "calendar_today" },
 ];
 
 export default function ClientDetailContent({ activeTab, setActiveTab, client = {}, clientId }) {
@@ -135,6 +137,8 @@ export default function ClientDetailContent({ activeTab, setActiveTab, client = 
         <Notes client={client} />
       ) : activeTab === "renewal" ? (
         <Renewal client={client} />
+      ) : activeTab === "content_calendar" ? (
+        <ContentCalendarTab clientId={clientId} clientName={client.name} />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-12 gap-stack-lg">
           {/* Company Details Card */}
