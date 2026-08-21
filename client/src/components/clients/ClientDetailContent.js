@@ -28,34 +28,48 @@ const tabs = [
   { id: "renewal", label: "Renewal", icon: "autorenew" },
 ];
 
-export default function ClientDetailContent({ activeTab, setActiveTab }) {
+export default function ClientDetailContent({ activeTab, setActiveTab, client = {}, clientId }) {
+  const clientName = client.name || "Client Details";
+  const clientIndustry = client.industry || "Industry";
+  const clientHealth = client.clientHealth;
+  const healthLabel = clientHealth >= 80 ? "Excellent" : clientHealth >= 50 ? "Fair" : "At Risk";
+  const healthColor = clientHealth >= 80 ? "green" : clientHealth >= 50 ? "amber" : "red";
+  const services = Array.isArray(client.servicesSelected) ? client.servicesSelected : (client.servicesSelected ? client.servicesSelected.split(",") : []);
+  const credentials = client.credentials && typeof client.credentials === "object" ? client.credentials : (client.credentials ? JSON.parse(client.credentials) : {});
+
   return (
     <main className="flex-1 p-container-margin flex flex-col gap-stack-lg max-w-[1600px] w-full mx-auto">
       {/* Client Header Section */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-stack-md bg-surface p-card-padding rounded-xl border border-outline-variant shadow-sm">
         <div className="flex items-center gap-stack-md">
-          <div className="w-16 h-16 rounded-xl overflow-hidden border border-surface-variant bg-white flex items-center justify-center shrink-0 shadow-sm">
-            <img
-              alt="Client Logo"
-              className="w-full h-full object-contain p-2"
-              src="https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=150"
-            />
+          <div className="w-16 h-16 rounded-xl overflow-hidden border border-surface-variant bg-primary-container flex items-center justify-center shrink-0 shadow-sm">
+            <span className="font-display-md text-display-md text-primary font-bold">
+              {clientName[0]?.toUpperCase()}
+            </span>
           </div>
           <div className="flex flex-col">
             <div className="flex items-center gap-3">
               <h1 className="font-headline-md text-headline-md text-on-surface m-0">
-                NovaTech Innovations
+                {clientName}
               </h1>
-              <span className="bg-primary-container/10 text-primary border border-primary-container/20 px-3 py-1 rounded-full font-label-sm text-label-sm flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
-                Active Client
+              <span className={`px-3 py-1 rounded-full font-label-sm text-label-sm flex items-center gap-1 ${
+                healthColor === 'green' ? 'bg-green-50 text-green-700 border border-green-200' :
+                healthColor === 'amber' ? 'bg-amber-50 text-amber-700 border border-amber-200' :
+                'bg-red-50 text-red-700 border border-red-200'
+              }`}>
+                <span className={`w-2 h-2 rounded-full animate-pulse ${
+                  healthColor === 'green' ? 'bg-green-500' :
+                  healthColor === 'amber' ? 'bg-amber-500' :
+                  'bg-red-500'
+                }`}></span>
+                {healthLabel} Client
               </span>
             </div>
             <p className="font-body-sm text-body-sm text-secondary flex items-center gap-2 mt-1">
               <span className="material-symbols-outlined text-[16px]">
                 domain
               </span>
-              Enterprise SaaS &amp; Cloud Infrastructure
+              {clientIndustry}
             </p>
           </div>
         </div>
@@ -102,65 +116,80 @@ export default function ClientDetailContent({ activeTab, setActiveTab }) {
 
       {/* Dynamic Tab Content */}
       {activeTab === "proposal" ? (
-        <ProposalTab />
+        <ProposalTab client={client} />
       ) : activeTab === "overview" ? (
-        <Overview />
+        <Overview client={client} />
       ) : activeTab === "credentials" ? (
-        <Credentials />
+        <Credentials client={client} credentials={credentials} />
       ) : activeTab === "google_ads" ? (
-        <AdsTab />
+        <AdsTab client={client} />
       ) : activeTab === "meta_ads" ? (
-        <MetaAdsTab />
+        <MetaAdsTab client={client} />
       ) : activeTab === "social" ? (
-        <SocialMedia />
+        <SocialMedia client={client} />
       ) : activeTab === "reports" ? (
-        <Reports />
+        <Reports client={client} />
       ) : activeTab === "invoices" ? (
-        <Invoices />
+        <Invoices client={client} />
       ) : activeTab === "notes" ? (
-        <Notes />
+        <Notes client={client} />
       ) : activeTab === "renewal" ? (
-        <Renewal />
+        <Renewal client={client} />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-12 gap-stack-lg">
           {/* Company Details Card */}
-          <div className="md:col-span-8 bg-surface rounded-xl shadow-sm border border-outline-variant p-card-padding flex flex-col gap-stack-md h-full relative overflow-hidden">
+          <div className="md:col-span-12 bg-surface rounded-xl shadow-sm border border-outline-variant p-card-padding flex flex-col gap-stack-md h-full relative overflow-hidden">
             <div className="absolute top-0 right-0 w-32 h-32 bg-primary-container/5 rounded-bl-full -z-0"></div>
-            <div className="flex items-center justify-between relative z-10">
-              <h3 className="font-title-lg text-title-lg text-on-surface flex items-center gap-2">
-                <span className="material-symbols-outlined text-primary text-[20px]">
-                  business
-                </span>
-                Company Details
-              </h3>
-              <button className="text-secondary hover:text-primary transition-colors">
-                <span className="material-symbols-outlined text-[20px]">
-                  edit
-                </span>
-              </button>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6 mt-2 relative z-10">
-              <div className="flex flex-col gap-1">
-                <span className="font-label-sm text-label-sm text-secondary uppercase tracking-wider">
-                  Primary Contact
-                </span>
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full overflow-hidden bg-surface-variant shrink-0">
-                    <img
-                      className="w-full h-full object-cover"
-                      src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150"
-                    />
-                  </div>
-                  <div className="flex flex-col">
-                    <span className="font-body-md text-body-md text-on-surface font-medium">
-                      Sarah Jenkins
+<div className="flex items-center justify-between relative z-10">
+                <h3 className="font-title-lg text-title-lg text-on-surface flex items-center gap-2">
+                  <span className="material-symbols-outlined text-primary text-[20px]">
+                    business
+                  </span>
+                  Company Details
+                </h3>
+                <div className="flex items-center gap-2">
+                  <span className={`px-2 py-0.5 rounded-full font-label-sm text-label-sm flex items-center gap-1 ${
+                    healthColor === 'green' ? 'bg-green-50 text-green-700' :
+                    healthColor === 'amber' ? 'bg-amber-50 text-amber-700' :
+                    'bg-red-50 text-red-700'
+                  }`}>
+                    <span className={`w-1.5 h-1.5 rounded-full ${
+                      healthColor === 'green' ? 'bg-green-500' :
+                      healthColor === 'amber' ? 'bg-amber-500' :
+                      'bg-red-500'
+                    }`}></span>
+                    Health: {healthLabel}
+                  </span>
+                  <button className="text-secondary hover:text-primary transition-colors">
+                    <span className="material-symbols-outlined text-[20px]">
+                      edit
                     </span>
-                    <span className="font-body-sm text-body-sm text-secondary">
-                      VP of Marketing
-                    </span>
-                  </div>
+                  </button>
                 </div>
               </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6 mt-2 relative z-10">
+                <div className="flex flex-col gap-1">
+                  <span className="font-label-sm text-label-sm text-secondary uppercase tracking-wider">
+                    Primary Contact
+                  </span>
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full overflow-hidden bg-surface-variant shrink-0">
+                      <div className="w-full h-full bg-primary-container rounded-full flex items-center justify-center">
+                        <span className="text-primary font-bold material-symbols-outlined text-[20px]">
+                          person
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="font-body-md text-body-md text-on-surface font-medium">
+                        {clientName}
+                      </span>
+                      <span className="font-label-sm text-label-sm text-on-surface-variant">
+                        {clientIndustry}
+                      </span>
+                    </div>
+                  </div>
+                </div>
               <div className="flex flex-col gap-1">
                 <span className="font-label-sm text-label-sm text-secondary uppercase tracking-wider">
                   Contact Info
@@ -173,7 +202,7 @@ export default function ClientDetailContent({ activeTab, setActiveTab }) {
                     <span className="material-symbols-outlined text-secondary text-[16px]">
                       mail
                     </span>
-                    sarah.j@novatech.io
+                    {client.email || "client@example.com"}
                   </a>
                   <a
                     className="font-body-sm text-body-sm text-on-surface hover:text-primary transition-colors flex items-center gap-2"
@@ -182,7 +211,7 @@ export default function ClientDetailContent({ activeTab, setActiveTab }) {
                     <span className="material-symbols-outlined text-secondary text-[16px]">
                       call
                     </span>
-                    +1 (555) 019-2837
+                    {client.phoneNumber || "+1 (555) 019-2837"}
                   </a>
                 </div>
               </div>
@@ -191,25 +220,14 @@ export default function ClientDetailContent({ activeTab, setActiveTab }) {
                   Web &amp; Location
                 </span>
                 <div className="flex flex-col gap-2 mt-1">
-                  <a
-                    className="font-body-sm text-body-sm text-on-surface hover:text-primary transition-colors flex items-center gap-2"
-                    href="#"
-                  >
-                    <span className="material-symbols-outlined text-secondary text-[16px]">
-                      language
+                  {client.address && (
+                    <span className="font-body-sm text-body-sm text-on-surface flex items-start gap-2">
+                      <span className="material-symbols-outlined text-secondary text-[16px] mt-0.5">
+                        location_on
+                      </span>
+                      <span>{client.address}</span>
                     </span>
-                    www.novatech.io
-                  </a>
-                  <span className="font-body-sm text-body-sm text-on-surface flex items-start gap-2">
-                    <span className="material-symbols-outlined text-secondary text-[16px] mt-0.5">
-                      location_on
-                    </span>
-                    <span>
-                      100 Innovation Way
-                      <br />
-                      San Francisco, CA 94105
-                    </span>
-                  </span>
+                  )}
                 </div>
               </div>
               <div className="flex flex-col gap-1">
@@ -222,23 +240,7 @@ export default function ClientDetailContent({ activeTab, setActiveTab }) {
                       Client Since
                     </span>
                     <span className="font-body-sm text-body-sm text-on-surface font-medium">
-                      Oct 2022
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center border-b border-surface-variant pb-1">
-                    <span className="font-body-sm text-body-sm text-secondary">
-                      Billing Cycle
-                    </span>
-                    <span className="font-body-sm text-body-sm text-on-surface font-medium">
-                      Net 30 (1st)
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="font-body-sm text-body-sm text-secondary">
-                      Timezone
-                    </span>
-                    <span className="font-body-sm text-body-sm text-on-surface font-medium">
-                      PST / PDT
+                      {client.createdAt ? new Date(client.createdAt).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : "N/A"}
                     </span>
                   </div>
                 </div>
@@ -246,59 +248,8 @@ export default function ClientDetailContent({ activeTab, setActiveTab }) {
             </div>
           </div>
 
-          {/* Monthly Budget Card */}
-          <div className="md:col-span-4 bg-primary text-white rounded-xl shadow-sm p-card-padding flex flex-col justify-between h-full relative overflow-hidden">
-            <div
-              className="absolute inset-0 opacity-10 pointer-events-none"
-              style={{
-                backgroundImage:
-                  "radial-gradient(circle at 2px 2px, white 1px, transparent 0)",
-                backgroundSize: "16px 16px",
-              }}
-            ></div>
-            <div className="relative z-10 flex justify-between items-start">
-              <div className="flex flex-col">
-                <span className="font-label-sm text-label-sm text-white/80 uppercase tracking-widest">
-                  Monthly Retainer
-                </span>
-                <h3 className="font-display-lg text-display-lg font-bold mt-1">
-                  $24,500
-                </h3>
-              </div>
-              <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center backdrop-blur-sm">
-                <span className="material-symbols-outlined text-white">
-                  payments
-                </span>
-              </div>
-            </div>
-            <div className="relative z-10 mt-6 flex flex-col gap-3">
-              <div className="flex justify-between items-center text-white/90">
-                <span className="font-body-sm text-body-sm">
-                  Media Spend Managed
-                </span>
-                <span className="font-body-md text-body-md font-semibold">
-                  $150,000/mo
-                </span>
-              </div>
-              <div className="w-full bg-white/20 h-2 rounded-full overflow-hidden">
-                <div className="bg-white w-[75%] h-full rounded-full"></div>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="font-label-sm text-label-sm text-white/70">
-                  75% Budget Utilized
-                </span>
-                <span className="font-label-sm text-label-sm text-white flex items-center gap-1 bg-white/20 px-2 py-0.5 rounded">
-                  <span className="material-symbols-outlined text-[14px]">
-                    trending_up
-                  </span>
-                  +12% YTD
-                </span>
-              </div>
-            </div>
-          </div>
-
           {/* Current Services List */}
-          <div className="md:col-span-8 bg-surface rounded-xl shadow-sm border border-outline-variant p-card-padding flex flex-col gap-stack-md h-full">
+          <div className="md:col-span-12 bg-surface rounded-xl shadow-sm border border-outline-variant p-card-padding flex flex-col gap-stack-md h-full">
             <div className="flex items-center justify-between">
               <h3 className="font-title-lg text-title-lg text-on-surface flex items-center gap-2">
                 <span className="material-symbols-outlined text-primary text-[20px]">
@@ -314,133 +265,46 @@ export default function ClientDetailContent({ activeTab, setActiveTab }) {
               </button>
             </div>
             <div className="flex flex-col gap-3 mt-2">
-              {/* Service Item 1 */}
-              <div className="flex items-center justify-between p-3 rounded-lg border border-surface-variant hover:bg-surface-variant/30 transition-colors group">
-                <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 rounded bg-blue-50 text-blue-600 flex items-center justify-center">
-                    <span className="material-symbols-outlined">
-                      drive_file_rename
-                    </span>
-                  </div>
-                  <div className="flex flex-col">
-                    <span className="font-body-md text-body-md text-on-surface font-medium group-hover:text-primary transition-colors">
-                      Technical SEO &amp; Content Strategy
-                    </span>
-                    <span className="font-label-sm text-label-sm text-secondary">
-                      Tier 2 Retainer
-                    </span>
-                  </div>
+              {services.length > 0 ? (
+                services.map((service, si) => {
+                  const palettes = [
+                    { bg: "bg-blue-50", text: "text-blue-600", icon: "drive_file_rename" },
+                    { bg: "bg-orange-50", text: "text-orange-600", icon: "ads_click" },
+                    { bg: "bg-purple-50", text: "text-purple-600", icon: "campaign" },
+                    { bg: "bg-green-50", text: "text-green-600", icon: "check_circle" },
+                    { bg: "bg-pink-50", text: "text-pink-600", icon: "favorite" },
+                    { bg: "bg-cyan-50", text: "text-cyan-600", icon: "insights" },
+                  ];
+                  const palette = palettes[si % palettes.length];
+                  return (
+                    <div
+                      key={si}
+                      className="flex items-center justify-between p-3 rounded-lg border border-surface-variant hover:bg-surface-variant/30 transition-colors group"
+                    >
+                      <div className="flex items-center gap-4">
+                        <div className={`w-10 h-10 rounded ${palette.bg} ${palette.text} flex items-center justify-center`}>
+                          <span className="material-symbols-outlined">{palette.icon}</span>
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="font-body-md text-body-md text-on-surface font-medium group-hover:text-primary transition-colors">
+                            {service}
+                          </span>
+                          <span className="font-label-sm text-label-sm text-secondary">
+                            Service {si + 1}
+                          </span>
+                        </div>
+                      </div>
+                      <span className="bg-green-100 text-green-800 px-2.5 py-1 rounded-full font-label-sm text-label-sm hidden sm:block">
+                        Active
+                      </span>
+                    </div>
+                  );
+                })
+              ) : (
+                <div className="p-4 rounded-lg border border-dashed border-outline-variant text-secondary font-body-sm text-body-sm text-center">
+                  No active services selected for this client yet.
                 </div>
-                <span className="bg-green-100 text-green-800 px-2.5 py-1 rounded-full font-label-sm text-label-sm hidden sm:block">
-                  Active
-                </span>
-              </div>
-              {/* Service Item 2 */}
-              <div className="flex items-center justify-between p-3 rounded-lg border border-surface-variant hover:bg-surface-variant/30 transition-colors group">
-                <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 rounded bg-orange-50 text-orange-600 flex items-center justify-center">
-                    <span className="material-symbols-outlined">ads_click</span>
-                  </div>
-                  <div className="flex flex-col">
-                    <span className="font-body-md text-body-md text-on-surface font-medium group-hover:text-primary transition-colors">
-                      Google Ads Management (PPC)
-                    </span>
-                    <span className="font-label-sm text-label-sm text-secondary">
-                      $100k/mo Spend Target
-                    </span>
-                  </div>
-                </div>
-                <span className="bg-green-100 text-green-800 px-2.5 py-1 rounded-full font-label-sm text-label-sm hidden sm:block">
-                  Active
-                </span>
-              </div>
-              {/* Service Item 3 */}
-              <div className="flex items-center justify-between p-3 rounded-lg border border-surface-variant hover:bg-surface-variant/30 transition-colors group">
-                <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 rounded bg-purple-50 text-purple-600 flex items-center justify-center">
-                    <span className="material-symbols-outlined">campaign</span>
-                  </div>
-                  <div className="flex flex-col">
-                    <span className="font-body-md text-body-md text-on-surface font-medium group-hover:text-primary transition-colors">
-                      B2B LinkedIn Campaign
-                    </span>
-                    <span className="font-label-sm text-label-sm text-secondary">
-                      Q3 Initiative
-                    </span>
-                  </div>
-                </div>
-                <span className="bg-yellow-100 text-yellow-800 px-2.5 py-1 rounded-full font-label-sm text-label-sm hidden sm:block">
-                  Onboarding
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* Assigned Team Card */}
-          <div className="md:col-span-4 bg-surface rounded-xl shadow-sm border border-outline-variant p-card-padding flex flex-col gap-stack-md h-full">
-            <div className="flex items-center justify-between">
-              <h3 className="font-title-lg text-title-lg text-on-surface flex items-center gap-2">
-                <span className="material-symbols-outlined text-primary text-[20px]">
-                  groups
-                </span>
-                Agency Team
-              </h3>
-            </div>
-            <div className="flex flex-col gap-4 mt-2">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full overflow-hidden bg-surface-variant shrink-0 border border-outline-variant">
-                  <img
-                    className="w-full h-full object-cover"
-                    src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150"
-                  />
-                </div>
-                <div className="flex flex-col">
-                  <span className="font-body-sm text-body-sm text-on-surface font-medium">
-                    David Chen
-                  </span>
-                  <span className="font-label-sm text-label-sm text-primary font-bold">
-                    Account Director
-                  </span>
-                </div>
-              </div>
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full overflow-hidden bg-surface-variant shrink-0 border border-outline-variant">
-                  <img
-                    className="w-full h-full object-cover"
-                    src="https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150"
-                  />
-                </div>
-                <div className="flex flex-col">
-                  <span className="font-body-sm text-body-sm text-on-surface font-medium">
-                    Emily Stanton
-                  </span>
-                  <span className="font-label-sm text-label-sm text-secondary">
-                    Lead SEO Strategist
-                  </span>
-                </div>
-              </div>
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full overflow-hidden bg-surface-variant shrink-0 border border-outline-variant">
-                  <img
-                    className="w-full h-full object-cover"
-                    src="https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150"
-                  />
-                </div>
-                <div className="flex flex-col">
-                  <span className="font-body-sm text-body-sm text-on-surface font-medium">
-                    Marcus Johnson
-                  </span>
-                  <span className="font-label-sm text-label-sm text-secondary">
-                    PPC Specialist
-                  </span>
-                </div>
-              </div>
-              <button className="mt-2 w-full py-2 border border-dashed border-outline-variant rounded-lg text-secondary font-label-md text-label-md hover:border-primary hover:text-primary transition-colors flex items-center justify-center gap-2 bg-surface-container-low hover:bg-surface">
-                <span className="material-symbols-outlined text-[18px]">
-                  person_add
-                </span>
-                Assign Member
-              </button>
+              )}
             </div>
           </div>
         </div>

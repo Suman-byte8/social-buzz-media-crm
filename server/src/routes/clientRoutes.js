@@ -16,6 +16,26 @@ const formatArrayFields = (data) => ({
   contentCalendar: data.contentCalendar ? data.contentCalendar.split(',').filter(Boolean) : [],
 });
 
+// Accepts array or comma-separated string, returns CSV string or null
+const toArrayString = (value) => {
+  if (!value) return null;
+  return Array.isArray(value) ? value.filter(Boolean).join(',') : String(value);
+};
+
+// Accepts object or JSON string, returns JSON string or null
+const toJsonString = (value) => {
+  if (!value) return null;
+  if (typeof value === 'string') {
+    try {
+      JSON.parse(value);
+      return value;
+    } catch {
+      return null;
+    }
+  }
+  return JSON.stringify(value);
+};
+
 // Helper to prepare data for DB
 const prepareClientData = (body) => ({
   name: body.name,
@@ -24,18 +44,18 @@ const prepareClientData = (body) => ({
   whatsappNumber: body.whatsappNumber,
   address: body.address,
   email: body.email,
-  servicesSelected: body.servicesSelected ? body.servicesSelected.join(',') : null,
+  servicesSelected: toArrayString(body.servicesSelected),
   clientManagedBy: body.clientManagedBy,
   clientHealth: body.clientHealth,
-  proposals: body.proposals ? body.proposals.join(',') : null,
-  credentials: body.credentials ? JSON.stringify(body.credentials) : null,
-  campaigns: body.campaigns ? body.campaigns.join(',') : null,
-  socialMediaAccounts: body.socialMediaAccounts ? body.socialMediaAccounts.join(',') : null,
-  reports: body.reports ? body.reports.join(',') : null,
-  invoices: body.invoices ? body.invoices.join(',') : null,
+  proposals: toArrayString(body.proposals),
+  credentials: toJsonString(body.credentials),
+  campaigns: toArrayString(body.campaigns),
+  socialMediaAccounts: toArrayString(body.socialMediaAccounts),
+  reports: toArrayString(body.reports),
+  invoices: toArrayString(body.invoices),
   notes: body.notes,
   renewal: body.renewal ? new Date(body.renewal) : null,
-  contentCalendar: body.contentCalendar ? body.contentCalendar.join(',') : null,
+  contentCalendar: toArrayString(body.contentCalendar),
 });
 
 // POST /api/clients - Create a new client

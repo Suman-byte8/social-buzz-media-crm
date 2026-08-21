@@ -1,6 +1,10 @@
 import React from "react";
 
-const MetaAdsOverview = () => {
+const MetaAdsOverview = ({ client }) => {
+  const clientName = client?.name || "Client";
+  const campaigns = Array.isArray(client?.campaigns) ? client.campaigns :
+    (client?.campaigns ? client.campaigns.split(",") : []);
+
   return (
     <main className="flex-1 overflow-y-auto p-gutter md:p-container-margin bg-background">
       <div className="flex justify-between items-end mb-stack-lg">
@@ -9,7 +13,7 @@ const MetaAdsOverview = () => {
             Meta Ads Overview
           </h2>
           <p className="font-body-md text-body-md text-on-surface-variant mt-unit">
-            Performance metrics for Acme Corp (Last 30 Days)
+            Performance metrics for {clientName} (Last 30 Days)
           </p>
         </div>
         <div className="flex gap-stack-sm hidden md:flex">
@@ -33,33 +37,26 @@ const MetaAdsOverview = () => {
           </button>
         </div>
       </div>
-      {/* <!-- Metrics Bento Grid --> */}
-      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-stack-md mb-stack-lg">
+          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-stack-md mb-stack-lg">
         {/* <!-- Amount Spent --> */}
         <div className="bg-white p-card-padding rounded-lg border border-outline-variant shadow-sm flex flex-col justify-between">
           <div className="flex justify-between items-start mb-stack-sm">
             <span className="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">
               Amount Spent
             </span>
-            <span
-              className="material-symbols-outlined text-primary"
-              data-icon="payments"
-            >
+            <span className="material-symbols-outlined text-primary" data-icon="payments">
               payments
             </span>
           </div>
           <div>
             <div className="font-headline-md text-headline-md text-on-background">
-              $12,450.00
+              {client?.metaAdsData?.amountSpent || "$12,450.00"}
             </div>
             <div className="flex items-center gap-unit mt-unit text-[#10B981] font-label-sm text-label-sm">
-              <span
-                className="material-symbols-outlined text-[14px]"
-                data-icon="trending_down"
-              >
+              <span className="material-symbols-outlined text-[14px]" data-icon="trending_down">
                 trending_down
               </span>
-              <span>4.2% vs last month</span>
+              <span>{client?.metaAdsData?.spendChange || "4.2% vs last month"}</span>
             </div>
           </div>
         </div>
@@ -69,25 +66,19 @@ const MetaAdsOverview = () => {
             <span className="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">
               Reach
             </span>
-            <span
-              className="material-symbols-outlined text-primary"
-              data-icon="visibility"
-            >
+            <span className="material-symbols-outlined text-primary" data-icon="visibility">
               visibility
             </span>
           </div>
           <div>
             <div className="font-headline-md text-headline-md text-on-background">
-              452K
+              {client?.metaAdsData?.reach || "452K"}
             </div>
             <div className="flex items-center gap-unit mt-unit text-[#10B981] font-label-sm text-label-sm">
-              <span
-                className="material-symbols-outlined text-[14px]"
-                data-icon="trending_up"
-              >
+              <span className="material-symbols-outlined text-[14px]" data-icon="trending_up">
                 trending_up
               </span>
-              <span>12.5% vs last month</span>
+              <span>{client?.metaAdsData?.reachChange || "12.5% vs last month"}</span>
             </div>
           </div>
         </div>
@@ -97,25 +88,19 @@ const MetaAdsOverview = () => {
             <span className="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">
               Link Clicks
             </span>
-            <span
-              className="material-symbols-outlined text-primary"
-              data-icon="touch_app"
-            >
+            <span className="material-symbols-outlined text-primary" data-icon="touch_app">
               touch_app
             </span>
           </div>
           <div>
             <div className="font-headline-md text-headline-md text-on-background">
-              18,245
+              {client?.metaAdsData?.linkClicks || "18,245"}
             </div>
             <div className="flex items-center gap-unit mt-unit text-error font-label-sm text-label-sm">
-              <span
-                className="material-symbols-outlined text-[14px]"
-                data-icon="trending_down"
-              >
+              <span className="material-symbols-outlined text-[14px]" data-icon="trending_down">
                 trending_down
               </span>
-              <span>2.1% vs last month</span>
+              <span>{client?.metaAdsData?.clicksChange || "2.1% vs last month"}</span>
             </div>
           </div>
         </div>
@@ -125,25 +110,19 @@ const MetaAdsOverview = () => {
             <span className="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">
               Purchases
             </span>
-            <span
-              className="material-symbols-outlined text-primary"
-              data-icon="shopping_cart"
-            >
+            <span className="material-symbols-outlined text-primary" data-icon="shopping_cart">
               shopping_cart
             </span>
           </div>
           <div>
             <div className="font-headline-md text-headline-md text-on-background">
-              1,142
+              {client?.metaAdsData?.purchases || "1,142"}
             </div>
             <div className="flex items-center gap-unit mt-unit text-[#10B981] font-label-sm text-label-sm">
-              <span
-                className="material-symbols-outlined text-[14px]"
-                data-icon="trending_up"
-              >
+              <span className="material-symbols-outlined text-[14px]" data-icon="trending_up">
                 trending_up
               </span>
-              <span>8.4% vs last month</span>
+              <span>{client?.metaAdsData?.purchasesChange || "8.4% vs last month"}</span>
             </div>
           </div>
         </div>
@@ -153,25 +132,19 @@ const MetaAdsOverview = () => {
             <span className="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">
               ROAS
             </span>
-            <span
-              className="material-symbols-outlined text-primary"
-              data-icon="finance"
-            >
+            <span className="material-symbols-outlined text-primary" data-icon="finance">
               finance
             </span>
           </div>
           <div>
             <div className="font-headline-md text-headline-md text-primary font-bold">
-              3.4x
+              {client?.metaAdsData?.roas || "3.4x"}
             </div>
             <div className="flex items-center gap-unit mt-unit text-[#10B981] font-label-sm text-label-sm">
-              <span
-                className="material-symbols-outlined text-[14px]"
-                data-icon="trending_up"
-              >
+              <span className="material-symbols-outlined text-[14px]" data-icon="trending_up">
                 trending_up
               </span>
-              <span>0.2x vs last month</span>
+              <span>{client?.metaAdsData?.roasChange || "0.2x vs last month"}</span>
             </div>
           </div>
         </div>
@@ -184,12 +157,7 @@ const MetaAdsOverview = () => {
           </h3>
           <button className="text-primary font-label-md text-label-md hover:underline flex items-center gap-unit">
             View All in Meta Ads Manager
-            <span
-              className="material-symbols-outlined text-[16px]"
-              data-icon="open_in_new"
-            >
-              open_in_new
-            </span>
+            <span className="material-symbols-outlined text-[16px]" data-icon="open_in_new">open_in_new</span>
           </button>
         </div>
         <div className="overflow-x-auto">
@@ -199,137 +167,57 @@ const MetaAdsOverview = () => {
                 <th className="py-3 px-4 font-semibold">Campaign Name</th>
                 <th className="py-3 px-4 font-semibold">Ad Set</th>
                 <th className="py-3 px-4 font-semibold">Status</th>
-                <th className="py-3 px-4 font-semibold text-right">
-                  Amount Spent
-                </th>
-                <th className="py-3 px-4 font-semibold text-right">
-                  Results (Purchases)
-                </th>
-                <th className="py-3 px-4 font-semibold text-right">
-                  Cost per Result
-                </th>
+                <th className="py-3 px-4 font-semibold text-right">Amount Spent</th>
+                <th className="py-3 px-4 font-semibold text-right">Results (Purchases)</th>
+                <th className="py-3 px-4 font-semibold text-right">Cost per Result</th>
               </tr>
             </thead>
             <tbody className="font-body-sm text-body-sm text-on-background divide-y divide-[#F0F0F0]">
-              <tr className="hover:bg-[#F9F9F9] transition-colors group cursor-pointer">
-                <td className="py-4 px-4">
-                  <div className="font-semibold text-on-background group-hover:text-primary transition-colors">
-                    Q3 Retargeting - Dynamic
-                  </div>
-                  <div className="text-on-surface-variant text-[12px] mt-0.5">
-                    ID: 23849920192
-                  </div>
-                </td>
-                <td className="py-4 px-4 text-on-surface-variant">
-                  Website Visitors 30D
-                </td>
-                <td className="py-4 px-4">
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#10B981]/10 text-[#10B981] font-label-sm text-label-sm">
-                    <span className="w-1.5 h-1.5 rounded-full bg-[#10B981]"></span>
-                    Active
-                  </span>
-                </td>
-                <td className="py-4 px-4 text-right tabular-nums">$3,240.50</td>
-                <td className="py-4 px-4 text-right tabular-nums font-medium">
-                  342
-                </td>
-                <td className="py-4 px-4 text-right tabular-nums">$9.47</td>
-              </tr>
-              <tr className="hover:bg-[#F9F9F9] transition-colors group cursor-pointer">
-                <td className="py-4 px-4">
-                  <div className="font-semibold text-on-background group-hover:text-primary transition-colors">
-                    Broad Prospecting - Video
-                  </div>
-                  <div className="text-on-surface-variant text-[12px] mt-0.5">
-                    ID: 23849920331
-                  </div>
-                </td>
-                <td className="py-4 px-4 text-on-surface-variant">
-                  US/CA - 25-44 - Broad
-                </td>
-                <td className="py-4 px-4">
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#10B981]/10 text-[#10B981] font-label-sm text-label-sm">
-                    <span className="w-1.5 h-1.5 rounded-full bg-[#10B981]"></span>
-                    Active
-                  </span>
-                </td>
-                <td className="py-4 px-4 text-right tabular-nums">$5,100.00</td>
-                <td className="py-4 px-4 text-right tabular-nums font-medium">
-                  415
-                </td>
-                <td className="py-4 px-4 text-right tabular-nums">$12.28</td>
-              </tr>
-              <tr className="hover:bg-[#F9F9F9] transition-colors group cursor-pointer">
-                <td className="py-4 px-4">
-                  <div className="font-semibold text-on-background group-hover:text-primary transition-colors">
-                    Lookalike 1% - Purchasers
-                  </div>
-                  <div className="text-on-surface-variant text-[12px] mt-0.5">
-                    ID: 23849920887
-                  </div>
-                </td>
-                <td className="py-4 px-4 text-on-surface-variant">LAL 1% US</td>
-                <td className="py-4 px-4">
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-error/10 text-error font-label-sm text-label-sm">
-                    <span className="w-1.5 h-1.5 rounded-full bg-error"></span>
-                    Learning Limited
-                  </span>
-                </td>
-                <td className="py-4 px-4 text-right tabular-nums">$1,850.25</td>
-                <td className="py-4 px-4 text-right tabular-nums font-medium">
-                  120
-                </td>
-                <td className="py-4 px-4 text-right tabular-nums">$15.41</td>
-              </tr>
-              <tr className="hover:bg-[#F9F9F9] transition-colors group cursor-pointer">
-                <td className="py-4 px-4">
-                  <div className="font-semibold text-on-background group-hover:text-primary transition-colors">
-                    Flash Sale Weekend
-                  </div>
-                  <div className="text-on-surface-variant text-[12px] mt-0.5">
-                    ID: 23849921102
-                  </div>
-                </td>
-                <td className="py-4 px-4 text-on-surface-variant">
-                  Engaged Audience 180D
-                </td>
-                <td className="py-4 px-4">
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-tertiary-fixed-dim/30 text-on-surface-variant font-label-sm text-label-sm">
-                    <span className="w-1.5 h-1.5 rounded-full bg-tertiary-fixed-dim"></span>
-                    Completed
-                  </span>
-                </td>
-                <td className="py-4 px-4 text-right tabular-nums">$2,259.25</td>
-                <td className="py-4 px-4 text-right tabular-nums font-medium">
-                  265
-                </td>
-                <td className="py-4 px-4 text-right tabular-nums">$8.52</td>
-              </tr>
+              {campaigns.length > 0 ? (
+                campaigns.filter(c => typeof c === 'object' && c.platform === 'meta').map((campaign, idx) => (
+                  <tr key={idx} className="hover:bg-[#F9F9F9] transition-colors group cursor-pointer">
+                    <td className="py-4 px-4">
+                      <div className="font-semibold text-on-background group-hover:text-primary transition-colors">
+                        {campaign.name || "Unnamed Campaign"}
+                      </div>
+                      <div className="text-on-surface-variant text-[12px] mt-0.5">
+                        ID: {campaign.id || "N/A"}
+                      </div>
+                    </td>
+                    <td className="py-4 px-4 text-on-surface-variant">
+                      {campaign.adSet || campaign.ad_set || "N/A"}
+                    </td>
+                    <td className="py-4 px-4">
+                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full font-label-sm text-label-sm ${
+                        campaign.status === 'Active' || campaign.status === 'active'
+                          ? 'bg-[#10B981]/10 text-[#10B981]'
+                          : campaign.status === 'Completed' || campaign.status === 'completed'
+                          ? 'bg-[#6B7280]/10 text-[#6B7280]'
+                          : 'bg-error/10 text-error'
+                      }`}>
+                        <span className="w-1.5 h-1.5 rounded-full bg-current"></span>
+                        {campaign.status || "Active"}
+                      </span>
+                    </td>
+                    <td className="py-4 px-4 text-right tabular-nums">{campaign.spend || "N/A"}</td>
+                    <td className="py-4 px-4 text-right tabular-nums font-medium">{campaign.results || campaign.purchases || "N/A"}</td>
+                    <td className="py-4 px-4 text-right tabular-nums">{campaign.cpc || campaign.costPerResult || "N/A"}</td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan="6" className="py-8 px-4 text-center text-on-surface-variant">
+                    No Meta campaigns configured for {clientName}.
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
         <div className="p-4 border-t border-outline-variant bg-[#FAFAFA] flex justify-between items-center">
           <span className="font-body-sm text-body-sm text-on-surface-variant">
-            Showing 4 of 12 campaigns
+            Showing data for active campaigns
           </span>
-          <div className="flex gap-2">
-            <button className="p-2 border border-outline-variant rounded bg-white text-on-surface-variant disabled:opacity-50 cursor-not-allowed">
-              <span
-                className="material-symbols-outlined text-[16px]"
-                data-icon="chevron_left"
-              >
-                chevron_left
-              </span>
-            </button>
-            <button className="p-2 border border-outline-variant rounded bg-white text-on-surface hover:border-primary transition-colors">
-              <span
-                className="material-symbols-outlined text-[16px]"
-                data-icon="chevron_right"
-              >
-                chevron_right
-              </span>
-            </button>
-          </div>
         </div>
       </div>
     </main>

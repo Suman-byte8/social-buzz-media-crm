@@ -1,12 +1,16 @@
 import React from "react";
 
-const Ads = () => {
+const Ads = ({ client }) => {
+  const clientName = client?.name || "Client";
+  const campaigns = Array.isArray(client?.campaigns) ? client.campaigns :
+    (client?.campaigns ? client.campaigns.split(",") : []);
+
   return (
     <main className="flex-1 p-container-margin bg-[#F5F5F7]">
       {/* Client Header */}
       <div className="mb-stack-lg flex justify-between items-end">
         <div>
-          <h2 className="font-display-lg text-display-lg text-on-background mb-unit">Acme Corp</h2>
+          <h2 className="font-display-lg text-display-lg text-on-background mb-unit">{clientName}</h2>
           <div className="flex gap-stack-md border-b border-outline-variant pb-unit mt-stack-md">
             <span className="font-label-md text-label-md text-on-surface-variant cursor-pointer hover:text-primary">Overview</span>
             <span className="font-label-md text-label-md text-primary font-bold border-b-2 border-primary cursor-pointer pb-unit -mb-[5px]">Google Ads</span>
@@ -27,9 +31,11 @@ const Ads = () => {
             <span className="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">Spend</span>
             <span className="material-symbols-outlined text-on-surface-variant" data-icon="payments">payments</span>
           </div>
-          <div className="font-display-lg text-display-lg text-on-surface relative z-10">$12,450</div>
+          <div className="font-display-lg text-display-lg text-on-surface relative z-10">
+            {client?.googleAdsData?.spend || "$12,450"}
+          </div>
           <div className="font-label-md text-label-md text-[#16a34a] mt-unit flex items-center gap-1 relative z-10">
-            <span className="material-symbols-outlined text-[14px]" data-icon="trending_up">trending_up</span> 14% vs last mo
+            <span className="material-symbols-outlined text-[14px]" data-icon="trending_up">trending_up</span> {client?.googleAdsData?.spendChange || "14% vs last mo"}
           </div>
         </div>
         {/* Conversions */}
@@ -39,9 +45,11 @@ const Ads = () => {
             <span className="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">Conversions</span>
             <span className="material-symbols-outlined text-on-surface-variant" data-icon="add_shopping_cart">add_shopping_cart</span>
           </div>
-          <div className="font-display-lg text-display-lg text-on-surface relative z-10">842</div>
+          <div className="font-display-lg text-display-lg text-on-surface relative z-10">
+            {client?.googleAdsData?.conversions || "842"}
+          </div>
           <div className="font-label-md text-label-md text-[#16a34a] mt-unit flex items-center gap-1 relative z-10">
-            <span className="material-symbols-outlined text-[14px]" data-icon="trending_up">trending_up</span> 5% vs last mo
+            <span className="material-symbols-outlined text-[14px]" data-icon="trending_up">trending_up</span> {client?.googleAdsData?.conversionsChange || "5% vs last mo"}
           </div>
         </div>
         {/* ROAS */}
@@ -51,9 +59,11 @@ const Ads = () => {
             <span className="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">ROAS</span>
             <span className="material-symbols-outlined text-on-surface-variant" data-icon="monitoring">monitoring</span>
           </div>
-          <div className="font-display-lg text-display-lg text-on-surface relative z-10">4.2x</div>
+          <div className="font-display-lg text-display-lg text-on-surface relative z-10">
+            {client?.googleAdsData?.roas || "4.2x"}
+          </div>
           <div className="font-label-md text-label-md text-[#dc2626] mt-unit flex items-center gap-1 relative z-10">
-            <span className="material-symbols-outlined text-[14px]" data-icon="trending_down">trending_down</span> 2% vs last mo
+            <span className="material-symbols-outlined text-[14px]" data-icon="trending_down">trending_down</span> {client?.googleAdsData?.roasChange || "2% vs last mo"}
           </div>
         </div>
         {/* CPC */}
@@ -63,9 +73,11 @@ const Ads = () => {
             <span className="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">Avg. CPC</span>
             <span className="material-symbols-outlined text-on-surface-variant" data-icon="touch_app">touch_app</span>
           </div>
-          <div className="font-display-lg text-display-lg text-on-surface relative z-10">$1.45</div>
+          <div className="font-display-lg text-display-lg text-on-surface relative z-10">
+            {client?.googleAdsData?.cpc || "$1.45"}
+          </div>
           <div className="font-label-md text-label-md text-on-surface-variant mt-unit flex items-center gap-1 relative z-10">
-            <span className="material-symbols-outlined text-[14px]" data-icon="horizontal_rule">horizontal_rule</span> 0% vs last mo
+            <span className="material-symbols-outlined text-[14px]" data-icon="horizontal_rule">horizontal_rule</span> {client?.googleAdsData?.cpcChange || "0% vs last mo"}
           </div>
         </div>
       </div>
@@ -92,46 +104,30 @@ const Ads = () => {
               </tr>
             </thead>
             <tbody className="font-body-sm text-body-sm text-on-surface">
-              <tr className="border-b border-[#F0F0F0] hover:bg-[#F9F9F9] transition-colors">
-                <td className="p-stack-md font-medium text-primary cursor-pointer hover:underline">Q3_Search_Brand_US</td>
-                <td className="p-stack-md">
-                  <span className="inline-flex items-center px-2 py-1 rounded-xl text-xs font-medium bg-[#16a34a]/10 text-[#16a34a]">Active</span>
-                </td>
-                <td className="p-stack-md text-right">$150.00</td>
-                <td className="p-stack-md text-right">45,231</td>
-                <td className="p-stack-md text-right">2,104</td>
-                <td className="p-stack-md text-right font-medium">142</td>
-              </tr>
-              <tr className="border-b border-[#F0F0F0] hover:bg-[#F9F9F9] transition-colors">
-                <td className="p-stack-md font-medium text-primary cursor-pointer hover:underline">Q3_Display_Retargeting_All</td>
-                <td className="p-stack-md">
-                  <span className="inline-flex items-center px-2 py-1 rounded-xl text-xs font-medium bg-[#16a34a]/10 text-[#16a34a]">Active</span>
-                </td>
-                <td className="p-stack-md text-right">$75.00</td>
-                <td className="p-stack-md text-right">120,450</td>
-                <td className="p-stack-md text-right">840</td>
-                <td className="p-stack-md text-right font-medium">56</td>
-              </tr>
-              <tr className="border-b border-[#F0F0F0] hover:bg-[#F9F9F9] transition-colors">
-                <td className="p-stack-md font-medium text-primary cursor-pointer hover:underline">Pmax_Holiday_Promo_Test</td>
-                <td className="p-stack-md">
-                  <span className="inline-flex items-center px-2 py-1 rounded-xl text-xs font-medium bg-[#eab308]/10 text-[#ca8a04]">Learning</span>
-                </td>
-                <td className="p-stack-md text-right">$200.00</td>
-                <td className="p-stack-md text-right">12,400</td>
-                <td className="p-stack-md text-right">450</td>
-                <td className="p-stack-md text-right font-medium">12</td>
-              </tr>
-              <tr className="border-b border-[#F0F0F0] hover:bg-[#F9F9F9] transition-colors opacity-60">
-                <td className="p-stack-md font-medium text-primary cursor-pointer hover:underline">Q2_Search_NonBrand_Competitor</td>
-                <td className="p-stack-md">
-                  <span className="inline-flex items-center px-2 py-1 rounded-xl text-xs font-medium bg-tertiary-fixed-dim/20 text-tertiary">Paused</span>
-                </td>
-                <td className="p-stack-md text-right">$50.00</td>
-                <td className="p-stack-md text-right">8,900</td>
-                <td className="p-stack-md text-right">120</td>
-                <td className="p-stack-md text-right font-medium">4</td>
-              </tr>
+              {campaigns.length > 0 ? (
+                campaigns.map((campaign, idx) => (
+                  <tr key={idx} className="border-b border-[#F0F0F0] hover:bg-[#F9F9F9] transition-colors">
+                    <td className="p-stack-md font-medium text-primary cursor-pointer hover:underline">
+                      {typeof campaign === 'object' ? campaign.name : campaign}
+                    </td>
+                    <td className="p-stack-md">
+                      <span className="inline-flex items-center px-2 py-1 rounded-xl text-xs font-medium bg-[#16a34a]/10 text-[#16a34a]">
+                        {typeof campaign === 'object' ? (campaign.status || "Active") : "Active"}
+                      </span>
+                    </td>
+                    <td className="p-stack-md text-right">{typeof campaign === 'object' ? (campaign.budget || "$150.00") : "$150.00"}</td>
+                    <td className="p-stack-md text-right">{typeof campaign === 'object' ? (campaign.impressions || "45,231") : "45,231"}</td>
+                    <td className="p-stack-md text-right">{typeof campaign === 'object' ? (campaign.clicks || "2,104") : "2,104"}</td>
+                    <td className="p-stack-md text-right font-medium">{typeof campaign === 'object' ? (campaign.conversions || "142") : "142"}</td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan="6" className="p-8 text-center text-on-surface-variant">
+                    No campaigns configured for {clientName}.
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>

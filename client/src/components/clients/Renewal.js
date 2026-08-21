@@ -1,6 +1,37 @@
 import React from "react";
 
-export default function Renewal() {
+export default function Renewal({ client }) {
+  const clientName = client?.name || "Client";
+  const renewalDate = client?.renewal;
+
+  const daysUntilRenewal = renewalDate
+    ? Math.ceil((new Date(renewalDate) - new Date()) / (1000 * 60 * 60 * 24))
+    : null;
+
+  const renewalDateStr = renewalDate
+    ? new Date(renewalDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+    : "N/A";
+
+  const statusLabel = daysUntilRenewal !== null
+    ? daysUntilRenewal <= 0
+      ? "Expired"
+      : daysUntilRenewal <= 7
+      ? "Action Required Soon"
+      : daysUntilRenewal <= 30
+      ? "Upcoming"
+      : "Active"
+    : "Unknown";
+
+  const statusColor = daysUntilRenewal !== null
+    ? daysUntilRenewal <= 0
+      ? "bg-error"
+      : daysUntilRenewal <= 7
+      ? "bg-error"
+      : daysUntilRenewal <= 30
+      ? "bg-tertiary-fixed-dim"
+      : "bg-primary"
+    : "bg-tertiary-fixed-dim";
+
   return (
     <main className="flex-1 overflow-y-auto p-container-margin">
       <div className="max-w-7xl mx-auto space-y-8">
@@ -8,7 +39,7 @@ export default function Renewal() {
           <div>
             <h1 className="font-display-lg text-display-lg text-on-surface">Renewal Details</h1>
             <p className="font-body-md text-body-md text-on-surface-variant mt-2">
-              Manage contract renewal timelines and next-term recommendations.
+              Manage contract renewal timelines and next-term recommendations for {clientName}.
             </p>
           </div>
           <button className="inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-3 text-on-primary font-label-md text-label-md shadow-sm hover:bg-primary/90 transition-colors">
@@ -27,31 +58,45 @@ export default function Renewal() {
                 </h2>
                 <p className="font-body-sm text-body-sm text-on-surface-variant mt-1">Master Services Agreement v2.1</p>
               </div>
-              <span className="inline-flex items-center rounded-full bg-error-container px-3 py-1 text-on-error-container text-sm font-medium gap-2">
-                <span className="h-2 w-2 rounded-full bg-error animate-pulse"></span>
-                Action Required Soon
+              <span className={`inline-flex items-center rounded-full px-3 py-1 text-sm font-medium gap-2 ${
+                daysUntilRenewal !== null && daysUntilRenewal <= 7
+                  ? "bg-error-container text-on-error-container"
+                  : "bg-surface-container-low text-on-surface-variant"
+              }`}>
+                <span className={`h-2 w-2 rounded-full animate-pulse ${statusColor}`}></span>
+                {statusLabel}
               </span>
             </div>
             <div className="flex flex-col gap-6">
               <div className="flex items-end justify-between gap-4">
                 <div className="flex items-baseline gap-2">
-                  <span className="font-display-lg text-display-lg text-primary text-[72px] leading-none">45</span>
-                  <span className="font-headline-sm text-headline-sm text-on-surface-variant">Days</span>
+                  <span className="font-display-lg text-display-lg text-primary text-[72px] leading-none">
+                    {daysUntilRenewal !== null ? Math.abs(daysUntilRenewal) : "--"}
+                  </span>
+                  <span className="font-headline-sm text-headline-sm text-on-surface-variant">
+                    {daysUntilRenewal !== null ? "Days" : "N/A"}
+                  </span>
                 </div>
                 <div className="text-right">
                   <p className="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-widest">Target Date</p>
-                  <p className="font-headline-sm text-headline-sm text-on-surface">Oct 15, 2024</p>
+                  <p className="font-headline-sm text-headline-sm text-on-surface">{renewalDateStr}</p>
                 </div>
               </div>
               <div className="rounded-3xl border border-secondary-fixed bg-surface p-5">
                 <div className="flex flex-col gap-4">
                   <div className="flex items-center justify-between">
                     <span className="font-label-md text-label-md text-on-surface-variant">Current Value</span>
-                    <span className="font-title-lg text-title-lg text-on-surface">$12,500/mo</span>
+                    <span className="font-title-lg text-title-lg text-on-surface">
+                      {client?.monthlyRetainer
+                        ? `$${client.monthlyRetainer.toLocaleString()}/mo`
+                        : "N/A"}
+                    </span>
                   </div>
                   <div className="text-[#16a34a] font-label-md flex items-center gap-2">
                     <span className="material-symbols-outlined text-[16px]">trending_up</span>
-                    +15% vs previous term
+                    {client?.contractValue
+                      ? `$${client.contractValue.toLocaleString()} total contract`
+                      : "No contract value on file"}
                   </div>
                 </div>
               </div>
@@ -65,13 +110,18 @@ export default function Renewal() {
                 Current Value
               </h2>
               <p className="font-display-lg text-display-lg text-on-surface">
-                $150,000 <span className="font-body-md text-on-surface-variant text-[16px] font-normal">/12 mo</span>
+                {client?.contractValue
+                  ? `$${client.contractValue.toLocaleString()}`
+                  : "N/A"}
+                {client?.renewalTerm ? <span className="font-body-md text-on-surface-variant text-[16px] font-normal"> {client.renewalTerm}</span> : ""}
               </p>
             </div>
             <div className="pt-6 border-t border-secondary-fixed">
-              <div className="flex items-center justify-between mb-2">
-                <span className="font-body-sm text-body-sm text-on-surface-variant">Total Contract Value</span>
-                <span className="font-label-md text-label-md text-on-surface">$150,000</span>
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="font-body-sm text-body-sm text-on-surface-variant">Renewal Date</span>
+                  <span className="font-label-md text-label-md text-on-surface block">{renewalDateStr}</span>
+                </div>
               </div>
             </div>
           </aside>
@@ -89,14 +139,20 @@ export default function Renewal() {
                   <p className="font-label-md text-label-md text-on-surface">Proposed Increase</p>
                   <p className="font-body-sm text-body-sm text-on-surface-variant">Targeting 8% baseline bump</p>
                 </div>
-                <span className="font-title-lg text-title-lg text-on-surface">$13,500/mo</span>
+                <span className="font-title-lg text-title-lg text-on-surface">
+                  {client?.monthlyRetainer
+                    ? `$${(client.monthlyRetainer * 1.08).toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0})}/mo`
+                    : "N/A"}
+                </span>
               </div>
               <div className="rounded-3xl border border-secondary-fixed bg-surface p-4 flex items-center justify-between gap-4 hover:bg-surface-container transition-colors cursor-pointer">
                 <div>
                   <p className="font-label-md text-label-md text-on-surface">Term Length</p>
                   <p className="font-body-sm text-body-sm text-on-surface-variant">Standard commit</p>
                 </div>
-                <span className="font-title-lg text-title-lg text-on-surface">12 Months</span>
+                <span className="font-title-lg text-title-lg text-on-surface">
+                  {client?.renewalTerm || "12 Months"}
+                </span>
               </div>
             </div>
             <div className="mt-6 border-t border-secondary-fixed pt-5">
@@ -106,7 +162,7 @@ export default function Renewal() {
                   <p className="font-body-sm text-body-sm text-on-surface-variant">Send nudges at 30, 15, and 5 days.</p>
                 </div>
                 <label className="relative inline-flex items-center cursor-pointer">
-                  <input className="sr-only peer" type="checkbox" />
+                  <input className="sr-only peer" type="checkbox" defaultChecked={true} />
                   <div className="h-6 w-11 rounded-full bg-tertiary-fixed-dim peer-checked:bg-primary peer-focus:outline-none relative after:absolute after:left-1 after:top-1 after:h-4 after:w-4 after:rounded-full after:bg-white after:transition-all peer-checked:after:translate-x-full"></div>
                 </label>
               </div>
@@ -132,19 +188,19 @@ export default function Renewal() {
                 </thead>
                 <tbody>
                   <tr className="border-b border-secondary-fixed hover:bg-[#F9F9F9] transition-colors cursor-pointer">
-                    <td className="px-4 py-3 font-body-sm text-body-sm text-on-surface">Oct 2023 - Oct 2024</td>
-                    <td className="px-4 py-3 font-label-md text-label-md text-on-surface">$12,500/mo</td>
-                    <td className="px-4 py-3"><span className="rounded-xl bg-primary-fixed px-2 py-1 text-xs font-semibold text-on-primary-fixed-variant">Current</span></td>
-                  </tr>
-                  <tr className="border-b border-secondary-fixed hover:bg-[#F9F9F9] transition-colors cursor-pointer">
-                    <td className="px-4 py-3 font-body-sm text-body-sm text-on-surface">Oct 2022 - Oct 2023</td>
-                    <td className="px-4 py-3 font-label-md text-label-md text-on-surface">$10,870/mo</td>
-                    <td className="px-4 py-3"><span className="rounded-xl bg-tertiary-fixed px-2 py-1 text-xs font-semibold text-tertiary">Completed</span></td>
-                  </tr>
-                  <tr className="hover:bg-[#F9F9F9] transition-colors cursor-pointer">
-                    <td className="px-4 py-3 font-body-sm text-body-sm text-on-surface">Oct 2021 - Oct 2022</td>
-                    <td className="px-4 py-3 font-label-md text-label-md text-on-surface">$9,500/mo</td>
-                    <td className="px-4 py-3"><span className="rounded-xl bg-tertiary-fixed px-2 py-1 text-xs font-semibold text-tertiary">Completed</span></td>
+                    <td className="px-4 py-3 font-body-sm text-body-sm text-on-surface">
+                      {renewalDate
+                        ? `${new Date(renewalDate).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })} - ${renewalDateStr}`
+                        : "N/A"}
+                    </td>
+                    <td className="px-4 py-3 font-label-md text-label-md text-on-surface">
+                      {client?.monthlyRetainer
+                        ? `$${client.monthlyRetainer.toLocaleString()}/mo`
+                        : "N/A"}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className="rounded-xl bg-primary-fixed px-2 py-1 text-xs font-semibold text-on-primary-fixed-variant">Current</span>
+                    </td>
                   </tr>
                 </tbody>
               </table>

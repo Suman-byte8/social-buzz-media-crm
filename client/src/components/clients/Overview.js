@@ -1,76 +1,34 @@
-import React, { useState } from "react";
+import React from "react";
 import StatusBadge from "@/components/ui/StatusBadge";
 import Card from "@/components/ui/Card";
 
-export default function Overview() {
-  const [clients] = useState([
-    {
-      id: 1,
-      name: "TechCorp Inc.",
-      industry: "SaaS / Enterprise",
-      services: ["SEO", "Content"],
-      accountManager: "Jane Doe",
-      healthStatus: "Excellent",
-      healthColor: "green",
-      mrr: "$12,500",
-      avatar: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=150&auto=format&fit=crop&q=80",
-    },
-    {
-      id: 2,
-      name: "Global Retailers",
-      industry: "E-commerce",
-      services: ["Meta Ads", "Google Ads", "Design"],
-      accountManager: "Mike Smith",
-      healthStatus: "Fair",
-      healthColor: "amber",
-      mrr: "$8,200",
-      avatar: null,
-    },
-    {
-      id: 3,
-      name: "HealthPlus",
-      industry: "Healthcare",
-      services: ["SEO"],
-      accountManager: "Jane Doe",
-      healthStatus: "At Risk",
-      healthColor: "red",
-      mrr: "$4,500",
-      avatar: "https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?w=150&auto=format&fit=crop&q=80",
-    },
-  ]);
+export default function Overview({ client }) {
+  const clientName = client?.name || "Client Details";
+  const clientIndustry = client?.industry || "Industry";
+  const clientHealth = client?.clientHealth || 0;
+  const healthLabel = clientHealth >= 80 ? "Excellent" : clientHealth >= 50 ? "Fair" : "At Risk";
+  const healthColor = clientHealth >= 80 ? "green" : clientHealth >= 50 ? "amber" : "red";
+  const services = Array.isArray(client?.servicesSelected) ? client.servicesSelected : 
+    (client?.servicesSelected ? client.servicesSelected.split(",") : []);
+  const mrr = client?.monthlyRetainer ? `$${client.monthlyRetainer.toLocaleString()}` : "N/A";
 
   const metrics = [
-    { id: 1, title: "Monthly Retainer", value: "$12,500", change: "Stable over last 30 days" },
-    { id: 2, title: "Active Campaigns", value: "8", change: "2 launching this week" },
-    { id: 3, title: "Total Spend", value: "$71,400", change: "+9.8% vs prior period" },
-    { id: 4, title: "Open Issues", value: "3", change: "1 overdue deliverable" },
+    { id: 1, title: "Monthly Retainer", value: mrr, change: "Based on current contract" },
+    { id: 2, title: "Active Services", value: services.length, change: services.length > 0 ? `${services.length} service${services.length > 1 ? 's' : ''} active` : "No active services" },
+    { id: 3, title: "Client Health", value: `${clientHealth}%`, change: `${healthLabel} health score` },
+    { id: 4, title: "Client Since", value: client?.createdAt ? new Date(client.createdAt).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : "N/A", change: "" },
   ];
 
-  const recentActivities = [
-    {
-      id: 1,
-      date: "Oct 24, 2024",
-      message: "Approved new Meta Ads budget for Q4 launch",
-      type: "Budget",
-    },
-    {
-      id: 2,
-      date: "Oct 18, 2024",
-      message: "Shared performance deck for September campaigns",
-      type: "Report",
-    },
-    {
-      id: 3,
-      date: "Oct 12, 2024",
-      message: "Reviewed social media strategy with client team",
-      type: "Strategy",
-    },
+  const recentActivities = client?.notes ? [
+    { id: 1, date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }), message: client.notes.substring(0, 100) + (client.notes.length > 100 ? '...' : ''), type: "Note" },
+  ] : [
+    { id: 1, date: "N/A", message: "No recent activity recorded", type: "Note" },
   ];
 
   const keyContacts = [
-    { role: "Primary Decision Maker", name: "Sarah Jenkins" },
-    { role: "Finance Lead", name: "Miles Carter" },
-    { role: "Media Lead", name: "Leah Kim" },
+    { role: "Primary Contact", name: client?.contactPerson || clientName },
+    { role: "Email", name: client?.email || "N/A" },
+    { role: "Phone", name: client?.phoneNumber || "N/A" },
   ];
 
   return (
