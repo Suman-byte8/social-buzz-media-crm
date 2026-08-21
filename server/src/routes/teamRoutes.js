@@ -65,8 +65,12 @@ router.post("/team-members", async (req, res) => {
 
       // Work & Status Details
       status: status !== undefined ? status : null,
-      assignedWorks: formatField(assignedWorks !== undefined ? assignedWorks : assigned_works),
-      clientHandling: formatField(clientHandling !== undefined ? clientHandling : client_handling),
+      assignedWorks: formatField(
+        assignedWorks !== undefined ? assignedWorks : assigned_works,
+      ),
+      clientHandling: formatField(
+        clientHandling !== undefined ? clientHandling : client_handling,
+      ),
     };
 
     const teamMember = await TeamMember.create(memberData);
@@ -160,17 +164,39 @@ router.put("/team-members/:id", async (req, res) => {
     const updateData = {
       name: name ?? teamMember.name,
       email: email !== undefined ? email : teamMember.email,
-      number: (number || phoneNumber) !== undefined ? (number || phoneNumber) : teamMember.number,
-      whatsappNumber: (whatsappNumber || whatsapp_number) !== undefined ? (whatsappNumber || whatsapp_number) : teamMember.whatsappNumber,
+      number:
+        (number || phoneNumber) !== undefined
+          ? number || phoneNumber
+          : teamMember.number,
+      whatsappNumber:
+        (whatsappNumber || whatsapp_number) !== undefined
+          ? whatsappNumber || whatsapp_number
+          : teamMember.whatsappNumber,
       address: address !== undefined ? address : teamMember.address,
-      designation: designation !== undefined ? designation : teamMember.designation,
+      designation:
+        designation !== undefined ? designation : teamMember.designation,
       department: department !== undefined ? department : teamMember.department,
-      employmentType: (employmentType || type_of_employment) !== undefined ? (employmentType || type_of_employment) : teamMember.employmentType,
-      hireDate: (hireDate || hire_date) !== undefined ? new Date(hireDate || hire_date) : teamMember.hireDate,
-      managerReportTo: (managerReportTo || manager_report_to) !== undefined ? (managerReportTo || manager_report_to) : teamMember.managerReportTo,
+      employmentType:
+        (employmentType || type_of_employment) !== undefined
+          ? employmentType || type_of_employment
+          : teamMember.employmentType,
+      hireDate:
+        (hireDate || hire_date) !== undefined
+          ? new Date(hireDate || hire_date)
+          : teamMember.hireDate,
+      managerReportTo:
+        (managerReportTo || manager_report_to) !== undefined
+          ? managerReportTo || manager_report_to
+          : teamMember.managerReportTo,
       status: status !== undefined ? status : teamMember.status,
-      assignedWorks: (assignedWorks !== undefined || assigned_works !== undefined) ? formatField(assignedWorks ?? assigned_works) : teamMember.assignedWorks,
-      clientHandling: (clientHandling !== undefined || client_handling !== undefined) ? formatField(clientHandling ?? client_handling) : teamMember.clientHandling,
+      assignedWorks:
+        assignedWorks !== undefined || assigned_works !== undefined
+          ? formatField(assignedWorks ?? assigned_works)
+          : teamMember.assignedWorks,
+      clientHandling:
+        clientHandling !== undefined || client_handling !== undefined
+          ? formatField(clientHandling ?? client_handling)
+          : teamMember.clientHandling,
     };
 
     await teamMember.update(updateData);

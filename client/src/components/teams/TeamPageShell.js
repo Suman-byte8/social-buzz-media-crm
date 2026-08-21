@@ -1,17 +1,50 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
+import { fetchTeamMembers } from "@/services/teamService";
 import TeamMemberRow from "@/components/teams/TeamMemberRow";
+import AddTeamMemberModal from "@/components/teams/AddTeamMemberModal";
+import EditMemberModal from "@/components/teams/EditMemberModal";
 
 const STATUS_OPTIONS = ["All", "active", "inactive", "null"];
 const DEPARTMENTS = ["All", "Social Media", "Tech & Dev", "Creative & Design", "Strategy"];
 
-export default function TeamPageShell({ teamMembers, stats }) {
+export default function TeamPageShell({ teamMembers: initialMembers }) {
+  const [teamMembers, setTeamMembers] = useState(initialMembers || []);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
   const [departmentFilter, setDepartmentFilter] = useState("All");
   const [currentPage, setCurrentPage] = useState(1);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [editingMember, setEditingMember] = useState(null);
   const itemsPerPage = 10;
+
+  const handleTeamMemberUpdate = async () => {
+    try {
+      const members = await fetchTeamMembers();
+      setTeamMembers(members || []);
+      setEditingMember(null);
+      setCurrentPage(1);
+    } catch (error) {
+      console.error("Error refreshing team members:", error);
+    }
+  };
+
+  const handleEdit = (member) => {
+    setEditingMember(member);
+  };
+
+  const handleDelete = async (member) => {
+    if (!window.confirm(`Delete ${member.name}? This action cannot be undone.`)) return;
+    try {
+      const { deleteTeamMember } = await import("@/services/teamService");
+      await deleteTeamMember(member.id);
+      handleTeamMemberUpdate();
+    } catch (error) {
+      console.error("Error deleting team member:", error);
+      alert("Failed to delete team member. Please try again.");
+    }
+  };
 
   const filteredMembers = useMemo(() => {
     return teamMembers.filter((member) => {
@@ -70,10 +103,9 @@ export default function TeamPageShell({ teamMembers, stats }) {
     {
       id: 4,
       title: "Tasks Completed This Week",
-      value: stats?.completedThisWeek || Math.floor(Math.random() * 200),
+      value: (teamMembers.length * 2).toString(),
       icon: "task_alt",
       iconColor: "text-purple-600",
-      suffix: "%",
     },
   ];
 
@@ -97,7 +129,10 @@ export default function TeamPageShell({ teamMembers, stats }) {
             <span className="material-symbols-outlined text-[18px]">download</span>
             Export
           </button>
-          <button className="h-10 px-4 rounded bg-[#e8262a] text-white font-label-md text-label-md flex items-center gap-2 hover:bg-[#c00016] transition-colors shadow-sm">
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="h-10 px-4 rounded bg-[#e8262a] text-white font-label-md text-label-md flex items-center gap-2 hover:bg-[#c00016] transition-colors shadow-sm"
+          >
             <span className="material-symbols-outlined text-[18px]">add</span>
             Add Team Member
           </button>
@@ -121,7 +156,6 @@ export default function TeamPageShell({ teamMembers, stats }) {
             </div>
             <div className="font-display-lg text-display-lg text-on-surface">
               {stat.value}
-              {stat.suffix && <span className="text-sm ml-1">{stat.suffix}</span>}
             </div>
           </div>
         ))}
@@ -148,8 +182,12 @@ export default function TeamPageShell({ teamMembers, stats }) {
             onChange={(e) => setStatusFilter(e.target.value)}
           >
             {STATUS_OPTIONS.map((option) => (
-              <option key={option} value={option === "All" ? "All" : option === "null" ? "null" : option}>
-                {option === "All" ? "All Status" : option === "null" ? "No Status" : option.charAt(0).toUpperCase() + option.slice(1)}
+              <option key={option} value={option}>
+                {option === "All"
+                  ? "All Status"
+                  : option === "null"
+                  ? "No Status"
+                  : option.charAt(0).toUpperCase() + option.slice(1)}
               </option>
             ))}
           </select>
@@ -160,7 +198,7 @@ export default function TeamPageShell({ teamMembers, stats }) {
           >
             {DEPARTMENTS.map((option) => (
               <option key={option} value={option}>
-                {option}
+                {option === "All" ? "All Departments" : option}
               </option>
             ))}
           </select>
@@ -199,7 +237,13 @@ export default function TeamPageShell({ teamMembers, stats }) {
             <tbody className="font-body-sm text-body-sm divide-y divide-[#F0F0F0]">
               {paginatedMembers.length > 0 ? (
                 paginatedMembers.map((member) => (
-                  <TeamMemberRow key={member.id} member={member} />
+                  <TeamMemberRow
+                    key={member.id}
+                    member={member}
+                    onUpdate={handleTeamMemberUpdate}
+                    onEdit={handleEdit}
+                    onDelete={handleDelete}
+                  />
                 ))
               ) : (
                 <tr>
@@ -250,6 +294,23 @@ export default function TeamPageShell({ teamMembers, stats }) {
           </div>
         </div>
       </div>
+
+      {/* Add Team Member Modal */}
+      <AddTeamMemberModal
+        isOpen={showAddModal}
+        onClose={() => setShowAddModal(false)}
+        onSuccess={handleTeamMemberUpdate}
+      />
+
+      {/* Edit Team Member Modal */}
+      {editingMember && (
+        <EditMemberModal
+          isOpen={true}
+          onClose={() => setEditingMember(null)}
+          onSuccess={handleTeamMemberUpdate}
+          member={editingMember}
+        />
+      )}
     </div>
   );
 }

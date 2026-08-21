@@ -1,10 +1,23 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { parseArrayField } from "@/services/teamService";
 
-export default function TeamMemberRow({ member }) {
+export default function TeamMemberRow({ member, onEdit, onDelete }) {
+  const [showDropdown, setShowDropdown] = useState(false);
+  const dropdownRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setShowDropdown(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
   const status = (member.status || "").toLowerCase();
   const getStatusBadge = () => {
     if (status === "active") {
@@ -89,12 +102,12 @@ export default function TeamMemberRow({ member }) {
       </td>
       <td className="py-3 px-4">
         <div className="flex flex-wrap gap-1">
-          {clientHandling.slice(0, 3).map((client, idx) => (
+          {clientHandling.slice(0, 3).map((clientName, idx) => (
             <span
               key={idx}
               className="px-2 py-0.5 bg-gray-100 rounded text-xs text-secondary border border-gray-200"
             >
-              {client}
+              {clientName}
             </span>
           ))}
           {clientHandling.length > 3 && (
@@ -119,12 +132,48 @@ export default function TeamMemberRow({ member }) {
         </div>
       </td>
       <td className="py-3 px-4 text-right">
-        <button
-          className="text-tertiary hover:text-primary transition-colors p-1"
-          title="Manage"
-        >
-          <span className="material-symbols-outlined text-[20px]">more_vert</span>
-        </button>
+        <div className="relative inline-block" ref={dropdownRef}>
+          <button
+            onClick={() => setShowDropdown(!showDropdown)}
+            className="text-tertiary hover:text-primary transition-colors p-1 rounded hover:bg-gray-100"
+            title="Actions"
+          >
+            <span className="material-symbols-outlined text-[20px]">more_vert</span>
+          </button>
+
+          {showDropdown && (
+            <div className="absolute right-0 mt-2 w-44 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
+              <Link
+                href={`/team/${member.id}`}
+                className="flex items-center gap-2 px-3 py-2 text-label-sm text-label-md text-on-surface hover:bg-gray-100 transition-colors"
+                onClick={() => setShowDropdown(false)}
+              >
+                <span className="material-symbols-outlined text-[18px]">visibility</span>
+                View Profile
+              </Link>
+              <button
+                onClick={() => {
+                  setShowDropdown(false);
+                  onEdit(member);
+                }}
+                className="w-full flex items-center gap-2 px-3 py-2 text-label-sm text-label-md text-on-surface hover:bg-gray-100 transition-colors text-left"
+              >
+                <span className="material-symbols-outlined text-[18px]">edit</span>
+                Edit
+              </button>
+              <button
+                onClick={() => {
+                  setShowDropdown(false);
+                  onDelete(member);
+                }}
+                className="w-full flex items-center gap-2 px-3 py-2 text-label-sm text-label-md text-red-600 hover:bg-red-50 transition-colors text-left"
+              >
+                <span className="material-symbols-outlined text-[18px]">delete</span>
+                Delete
+              </button>
+            </div>
+          )}
+        </div>
       </td>
     </tr>
   );
