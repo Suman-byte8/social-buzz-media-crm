@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { fetchClients } from "@/services/clientService";
-import { fetchDocumentsByClient, uploadDocument, deleteDocument } from "@/services/documentService";
+import { fetchDocuments, fetchDocumentsByClient, uploadDocument, deleteDocument } from "@/services/documentService";
 
 export default function ContentCalendarShell({ clients: initialClients }) {
   const [clients, setClients] = useState(initialClients || []);
@@ -34,7 +34,7 @@ export default function ContentCalendarShell({ clients: initialClients }) {
     if (selectedClientId) {
       loadDocuments(selectedClientId);
     } else {
-      setDocuments([]);
+      loadAllDocuments();
     }
   }, [selectedClientId]);
 
@@ -45,6 +45,17 @@ export default function ContentCalendarShell({ clients: initialClients }) {
       setDocuments(docList);
     } catch (error) {
       console.error("Error fetching documents:", error);
+      setDocuments([]);
+    }
+  };
+
+  const loadAllDocuments = async () => {
+    try {
+      const response = await fetchDocuments();
+      const docList = response.data || response || [];
+      setDocuments(docList);
+    } catch (error) {
+      console.error("Error fetching all documents:", error);
       setDocuments([]);
     }
   };
@@ -117,6 +128,23 @@ export default function ContentCalendarShell({ clients: initialClients }) {
       month: "short",
       day: "numeric",
     });
+  };
+
+  const handleShareWhatsApp = (doc) => {
+    const client = clients.find((c) => c.id === doc.clientId);
+    const whatsappNumber = client?.whatsappNumber || client?.phoneNumber || "";
+
+    if (!whatsappNumber) {
+      alert("No WhatsApp number found for this client.");
+      return;
+    }
+
+    const cleanedNumber = whatsappNumber.replace(/[^0-9]/g, "");
+    const message = encodeURIComponent(
+      `Hi${client?.name ? ` ${client.name}` : ""}, here is the document: ${doc.fileName}\nLink: ${doc.driveLink || doc.googleUserContentLink || window.location.origin + `/api/documents/${doc.id}/stream`}`
+    );
+    const url = `https://wa.me/${cleanedNumber}?text=${message}`;
+    window.open(url, "_blank");
   };
 
   return (
@@ -309,6 +337,13 @@ export default function ContentCalendarShell({ clients: initialClients }) {
                         >
                           <span className="material-symbols-outlined text-[18px]">visibility</span>
                         </a>
+                        <button
+                          onClick={() => handleShareWhatsApp(doc)}
+                          className="p-1 text-gray-600 hover:text-green-600 hover:bg-green-50 rounded"
+                          title="Share via WhatsApp"
+                        >
+                          <span className="material-symbols-outlined text-[18px]">share</span>
+                        </button>
                         <button
                           onClick={() => handleDelete(doc.id)}
                           className="p-1 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded"
