@@ -1,13 +1,11 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactCompiler: true,
-  trailingSlash: true,
+  output: 'export',
   images: {
     unoptimized: true,
   },
-  turbopack: {
-    root: '.',
-  },
+  turbopack: false,
   async rewrites() {
     return [
       {
