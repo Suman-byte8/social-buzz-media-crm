@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchClients, exportClients, deleteClient, clearMessages } from "@/redux/slices/clientsSlice";
+import { apiClient } from "@/services/apiClient";
 import Link from "next/link";
 import StatusBadge from "@/components/ui/StatusBadge";
 
@@ -481,16 +482,14 @@ function AddClientForm({ client, onClose, onSuccess }) {
       };
 
       if (client) {
-        await fetch(`/api/clients/${client.id}`, {
+        await apiClient(`/clients/${client.id}`, {
           method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
+          body: payload,
         });
       } else {
-        await fetch("/api/clients", {
+        await apiClient("/clients", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
+          body: payload,
         });
       }
       onSuccess();
