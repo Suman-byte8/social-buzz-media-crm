@@ -42,11 +42,13 @@ import teamRoutes from "./src/routes/teamRoutes.js";
 import settingRoutes from "./src/routes/settingRoutes.js";
 import documentRoutes from "./src/routes/documentRoutes.js";
 import taskRoutes from "./src/routes/taskRoutes.js";
+import meetingNoteRoutes from "./src/routes/meetingNoteRoutes.js";
 app.use("/api", clientRoutes);
 app.use("/api", teamRoutes);
 app.use("/api", settingRoutes);
 app.use("/api", documentRoutes);
 app.use("/api", taskRoutes);
+app.use("/api", meetingNoteRoutes);
 
 app.get("/", (req, res) => {
   res.json({

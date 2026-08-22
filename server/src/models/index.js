@@ -4,6 +4,7 @@ import teamMemberModel from "./TeamMember.js";
 import agencySettingModel from "./AgencySetting.js";
 import documentModel from "./Document.js";
 import taskModel from "./Task.js";
+import meetingNoteModel from "./MeetingNote.js";
 
 export const initModels = (sequelize) => {
   const Client = clientModel(sequelize, DataTypes);
@@ -11,6 +12,7 @@ export const initModels = (sequelize) => {
   const AgencySetting = agencySettingModel(sequelize, DataTypes);
   const Document = documentModel(sequelize, DataTypes);
   const Task = taskModel(sequelize, DataTypes);
+  const MeetingNote = meetingNoteModel(sequelize, DataTypes);
   
   Client.hasMany(Document, { foreignKey: "clientId", as: "documents" });
   Document.belongsTo(Client, { foreignKey: "clientId", as: "client" });
@@ -18,5 +20,8 @@ export const initModels = (sequelize) => {
   Client.hasMany(Task, { foreignKey: "clientId", as: "tasks" });
   Task.belongsTo(Client, { foreignKey: "clientId", as: "client" });
 
-  return { Client, TeamMember, AgencySetting, Document, Task };
+  Client.hasMany(MeetingNote, { foreignKey: "clientId", as: "meetingNotes" });
+  MeetingNote.belongsTo(Client, { foreignKey: "clientId", as: "client" });
+  
+  return { Client, TeamMember, AgencySetting, Document, Task, MeetingNote };
 };

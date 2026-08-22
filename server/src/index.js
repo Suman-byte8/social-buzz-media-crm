@@ -14,7 +14,17 @@ app.use(express.json());
 
 // Routes
 const clientRoutes = require('./routes/clientRoutes');
+const teamRoutes = require('./routes/teamRoutes');
+const settingRoutes = require('./routes/settingRoutes');
+const documentRoutes = require('./routes/documentRoutes');
+const taskRoutes = require('./routes/taskRoutes');
+const meetingNoteRoutes = require('./routes/meetingNoteRoutes');
 app.use('/api', clientRoutes);
+app.use('/api', teamRoutes);
+app.use('/api', settingRoutes);
+app.use('/api', documentRoutes);
+app.use('/api', taskRoutes);
+app.use('/api', meetingNoteRoutes);
 
 // Start server
 const PORT = process.env.PORT || 3000;
