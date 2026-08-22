@@ -2,6 +2,9 @@ import React from "react";
 import { notFound } from "next/navigation";
 import ClientDetailShell from "@/components/clients/ClientDetailShell";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 async function fetchClientById(id) {
   const API_BASE_URL =
     process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
@@ -21,13 +24,7 @@ async function fetchClientById(id) {
 }
 
 export async function generateStaticParams() {
-  return [
-    { id: "1" },
-    { id: "2" },
-    { id: "3" },
-    { id: "123" },
-    { id: "novatech" },
-  ];
+  return [{ id: "1" }];
 }
 
 export default async function ClientDetailPage({ params }) {

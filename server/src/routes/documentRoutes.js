@@ -1,13 +1,13 @@
 import express from "express";
 import multer from "multer";
-import { uploadFileToDrive, getFileStreamFromDrive, getOrCreateClientFolder } from "../utils/googleDrive.js";
+import { uploadFileToDrive, getFileStreamFromDrive, getOrCreateClientFolder, getOrCreateClientSubfolder } from "../utils/googleDrive.js";
 
 const router = express.Router();
 
 const storage = multer.memoryStorage();
 const upload = multer({
   storage: storage,
-  limits: { fileSize: 20 * 1024 * 1024 }, // 20MB limit for documents
+  limits: { fileSize: 2 * 1024 * 1024 }, // 2MB limit for agreements
   fileFilter: (req, file, cb) => {
     if (file.mimetype === "application/pdf" || file.originalname?.toLowerCase().endsWith(".pdf")) {
       cb(null, true);
@@ -17,9 +17,10 @@ const upload = multer({
   },
 });
 
-router.post("/documents/upload", upload.single("file"), async (req, res) => {
+// Upload agreement with specific subfolder
+router.post("/agreements/upload", upload.single("file"), async (req, res) => {
   try {
-    const { clientId, description } = req.body;
+    const { clientId, issuedDate, expiryDate, status, description } = req.body;
 
     if (!req.file) {
       return res.status(400).json({ success: false, message: "No PDF file provided" });
@@ -33,7 +34,9 @@ router.post("/documents/upload", upload.single("file"), async (req, res) => {
       const clientRecord = await Client.findByPk(parseInt(clientId));
       if (clientRecord) {
         const clientFolder = await getOrCreateClientFolder(clientRecord.name, clientRecord.id);
-        folderId = clientFolder.folderId;
+        // Get or create Agreements subfolder
+        const agreementsFolder = await getOrCreateClientSubfolder(clientFolder.folderId, "Agreements");
+        folderId = agreementsFolder.folderId;
       }
     }
 
@@ -55,6 +58,73 @@ router.post("/documents/upload", upload.single("file"), async (req, res) => {
       folderId: folderId,
       clientId: clientId ? parseInt(clientId) : null,
       description: description || null,
+      documentType: "agreement",
+      issuedDate: issuedDate || null,
+      expiryDate: expiryDate || null,
+      status: status || "active",
+    });
+
+    res.status(201).json({
+      success: true,
+      message: "Agreement uploaded successfully",
+      data: document,
+    });
+  } catch (error) {
+    console.error("Error uploading agreement:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message || "Failed to upload agreement",
+      error: error.message,
+    });
+  }
+});
+
+// Upload other document types (invoices, reports, content_calendar)
+router.post("/documents/upload", upload.single("file"), async (req, res) => {
+  try {
+    const { clientId, description, documentType } = req.body;
+
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: "No PDF file provided" });
+    }
+
+    const { Document, Client } = req.app.locals.models;
+
+    let folderId = null;
+
+    if (clientId) {
+      const clientRecord = await Client.findByPk(parseInt(clientId));
+      if (clientRecord) {
+        const clientFolder = await getOrCreateClientFolder(clientRecord.name, clientRecord.id);
+        // Determine subfolder based on document type
+        const subfolderName = documentType === "invoice" ? "Invoices" :
+                              documentType === "report" ? "Reports" :
+                              documentType === "content_calendar" ? "Content Calendar" :
+                              "Other";
+        const subfolder = await getOrCreateClientSubfolder(clientFolder.folderId, subfolderName);
+        folderId = subfolder.folderId;
+      }
+    }
+
+    const driveResult = await uploadFileToDrive(
+      req.file.buffer,
+      req.file.originalname,
+      req.file.mimetype,
+      folderId
+    );
+
+    const document = await Document.create({
+      fileName: req.file.originalname,
+      fileType: req.file.mimetype,
+      fileSize: req.file.size,
+      fileId: driveResult.fileId,
+      driveLink: driveResult.googleUserContentLink,
+      webViewLink: driveResult.webViewLink,
+      googleUserContentLink: driveResult.googleUserContentLink,
+      folderId: folderId,
+      clientId: clientId ? parseInt(clientId) : null,
+      description: description || null,
+      documentType: documentType || "other",
     });
 
     res.status(201).json({
@@ -154,6 +224,105 @@ router.get("/documents/:id/stream", async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Error streaming document",
+      error: error.message,
+    });
+  }
+});
+
+// Agreement-specific routes
+router.get("/agreements", async (req, res) => {
+  try {
+    const { Document } = req.app.locals.models;
+    const { clientId, status } = req.query;
+
+    const where = { documentType: "agreement" };
+    if (clientId) where.clientId = parseInt(clientId);
+    if (status) where.status = status;
+
+    const agreements = await Document.findAll({
+      where,
+      order: [["createdAt", "DESC"]],
+    });
+
+    res.json({ success: true, data: agreements });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Error fetching agreements",
+      error: error.message,
+    });
+  }
+});
+
+router.get("/agreements/:id", async (req, res) => {
+  try {
+    const { Document } = req.app.locals.models;
+    const agreement = await Document.findOne({
+      where: { id: req.params.id, documentType: "agreement" },
+    });
+
+    if (!agreement) {
+      return res.status(404).json({ success: false, message: "Agreement not found" });
+    }
+
+    res.json({ success: true, data: agreement });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Error fetching agreement",
+      error: error.message,
+    });
+  }
+});
+
+router.put("/agreements/:id", async (req, res) => {
+  try {
+    const { Document } = req.app.locals.models;
+    const { issuedDate, expiryDate, status, description } = req.body;
+
+    const agreement = await Document.findOne({
+      where: { id: req.params.id, documentType: "agreement" },
+    });
+
+    if (!agreement) {
+      return res.status(404).json({ success: false, message: "Agreement not found" });
+    }
+
+    // If status changed to active and was pending_signature, record signedAt
+    const updateData = { issuedDate, expiryDate, status, description };
+    if (status === "active" && agreement.status === "pending_signature") {
+      updateData.signedAt = new Date();
+    }
+
+    await agreement.update(updateData);
+
+    res.json({ success: true, message: "Agreement updated successfully", data: agreement });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Error updating agreement",
+      error: error.message,
+    });
+  }
+});
+
+router.delete("/agreements/:id", async (req, res) => {
+  try {
+    const { Document } = req.app.locals.models;
+    const agreement = await Document.findOne({
+      where: { id: req.params.id, documentType: "agreement" },
+    });
+
+    if (!agreement) {
+      return res.status(404).json({ success: false, message: "Agreement not found" });
+    }
+
+    await agreement.destroy();
+    res.json({ success: true, message: "Agreement deleted successfully" });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Error deleting agreement",
       error: error.message,
     });
   }

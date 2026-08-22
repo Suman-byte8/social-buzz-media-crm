@@ -1,11 +1,12 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactCompiler: true,
-  output: 'export',
   images: {
     unoptimized: true,
   },
-  turbopack: false,
+  turbopack: {
+    root: process.cwd(),
+  },
   async rewrites() {
     return [
       {

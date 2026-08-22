@@ -191,3 +191,13 @@ export const getOrCreateClientFolder = async (clientName, clientId) => {
 
   return folder;
 };
+
+export const getOrCreateClientSubfolder = async (parentFolderId, subfolderName) => {
+  let folder = await findFolderInDrive(subfolderName, parentFolderId);
+
+  if (!folder) {
+    folder = await createFolderInDrive(subfolderName, parentFolderId);
+  }
+
+  return folder;
+};
