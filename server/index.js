@@ -27,7 +27,7 @@ const DATABASE_URL_HOST = (process.env.DATABASE_URL || "").split("/")[2] || "";
 const needsSslByDefault =
   process.env.DB_SSL === "true" ||
   /neon\.tech|supabase\.co|aws\.|azure|cleardb|elephantsql|aivencloud/i.test(
-    DATABASE_URL_HOST
+    DATABASE_URL_HOST,
   );
 const sslOptions = needsSslByDefault
   ? { ssl: { require: true, rejectUnauthorized: false } }
@@ -40,7 +40,9 @@ if (process.env.DATABASE_URL) {
     dialectOptions: sslOptions,
     pool: { max: 10, min: 0, acquire: 30000, idle: 10000 },
   });
-  console.log(`[DB] Using DATABASE_URL (connection string) ssl=${!!sslOptions}`);
+  console.log(
+    `[DB] Using DATABASE_URL (connection string) ssl=${!!sslOptions}`,
+  );
 } else if (process.env.DB_DATABASE) {
   sequelize = new Sequelize(
     process.env.DB_DATABASE,
@@ -53,13 +55,13 @@ if (process.env.DATABASE_URL) {
       logging: isDev ? console.log : false,
       dialectOptions: sslOptions,
       pool: { max: 10, min: 0, acquire: 30000, idle: 10000 },
-    }
+    },
   );
   console.log(`[DB] Using DB_* env vars (host=${process.env.DB_HOST})`);
 } else {
   console.error(
     "[DB] Missing database configuration. Set DATABASE_URL in Render " +
-      "(or DB_HOST/DB_USER/DB_PASS/DB_DATABASE/DB_PORT). All /api/* routes will fail until this is fixed."
+      "(or DB_HOST/DB_USER/DB_PASS/DB_DATABASE/DB_PORT). All /api/* routes will fail until this is fixed.",
   );
   // Best-effort instance so the app still boots and logs a descriptive error.
   sequelize = new Sequelize("postgres", "postgres", "", {
@@ -84,7 +86,7 @@ const connectWithRetry = async (retries = 5, delayMs = 3000) => {
     } catch (err) {
       console.error(
         `[DB] Connection attempt ${attempt}/${retries} failed:`,
-        err.message || err
+        err.message || err,
       );
       if (attempt < retries) {
         await new Promise((r) => setTimeout(r, delayMs));
@@ -92,7 +94,7 @@ const connectWithRetry = async (retries = 5, delayMs = 3000) => {
         console.error(
           "[DB] Giving up after",
           retries,
-          "attempts. Check DATABASE_URL / DB_* env vars in Render."
+          "attempts. Check DATABASE_URL / DB_* env vars in Render.",
         );
       }
     }
@@ -117,7 +119,7 @@ app.use("/api", meetingNoteRoutes);
 app.get("/", (req, res) => {
   res.json({
     success: true,
-    message: "CRM API is running"
+    message: "CRM API is running",
   });
 });
 

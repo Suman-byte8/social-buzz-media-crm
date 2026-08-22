@@ -20,12 +20,18 @@ export const apiClient = async (endpoint, options = {}) => {
 
   try {
     const response = await fetch(url, config);
-    const data = await response.json();
-
+    
     if (!response.ok) {
-      throw new Error(data.message || `HTTP error! status: ${response.status}`);
+      try {
+        const data = await response.json();
+        const message = data.message || `HTTP error! status: ${response.status}`;
+        throw new Error(message);
+      } catch {
+        throw new Error(`Failed to parse error response: ${response.statusText}`);
+      }
     }
 
+    const data = await response.json();
     return data;
   } catch (error) {
     console.error(`API Call Error [${method} ${endpoint}]:`, error);
