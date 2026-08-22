@@ -20,11 +20,7 @@ const upload = multer({
 // Upload agreement with specific subfolder
 router.post("/agreements/upload", upload.single("file"), async (req, res) => {
   try {
-    const { clientId, issuedDate, expiryDate, status, description } = req.body;
-
-    if (!req.file) {
-      return res.status(400).json({ success: false, message: "No PDF file provided" });
-    }
+    const { id, clientId, issuedDate, expiryDate, status, description } = req.body;
 
     const { Document, Client } = req.app.locals.models;
 
@@ -34,10 +30,58 @@ router.post("/agreements/upload", upload.single("file"), async (req, res) => {
       const clientRecord = await Client.findByPk(parseInt(clientId));
       if (clientRecord) {
         const clientFolder = await getOrCreateClientFolder(clientRecord.name, clientRecord.id);
-        // Get or create Agreements subfolder
         const agreementsFolder = await getOrCreateClientSubfolder(clientFolder.folderId, "Agreements");
         folderId = agreementsFolder.folderId;
       }
+    }
+
+    if (id) {
+      const existingAgreement = await Document.findOne({
+        where: { id, documentType: "agreement" },
+      });
+
+      if (!existingAgreement) {
+        return res.status(404).json({ success: false, message: "Agreement not found" });
+      }
+
+      if (!req.file) {
+        await existingAgreement.update({
+          issuedDate: issuedDate || existingAgreement.issuedDate,
+          expiryDate: expiryDate || existingAgreement.expiryDate,
+          status: status || existingAgreement.status,
+          description: description !== undefined ? description : existingAgreement.description,
+        });
+        return res.json({ success: true, message: "Agreement updated successfully", data: existingAgreement });
+      }
+
+      const driveResult = await uploadFileToDrive(
+        req.file.buffer,
+        req.file.originalname,
+        req.file.mimetype,
+        folderId
+      );
+
+      const updated = await existingAgreement.update({
+        fileName: req.file.originalname,
+        fileType: req.file.mimetype,
+        fileSize: req.file.size,
+        fileId: driveResult.fileId,
+        driveLink: driveResult.googleUserContentLink,
+        webViewLink: driveResult.webViewLink,
+        googleUserContentLink: driveResult.googleUserContentLink,
+        folderId: folderId,
+        clientId: clientId ? parseInt(clientId) : existingAgreement.clientId,
+        description: description || existingAgreement.description,
+        issuedDate: issuedDate || existingAgreement.issuedDate,
+        expiryDate: expiryDate || existingAgreement.expiryDate,
+        status: status || existingAgreement.status,
+      });
+
+      return res.json({ success: true, message: "Agreement updated successfully", data: updated });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: "No PDF file provided" });
     }
 
     const driveResult = await uploadFileToDrive(

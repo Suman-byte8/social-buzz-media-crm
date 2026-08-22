@@ -1,207 +1,381 @@
-import React from "react";
-import Link from "next/link";
+"use client";
+
+import React, { useState, useEffect } from "react";
+import AgreementUploadModal from "@/components/clients/AgreementUploadModal";
+import AgreementViewModal from "@/components/clients/AgreementViewModal";
+import {
+  fetchAgreements,
+  fetchClients,
+  deleteAgreement,
+} from "@/services/documentService";
+import * as documentService from "@/services/documentService";
 
 export default function AgreementsPage() {
-  return (
-    <main className="flex-1 p-container-margin w-full max-w-7xl mx-auto">
-      {/* Client Header Context */}
-      <div className="mb-stack-lg flex flex-col sm:flex-row justify-between items-start sm:items-end gap-stack-md">
-        <div>
-          <div className="flex items-center gap-2 mb-2">
-            <Link
-              href="/clients"
-              className="font-label-sm text-label-sm text-secondary uppercase tracking-wider hover:text-primary transition-colors"
-            >
-              Client Workspace
-            </Link>
-            <span className="material-symbols-outlined text-[16px] text-secondary">
-              chevron_right
-            </span>
-            <Link
-              href="/clients/1"
-              className="font-label-sm text-label-sm text-primary uppercase tracking-wider hover:underline"
-            >
-              Acme Corp
-            </Link>
+  const [clients, setClients] = useState([]);
+  const [agreements, setAgreements] = useState([]);
+  const [selectedClientId, setSelectedClientId] = useState(null);
+  const [uploadModalOpen, setUploadModalOpen] = useState(false);
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [viewModalOpen, setViewModalOpen] = useState(false);
+  const [editingAgreement, setEditingAgreement] = useState(null);
+  const [viewingAgreement, setViewingAgreement] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [deleteLoading, setDeleteLoading] = useState({});
+
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        const clientsData = await fetchClients();
+        setClients(clientsData.data || []);
+        
+        const agreementsData = await fetchAgreements();
+        setAgreements(agreementsData.data || []);
+      } catch (err) {
+        setError("Failed to load initial data");
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    loadData();
+  }, []);
+
+  const loadAgreementsByClient = async (clientId) => {
+    if (!clientId) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await fetchAgreements(clientId);
+      setAgreements(data.data || []);
+    } catch (err) {
+      setError("Failed to load agreements");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleClientChange = (e) => {
+    const rawValue = e.target.value;
+    const clientId = rawValue === "" ? null : Number(rawValue);
+    if (clientId !== null && isNaN(clientId)) return;
+    setSelectedClientId(clientId);
+    loadAgreementsByClient(clientId);
+  };
+
+  const handleResetFilter = () => {
+    setSelectedClientId(null);
+    loadAgreements();
+  };
+
+  const handleUploadSuccess = (agreement) => {
+    setAgreements((prev) => [...prev, agreement]);
+    setUploadModalOpen(false);
+  };
+
+  const handleEditSuccess = (updated) => {
+    setAgreements((prev) =>
+      prev.map((a) => (a.id === updated.id ? updated : a))
+    );
+    setEditModalOpen(false);
+    setEditingAgreement(null);
+  };
+
+  const handleDelete = async (id) => {
+    if (!window.confirm("Are you sure you want to delete this agreement?"))
+      return;
+    try {
+      setError(null);
+      await deleteAgreement(id);
+      setAgreements((prev) => prev.filter((a) => a.id !== id));
+      setDeleteLoading((prev) => {
+        const copy = { ...prev };
+        delete copy[id];
+        return copy;
+      });
+    } catch (err) {
+      setError(err.message || "Failed to delete agreement");
+    }
+  };
+
+  const handleEdit = (agreement) => {
+    setEditingAgreement(agreement);
+    setEditModalOpen(true);
+  };
+
+  const handleView = (agreement) => {
+    setViewingAgreement(agreement);
+    setViewModalOpen(true);
+  };
+
+  const loadAgreements = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await fetchAgreements();
+      setAgreements(data.data || []);
+    } catch (err) {
+      setError("Failed to load agreements");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const statusColors = {
+    active: "bg-green-100 text-green-800",
+    pending_signature: "bg-amber-100 text-amber-800",
+    expired: "bg-red-100 text-red-800",
+  };
+
+  const statusLabels = {
+    active: "Active",
+    pending_signature: "Pending Signature",
+    expired: "Expired",
+  };
+
+  const getClientName = (clientId) => {
+    const client = clients.find(c => c.id === clientId);
+    return client ? client.name : 'Unknown Client';
+  };
+
+  const getClientNameForAgreement = (agreement) => {
+    if (!agreement) return null;
+    return getClientName(agreement.clientId);
+  };
+
+  if (loading && (!clients.length || !agreements.length)) {
+    return (
+      <div className="p-6">
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+          <h1 className="text-2xl font-bold text-gray-900 mb-4">Agreements</h1>
+          <p className="text-gray-600 mb-4">
+            Loading agreements...
+          </p>
+          <div className="grid gap-4">
+            {[...Array(3)].map((_, i) => (
+              <div
+                key={i}
+                className="animate-pulse border rounded-lg p-4"
+              >
+                <div className="h-4 w-3/4 bg-gray-200 rounded mb-2"></div>
+                <div className="h-3 w-1/2 bg-gray-200 rounded"></div>
+              </div>
+            ))}
           </div>
-          <h2 className="font-display-lg text-display-lg text-on-background">
-            Agreements
-          </h2>
         </div>
-        <button className="bg-[#E8262A] text-white font-label-md text-label-md px-6 py-3 rounded-lg flex items-center gap-2 hover:bg-primary transition-colors shadow-sm cursor-pointer">
-          <span className="material-symbols-outlined text-[18px]">
-            upload_file
-          </span>
-          Upload Agreement
-        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-6">
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+        <div className="p-6 border-b border-gray-200 flex justify-between items-center">
+          <h1 className="text-2xl font-bold text-gray-900">Agreements</h1>
+
+          <div className="flex gap-2 items-center">
+            <select
+              value={selectedClientId || ""}
+              onChange={handleClientChange}
+              className="border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            >
+              <option value="">-- All Clients --</option>
+              {clients.map((client) => (
+                <option key={client.id} value={client.id}>
+                  {client.name}
+                </option>
+              ))}
+            </select>
+
+            <button
+              onClick={handleResetFilter}
+              className="px-4 py-2 text-sm bg-gray-500 text-white hover:bg-gray-600 rounded-md"
+            >
+              Show All
+            </button>
+
+            <button
+              onClick={() => {
+                console.log("Upload button clicked, setting modal open");
+                setUploadModalOpen(true);
+              }}
+              disabled={!selectedClientId}
+              className="px-4 py-2 text-sm bg-blue-600 text-white hover:bg-blue-700 rounded-md disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Upload Agreement
+            </button>
+          </div>
+        </div>
+
+        <div className="p-6">
+          {error && (
+            <div className="bg-red-50 border border-red-200 text-red-700 p-3 rounded mb-4">
+              {error}
+            </div>
+          )}
+
+          {!selectedClientId && agreements.length === 0 && clients.length > 0 ? (
+            <div className="text-center py-8">
+              <p className="text-gray-500">
+                No agreements found. Upload your first agreement to get started.
+              </p>
+              <button
+                onClick={() => setUploadModalOpen(true)}
+                disabled={!selectedClientId}
+                className="mt-4 px-4 py-2 text-sm bg-blue-600 text-white hover:bg-blue-700 rounded-md disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Upload First Agreement
+              </button>
+            </div>
+          ) : (
+            <div className="grid gap-4">
+              {agreements.map((agreement) => (
+                <div
+                  key={agreement.id}
+                  className="border rounded-lg p-4 hover:shadow-sm transition-shadow"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <h3 className="font-semibold text-gray-900">
+                        <a
+                          href={agreement.driveLink}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-600 hover:underline"
+                        >
+                          {agreement.fileName}
+                        </a>
+                      </h3>
+                      <div className="text-sm text-gray-500 mt-1 flex flex-wrap gap-4">
+                        <span>
+                          Issued:{" "}
+                          {new Date(agreement.issuedDate).toLocaleDateString()}
+                        </span>
+                        <span>
+                          Expires:{" "}
+                          {new Date(agreement.expiryDate).toLocaleDateString()}
+                        </span>
+                        <span className="ml-2">
+                          Client:{" "}
+                          <strong>{getClientName(agreement.clientId)}</strong>
+                        </span>
+                      </div>
+                      <div className="text-xs text-gray-400 mt-1">
+                        Description:{" "}
+                        {agreement.description || "No description provided"}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center space-x-2 ml-4">
+                      <span
+                        className={`px-2 py-1 rounded-full text-xs font-medium ${
+                          statusColors[agreement.status] ||
+                          "bg-gray-100 text-gray-800"
+                        }`}
+                      >
+                        {statusLabels[agreement.status] || agreement.status}
+                      </span>
+
+                      <button
+                        onClick={() => handleView(agreement)}
+                        className="p-1 text-blue-600 hover:bg-blue-100 rounded-md"
+                        title="View Agreement"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.17 8.23 6.58 5 10.5 5c4.34 0 7.83 3.49 8.5 7.75a9.92 9.92 0 01-2.13 4.53L10.5 21l-2.13-3.72A9.92 9.92 0 012.458 12z" />
+                        </svg>
+                      </button>
+
+                      <button
+                        onClick={() => handleEdit(agreement)}
+                        className="p-1 text-amber-600 hover:bg-amber-100 rounded-md"
+                        title="Edit Agreement"
+                      >
+                        <Edit3 size={16} />
+                      </button>
+
+                      <button
+                        onClick={() => handleDelete(agreement.id)}
+                        disabled={deleteLoading[agreement.id]}
+                        className="p-1 text-red-600 hover:bg-red-100 rounded-md"
+                        title="Delete Agreement"
+                      >
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          className="h-5 w-5"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M6 18L18 6M6 6l12 12"
+                          />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* Content Area (Table) */}
-      <div className="bg-white border border-[#E5E5E7] rounded-xl shadow-[0px_2px_4px_rgba(0,0,0,0.05)] overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-[#FAFAFA] border-b border-[#F0F0F0]">
-                <th className="py-4 px-6 font-label-sm text-label-sm text-tertiary uppercase tracking-wider whitespace-nowrap">
-                  Document Name
-                </th>
-                <th className="py-4 px-6 font-label-sm text-label-sm text-tertiary uppercase tracking-wider whitespace-nowrap">
-                  Effective Date
-                </th>
-                <th className="py-4 px-6 font-label-sm text-label-sm text-tertiary uppercase tracking-wider whitespace-nowrap">
-                  Expiry Date
-                </th>
-                <th className="py-4 px-6 font-label-sm text-label-sm text-tertiary uppercase tracking-wider whitespace-nowrap">
-                  Status
-                </th>
-                <th className="py-4 px-6 font-label-sm text-label-sm text-tertiary uppercase tracking-wider text-right whitespace-nowrap">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[#F0F0F0]">
-              {/* Row 1: Active */}
-              <tr className="hover:bg-[#F9F9F9] transition-colors group">
-                <td className="py-4 px-6">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-lg bg-surface-container-high flex items-center justify-center text-primary">
-                      <span className="material-symbols-outlined text-[20px]">
-                        contract
-                      </span>
-                    </div>
-                    <div>
-                      <p className="font-title-lg text-title-lg text-on-surface">
-                        Master Service Agreement
-                      </p>
-                      <p className="font-body-sm text-body-sm text-secondary">
-                        AcmeCorp_MSA_2023.pdf
-                      </p>
-                    </div>
-                  </div>
-                </td>
-                <td className="py-4 px-6 font-body-sm text-body-sm text-on-surface">
-                  Jan 01, 2023
-                </td>
-                <td className="py-4 px-6 font-body-sm text-body-sm text-on-surface">
-                  Dec 31, 2025
-                </td>
-                <td className="py-4 px-6">
-                  <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800 border border-green-200">
-                    Active
-                  </span>
-                </td>
-                <td className="py-4 px-6 text-right space-x-2">
-                  <button className="inline-flex items-center justify-center px-4 py-2 border border-[#1A1A1A] bg-white text-[#1A1A1A] rounded-lg font-label-md text-label-md hover:bg-gray-50 transition-colors cursor-pointer">
-                    View
-                  </button>
-                </td>
-              </tr>
-              {/* Row 2: Pending Signature */}
-              <tr className="hover:bg-[#F9F9F9] transition-colors group">
-                <td className="py-4 px-6">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-lg bg-surface-container-high flex items-center justify-center text-primary">
-                      <span className="material-symbols-outlined text-[20px]">
-                        signature
-                      </span>
-                    </div>
-                    <div>
-                      <p className="font-title-lg text-title-lg text-on-surface">
-                        SEO Retainer Q3
-                      </p>
-                      <p className="font-body-sm text-body-sm text-secondary">
-                        AcmeCorp_SEO_Q3_2024.pdf
-                      </p>
-                    </div>
-                  </div>
-                </td>
-                <td className="py-4 px-6 font-body-sm text-body-sm text-on-surface">
-                  Jul 01, 2024
-                </td>
-                <td className="py-4 px-6 font-body-sm text-body-sm text-on-surface text-secondary italic">
-                  Pending
-                </td>
-                <td className="py-4 px-6">
-                  <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-yellow-100 text-yellow-800 border border-yellow-200">
-                    Pending Signature
-                  </span>
-                </td>
-                <td className="py-4 px-6 text-right space-x-2 whitespace-nowrap">
-                  <button className="inline-flex items-center justify-center px-4 py-2 bg-transparent text-primary hover:bg-surface-container-high rounded-lg font-label-md text-label-md transition-colors border border-transparent hover:border-surface-variant cursor-pointer">
-                    View
-                  </button>
-                  <button className="inline-flex items-center justify-center gap-2 px-4 py-2 border border-[#1A1A1A] bg-white text-[#1A1A1A] rounded-lg font-label-md text-label-md hover:bg-gray-50 transition-colors cursor-pointer">
-                    <span className="material-symbols-outlined text-[16px]">
-                      draw
-                    </span>
-                    Sign via DocuSign
-                  </button>
-                </td>
-              </tr>
-              {/* Row 3: Expired */}
-              <tr className="hover:bg-[#F9F9F9] transition-colors group opacity-75">
-                <td className="py-4 px-6">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center text-tertiary">
-                      <span className="material-symbols-outlined text-[20px]">
-                        history
-                      </span>
-                    </div>
-                    <div>
-                      <p className="font-title-lg text-title-lg text-on-surface">
-                        Initial Consultation NDA
-                      </p>
-                      <p className="font-body-sm text-body-sm text-secondary">
-                        AcmeCorp_NDA_2022.pdf
-                      </p>
-                    </div>
-                  </div>
-                </td>
-                <td className="py-4 px-6 font-body-sm text-body-sm text-on-surface">
-                  Feb 15, 2022
-                </td>
-                <td className="py-4 px-6 font-body-sm text-body-sm text-on-surface">
-                  Feb 15, 2023
-                </td>
-                <td className="py-4 px-6">
-                  <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-800 border border-gray-200">
-                    Expired
-                  </span>
-                </td>
-                <td className="py-4 px-6 text-right space-x-2">
-                  <button className="inline-flex items-center justify-center px-4 py-2 bg-transparent text-tertiary hover:bg-gray-100 rounded-lg font-label-md text-label-md transition-colors cursor-pointer">
-                    View
-                  </button>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-        {/* Table Footer/Pagination */}
-        <div className="bg-[#FAFAFA] border-t border-[#F0F0F0] px-6 py-4 flex items-center justify-between">
-          <p className="font-body-sm text-body-sm text-secondary">
-            Showing 1 to 3 of 3 entries
-          </p>
-          <div className="flex gap-2">
-            <button
-              className="p-2 rounded border border-[#E5E5E7] bg-white text-tertiary disabled:opacity-50 cursor-not-allowed"
-              disabled
-            >
-              <span className="material-symbols-outlined text-[18px]">
-                chevron_left
-              </span>
-            </button>
-            <button
-              className="p-2 rounded border border-[#E5E5E7] bg-white text-tertiary disabled:opacity-50 cursor-not-allowed"
-              disabled
-            >
-              <span className="material-symbols-outlined text-[18px]">
-                chevron_right
-              </span>
-            </button>
-          </div>
-        </div>
-      </div>
-    </main>
+      <AgreementUploadModal
+        open={uploadModalOpen}
+        onClose={() => setUploadModalOpen(false)}
+        onSuccess={handleUploadSuccess}
+        clientId={selectedClientId}
+        clientName={selectedClientId ? getClientName(selectedClientId) : null}
+        documentService={documentService}
+      />
+
+      <AgreementUploadModal
+        open={editModalOpen}
+        isEdit={true}
+        agreementToEdit={editingAgreement}
+        onClose={() => {
+          setEditModalOpen(false);
+          setEditingAgreement(null);
+        }}
+        onSuccess={handleEditSuccess}
+        clientId={selectedClientId || editingAgreement?.clientId}
+        clientName={getClientNameForAgreement(editingAgreement)}
+        documentService={documentService}
+      />
+
+      <AgreementViewModal
+        open={viewModalOpen}
+        onClose={() => {
+          setViewModalOpen(false);
+          setViewingAgreement(null);
+        }}
+        agreement={viewingAgreement}
+      />
+    </div>
   );
 }
+
+const Edit3 = ({ size = 24, ...props }) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    {...props}
+  >
+    <path d="M12 8v7l4 2v-5l-4-2z" />
+    <path d="M15 3.5a2.525 2.525 0 1 1 3.5 3.5A2.525 2.525 0 1 1 15 3.5z" />
+    <path d="M17 3.5h-1" />
+    <path d="M12 21h-7a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h4l4 4v9" />
+  </svg>
+);
