@@ -2,14 +2,11 @@ import React from "react";
 import { notFound } from "next/navigation";
 import ClientDetailShell from "@/components/clients/ClientDetailShell";
 
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
-
 async function fetchClientById(id) {
   const API_BASE_URL =
     process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
   const response = await fetch(`${API_BASE_URL}/clients/${id}`, {
-    cache: "no-store",
+    next: { revalidate: 60 },
     headers: {
       "Content-Type": "application/json",
     },
@@ -24,7 +21,32 @@ async function fetchClientById(id) {
 }
 
 export async function generateStaticParams() {
-  return [{ id: "1" }];
+  try {
+    const API_BASE_URL =
+      process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
+    const response = await fetch(`${API_BASE_URL}/clients?limit=1000`, {
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      return [{ id: "1" }];
+    }
+
+    const data = await response.json();
+    const clients = data.data || data || [];
+
+    if (!Array.isArray(clients) || clients.length === 0) {
+      return [{ id: "1" }];
+    }
+
+    return clients.map((client) => ({
+      id: String(client.id),
+    }));
+  } catch {
+    return [{ id: "1" }];
+  }
 }
 
 export default async function ClientDetailPage({ params }) {

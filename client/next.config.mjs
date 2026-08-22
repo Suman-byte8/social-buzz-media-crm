@@ -7,6 +7,7 @@ const nextConfig = {
   turbopack: {
     root: process.cwd(),
   },
+  output: 'export',
   async rewrites() {
     return [
       {

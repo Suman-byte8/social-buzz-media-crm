@@ -3,61 +3,51 @@ name: Deploy to Hostinger
 on:
   push:
     branches:
-      - main   # change to your production branch name if different
-
-# Prevents two deploys running at the same time and stepping on each other
-concurrency:
-  group: production-deploy
-  cancel-in-progress: false
+      - main
+  workflow_dispatch:
 
 jobs:
-  deploy:
-    name: Build & Deploy
+  build-and-deploy:
     runs-on: ubuntu-latest
-    environment: production   # optional: set up an "environment" in repo Settings for manual approval + secrets
 
     steps:
-      - name: Checkout repository
+      - name: Checkout code
         uses: actions/checkout@v4
 
-      # ---- OPTIONAL BUILD STEP ----
-      # Remove this block if your site is plain static/PHP with no build process.
-      # Keep it if you use npm to compile assets (Tailwind, Vite, Sass, bundlers, etc.)
       - name: Setup Node.js
-        if: hashFiles('client/package.json') != ''
         uses: actions/setup-node@v4
         with:
-          node-version: 24
-          cache: 'npm'
+          node-version: "24"
+          cache: "npm"
           cache-dependency-path: client/package-lock.json
 
       - name: Install dependencies
-        if: hashFiles('client/package.json') != ''
-        working-directory: client
+        working-directory: ./client
         run: npm ci
 
-      - name: Build and export client
-        if: hashFiles('client/package.json') != ''
-        working-directory: client
-        run: npm run export
-      # ---- END OPTIONAL BUILD STEP ----
+      - name: Build Next.js app
+        working-directory: ./client
+        run: npm run build
 
-      - name: Deploy via FTP (plain - last attempt)
+      - name: Verify build output
+        working-directory: ./client
+        run: |
+          echo "Checking build output..."
+          ls -la
+          ls -la out
+
+      - name: Deploy to Hostinger via FTP
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
-          server: ${{ secrets.FTP_SERVER }}
+          server: ${{ secrets.FTP_HOST }}
           username: ${{ secrets.FTP_USERNAME }}
           password: ${{ secrets.FTP_PASSWORD }}
-          protocol: ftp                      
-          local-dir: ./client/out/            
-          server-dir: ./  
+          local-dir: ./client/out/
+          server-dir: /
           exclude: |
             **/.git*
-            **/.git*/**
-            **/node_modules/**
             **/.github/**
+            **/node_modules/**
             **/README.md
             **/.env
             **/.env.*
-          dangerous-clean-slate: false
-          log-level: verbose
