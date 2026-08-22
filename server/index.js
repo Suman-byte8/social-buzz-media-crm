@@ -16,25 +16,82 @@ app.use(express.urlencoded({ extended: true }));
 import { Sequelize } from "sequelize";
 import { initModels } from "./src/models/index.js";
 
-const sequelize = new Sequelize(
-  process.env.DB_DATABASE,
-  process.env.DB_USER,
-  process.env.DB_PASS,
-  {
-    host: process.env.DB_HOST,
-    port: process.env.DB_PORT,
+const isDev = process.env.NODE_ENV === "development";
+
+// Prefer DATABASE_URL (connection string) — this is how Render's managed
+// Postgres (and Neon/Supabase/Aiven) exposes the database. Falls back to the
+// individual DB_* vars for a locally-configured PostgreSQL.
+let sequelize;
+if (process.env.DATABASE_URL) {
+  sequelize = new Sequelize(process.env.DATABASE_URL, {
     dialect: "postgres",
-    logging: process.env.NODE_ENV === "development" ? console.log : false
-  }
-);
+    logging: isDev ? console.log : false,
+    dialectOptions: process.env.DB_SSL === "true"
+      ? { ssl: { require: true, rejectUnauthorized: false } }
+      : undefined,
+    pool: { max: 10, min: 0, acquire: 30000, idle: 10000 },
+  });
+  console.log("[DB] Using DATABASE_URL (connection string)");
+} else if (process.env.DB_DATABASE) {
+  sequelize = new Sequelize(
+    process.env.DB_DATABASE,
+    process.env.DB_USER,
+    process.env.DB_PASS,
+    {
+      host: process.env.DB_HOST,
+      port: process.env.DB_PORT,
+      dialect: "postgres",
+      logging: isDev ? console.log : false,
+      dialectOptions: process.env.DB_SSL === "true"
+        ? { ssl: { require: true, rejectUnauthorized: false } }
+        : undefined,
+      pool: { max: 10, min: 0, acquire: 30000, idle: 10000 },
+    }
+  );
+  console.log(`[DB] Using DB_* env vars (host=${process.env.DB_HOST})`);
+} else {
+  console.error(
+    "[DB] Missing database configuration. Set DATABASE_URL in Render " +
+      "(or DB_HOST/DB_USER/DB_PASS/DB_DATABASE/DB_PORT). All /api/* routes will fail until this is fixed."
+  );
+  // Best-effort instance so the app still boots and logs a descriptive error.
+  sequelize = new Sequelize("postgres", "postgres", "", {
+    host: "localhost",
+    dialect: "postgres",
+    logging: false,
+  });
+}
 
 const models = initModels(sequelize);
 app.locals.models = models;
 
-// Sync database
-sequelize.sync({ alter: process.env.NODE_ENV === "development" })
-  .then(() => console.log("Database synchronized"))
-  .catch(err => console.error("Database sync error:", err));
+// Connect + sync with retries (handles Render cold starts / slow DB boot)
+const connectWithRetry = async (retries = 5, delayMs = 3000) => {
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      await sequelize.authenticate();
+      console.log(`[DB] Connection established (attempt ${attempt})`);
+      await sequelize.sync({ alter: isDev });
+      console.log("Database synchronized");
+      return;
+    } catch (err) {
+      console.error(
+        `[DB] Connection attempt ${attempt}/${retries} failed:`,
+        err.message || err
+      );
+      if (attempt < retries) {
+        await new Promise((r) => setTimeout(r, delayMs));
+      } else {
+        console.error(
+          "[DB] Giving up after",
+          retries,
+          "attempts. Check DATABASE_URL / DB_* env vars in Render."
+        );
+      }
+    }
+  }
+};
+connectWithRetry();
 
 // Routes
 import clientRoutes from "./src/routes/clientRoutes.js";

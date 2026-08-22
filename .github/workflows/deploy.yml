@@ -27,6 +27,10 @@ jobs:
 
       - name: Build Next.js app
         working-directory: ./client
+        env:
+          # Point the static export at the deployed API. Override by setting a
+          # repository Variable named NEXT_PUBLIC_API_URL (GitHub → Settings → Variables).
+          NEXT_PUBLIC_API_URL: ${{ vars.NEXT_PUBLIC_API_URL || 'https://social-buzz-media-crm.onrender.com/api' }}
         run: npm run build
 
       - name: Verify build output
