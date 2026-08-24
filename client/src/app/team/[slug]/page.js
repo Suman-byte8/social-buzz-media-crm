@@ -1,10 +1,22 @@
-// Minimal page for /team/[slug] - satisfies Next.js static export
-// The actual team routes are handled via client/new and client/[id]/templates
+import TeamMemberDetailView from "@/components/teams/TeamMemberDetailView";
+
+// This server component only handles static generation for `output: 'export'`.
+// It MUST NOT call the API at build time (CI has no backend -> ECONNREFUSED).
+// Real member data is fetched in the browser by TeamMemberDetailView after
+// hydration, mirroring the working clients/[id] page.
+//
+// Team member rows link to `/team/${member.id}` (numeric database id), so we
+// pre-generate a numeric slug range to satisfy the static export requirement.
 export async function generateStaticParams() {
-  return [{ slug: 'any' }]; // Placeholder for static generation
+  return Array.from({ length: 100 }, (_, i) => ({ slug: String(i + 1) }));
 }
 
+// Only paths returned by generateStaticParams will be served.
+// Unspecified routes return 404 instead of attempting dynamic rendering
+// (which is incompatible with `output: 'export'`).
+export const dynamicParams = false;
+
 export default async function TeamPage({ params }) {
-  // Real team page would be at client/team/[slug]
-  return <p>Team page placeholder</p>;
+  const { slug } = await params;
+  return <TeamMemberDetailView memberId={String(slug)} />;
 }
