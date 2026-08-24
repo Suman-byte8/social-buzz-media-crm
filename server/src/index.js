@@ -13,12 +13,14 @@ app.use(helmet());
 app.use(express.json());
 
 // Routes
+const authRoutes = require('./routes/authRoutes');
 const clientRoutes = require('./routes/clientRoutes');
 const teamRoutes = require('./routes/teamRoutes');
 const settingRoutes = require('./routes/settingRoutes');
 const documentRoutes = require('./routes/documentRoutes');
 const taskRoutes = require('./routes/taskRoutes');
 const meetingNoteRoutes = require('./routes/meetingNoteRoutes');
+app.use('/api', authRoutes);
 app.use('/api', clientRoutes);
 app.use('/api', teamRoutes);
 app.use('/api', settingRoutes);

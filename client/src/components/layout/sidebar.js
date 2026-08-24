@@ -3,10 +3,10 @@
 import React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useAuth } from "@/app/login/context/AuthContext";
 
 const navItems = [
   { label: "Dashboard", href: "/dashboard", icon: "dashboard" },
-//   { label: "Sales CRM", href: "/crm", icon: "leaderboard" },
   { label: "Clients", href: "/clients", icon: "group" },
   { label: "Content Calendar", href: "/calendar", icon: "calendar_month" },
   { label: "Tasks", href: "/tasks", icon: "assignment" },
@@ -20,6 +20,11 @@ const navItems = [
 
 export default function Sidebar() {
   const pathname = usePathname();
+  const { logout } = useAuth();
+
+  const handleLogout = () => {
+    logout();
+  };
 
   return (
     <aside className="hidden md:flex flex-col h-full fixed left-0 top-0 w-[260px] bg-[#1A1A1A] z-50 ">
@@ -57,6 +62,19 @@ export default function Sidebar() {
           );
         })}
       </nav>
+
+      {/* Logout Button */}
+      <div className="border-t border-white/10 p-4">
+        <button
+          onClick={handleLogout}
+          className="flex items-center w-full px-3 py-2 text-secondary-fixed-dim hover:bg-white/10 hover:opacity-100 text-gray-300 rounded transition-colors"
+        >
+          <span className="material-symbols-outlined mr-4 opacity-100">
+            logout
+          </span>
+          <span className="font-label-md text-label-md">Logout</span>
+        </button>
+      </div>
     </aside>
   );
 }
