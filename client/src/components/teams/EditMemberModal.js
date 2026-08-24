@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { updateTeamMember } from "@/services/teamService";
+import { updateTeamMember, parseArrayField } from "@/services/teamService";
 
 const DEPARTMENTS = [
   "",
@@ -22,26 +22,70 @@ export default function EditMemberModal({ isOpen, onClose, onSuccess, member }) 
     number: "",
     whatsappNumber: "",
     address: "",
+    aadharNumber: "",
+    avatar: "",
+    resume: "",
+    resumeName: "",
+    bankDetails: {
+      bankName: "",
+      accountNumber: "",
+      ifscCode: "",
+      accountHolderName: "",
+      upiId: "",
+    },
     designation: "",
     department: "",
     employmentType: "",
     hireDate: "",
     managerReportTo: "",
     status: "",
-    assignedWorks: "",
-    clientHandling: "",
+    assignedWorks: [],
+    clientHandling: [],
   });
+
+  const [newWorkInput, setNewWorkInput] = useState("");
+  const [newClientInput, setNewClientInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
+  const [avatarError, setAvatarError] = useState("");
 
   useEffect(() => {
     if (isOpen && member) {
+      let parsedBank = {
+        bankName: "",
+        accountNumber: "",
+        ifscCode: "",
+        accountHolderName: "",
+        upiId: "",
+      };
+      if (member.bankDetails) {
+        try {
+          parsedBank =
+            typeof member.bankDetails === "string"
+              ? JSON.parse(member.bankDetails)
+              : member.bankDetails;
+        } catch {
+          parsedBank = { ...parsedBank, bankName: member.bankDetails };
+        }
+      }
+
       setFormData({
         name: member.name || "",
         email: member.email || "",
         number: member.number || "",
         whatsappNumber: member.whatsappNumber || "",
         address: member.address || "",
+        aadharNumber: member.aadharNumber || "",
+        avatar: member.avatar || "",
+        resume: member.resume || "",
+        resumeName: member.resume ? "Uploaded Resume" : "",
+        bankDetails: {
+          bankName: parsedBank.bankName || "",
+          accountNumber: parsedBank.accountNumber || "",
+          ifscCode: parsedBank.ifscCode || "",
+          accountHolderName: parsedBank.accountHolderName || "",
+          upiId: parsedBank.upiId || "",
+        },
         designation: member.designation || "",
         department: member.department || "",
         employmentType: member.employmentType || "",
@@ -50,13 +94,13 @@ export default function EditMemberModal({ isOpen, onClose, onSuccess, member }) 
           : "",
         managerReportTo: member.managerReportTo || "",
         status: member.status || "",
-        assignedWorks: Array.isArray(member.assignedWorks)
-          ? member.assignedWorks.join(", ")
-          : member.assignedWorks || "",
-        clientHandling: Array.isArray(member.clientHandling)
-          ? member.clientHandling.join(", ")
-          : member.clientHandling || "",
+        assignedWorks: parseArrayField(member.assignedWorks),
+        clientHandling: parseArrayField(member.clientHandling),
       });
+      setNewWorkInput("");
+      setNewClientInput("");
+      setAvatarError("");
+      setErrors({});
     }
   }, [isOpen, member]);
 
@@ -76,11 +120,113 @@ export default function EditMemberModal({ isOpen, onClose, onSuccess, member }) 
     if (errors[field]) setErrors((prev) => ({ ...prev, [field]: null }));
   };
 
+  const handleBankChange = (field, value) => {
+    setFormData((prev) => ({
+      ...prev,
+      bankDetails: {
+        ...prev.bankDetails,
+        [field]: value,
+      },
+    }));
+  };
+
+  const handleAvatarChange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Strict PNG check
+    const isPng =
+      file.type === "image/png" || file.name.toLowerCase().endsWith(".png");
+    if (!isPng) {
+      setAvatarError("Profile image must be in PNG format.");
+      return;
+    }
+
+    // Strict 1MB check (1,048,576 bytes)
+    if (file.size > 1 * 1024 * 1024) {
+      setAvatarError("Profile image size must be less than 1MB.");
+      return;
+    }
+
+    setAvatarError("");
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setFormData((prev) => ({ ...prev, avatar: reader.result }));
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleResumeChange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setFormData((prev) => ({
+        ...prev,
+        resume: reader.result,
+        resumeName: file.name,
+      }));
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // Add individual Work item
+  const handleAddWorkItem = () => {
+    const trimmed = newWorkInput.trim();
+    if (!trimmed) return;
+    if (!formData.assignedWorks.includes(trimmed)) {
+      setFormData((prev) => ({
+        ...prev,
+        assignedWorks: [...prev.assignedWorks, trimmed],
+      }));
+    }
+    setNewWorkInput("");
+  };
+
+  // Remove individual Work item
+  const handleRemoveWorkItem = (indexToRemove) => {
+    setFormData((prev) => ({
+      ...prev,
+      assignedWorks: prev.assignedWorks.filter((_, idx) => idx !== indexToRemove),
+    }));
+  };
+
+  // Add individual Client item
+  const handleAddClientItem = () => {
+    const trimmed = newClientInput.trim();
+    if (!trimmed) return;
+    if (!formData.clientHandling.includes(trimmed)) {
+      setFormData((prev) => ({
+        ...prev,
+        clientHandling: [...prev.clientHandling, trimmed],
+      }));
+    }
+    setNewClientInput("");
+  };
+
+  // Remove individual Client item
+  const handleRemoveClientItem = (indexToRemove) => {
+    setFormData((prev) => ({
+      ...prev,
+      clientHandling: prev.clientHandling.filter((_, idx) => idx !== indexToRemove),
+    }));
+  };
+
   const validateForm = () => {
     const newErrors = {};
     if (!formData.name.trim()) newErrors.name = "Team member name is required";
     if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
       newErrors.email = "Invalid email format";
+    }
+    if (
+      formData.aadharNumber &&
+      !/^\d{12}$/.test(formData.aadharNumber.replace(/\s/g, ""))
+    ) {
+      newErrors.aadharNumber = "Aadhar number must be 12 digits";
+    }
+    if (avatarError) {
+      newErrors.avatar = avatarError;
     }
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -92,19 +238,21 @@ export default function EditMemberModal({ isOpen, onClose, onSuccess, member }) 
 
     setLoading(true);
     try {
-      const assignedWorksArray = formData.assignedWorks
-        ? formData.assignedWorks.split(",").map((s) => s.trim()).filter(Boolean)
-        : [];
-      const clientHandlingArray = formData.clientHandling
-        ? formData.clientHandling.split(",").map((s) => s.trim()).filter(Boolean)
-        : [];
-
       const payload = {
         name: formData.name,
         email: formData.email || null,
         number: formData.number || null,
         whatsappNumber: formData.whatsappNumber || null,
         address: formData.address || null,
+        aadharNumber: formData.aadharNumber
+          ? formData.aadharNumber.replace(/\s/g, "")
+          : null,
+        avatar: formData.avatar || null,
+        resume: formData.resume || null,
+        bankDetails:
+          Object.values(formData.bankDetails).some(Boolean)
+            ? JSON.stringify(formData.bankDetails)
+            : null,
         designation: formData.designation || null,
         department: formData.department || null,
         employmentType: formData.employmentType || null,
@@ -112,12 +260,12 @@ export default function EditMemberModal({ isOpen, onClose, onSuccess, member }) 
         managerReportTo: formData.managerReportTo || null,
         status: formData.status || null,
         assignedWorks:
-          assignedWorksArray.length > 0
-            ? JSON.stringify(assignedWorksArray)
+          formData.assignedWorks.length > 0
+            ? JSON.stringify(formData.assignedWorks)
             : null,
         clientHandling:
-          clientHandlingArray.length > 0
-            ? JSON.stringify(clientHandlingArray)
+          formData.clientHandling.length > 0
+            ? JSON.stringify(formData.clientHandling)
             : null,
       };
 
@@ -153,84 +301,247 @@ export default function EditMemberModal({ isOpen, onClose, onSuccess, member }) 
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-6">
+          {/* Profile Image & Personal Info */}
+          <div>
+            <h4 className="font-title-md text-title-md text-on-surface-variant mb-3">
+              Profile Image &amp; Personal Info
+            </h4>
+            <div className="flex flex-col sm:flex-row items-start gap-6 mb-4">
+              <div className="flex flex-col items-center">
+                <div className="w-24 h-24 rounded-full border-2 border-dashed border-gray-300 flex items-center justify-center overflow-hidden bg-gray-50 relative group">
+                  {formData.avatar ? (
+                    <img
+                      src={formData.avatar}
+                      alt="Preview"
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <span className="material-symbols-outlined text-4xl text-gray-400">
+                      account_circle
+                    </span>
+                  )}
+                </div>
+                <label className="mt-2 px-3 py-1 bg-surface-container-high text-xs font-medium text-on-surface rounded border border-gray-300 cursor-pointer hover:bg-gray-100 transition-colors">
+                  Upload PNG
+                  <input
+                    type="file"
+                    accept="image/png"
+                    onChange={handleAvatarChange}
+                    className="hidden"
+                  />
+                </label>
+                <span className="text-[10px] text-gray-500 mt-1">
+                  PNG format only, &lt; 1MB
+                </span>
+                {avatarError && (
+                  <p className="text-red-500 text-xs mt-1 text-center font-medium">
+                    {avatarError}
+                  </p>
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 flex-1 w-full">
+                <div>
+                  <label className="block font-label-sm text-label-sm text-secondary mb-1">
+                    Full Name *
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.name}
+                    onChange={(e) => handleChange("name", e.target.value)}
+                    className={`w-full px-4 py-2 border rounded-lg focus:ring-1 focus:ring-primary focus:border-primary ${
+                      errors.name ? "border-red-500" : "border-[#E5E5E7]"
+                    } bg-white`}
+                    placeholder="Enter full name"
+                  />
+                  {errors.name && (
+                    <p className="text-red-500 text-sm mt-1">{errors.name}</p>
+                  )}
+                </div>
+                <div>
+                  <label className="block font-label-sm text-label-sm text-secondary mb-1">
+                    Email
+                  </label>
+                  <input
+                    type="email"
+                    value={formData.email}
+                    onChange={(e) => handleChange("email", e.target.value)}
+                    className={`w-full px-4 py-2 border rounded-lg focus:ring-1 focus:ring-primary focus:border-primary ${
+                      errors.email ? "border-red-500" : "border-[#E5E5E7]"
+                    } bg-white`}
+                    placeholder="name@example.com"
+                  />
+                  {errors.email && (
+                    <p className="text-red-500 text-sm mt-1">{errors.email}</p>
+                  )}
+                </div>
+                <div>
+                  <label className="block font-label-sm text-label-sm text-secondary mb-1">
+                    Phone Number
+                  </label>
+                  <input
+                    type="tel"
+                    value={formData.number}
+                    onChange={(e) => handleChange("number", e.target.value)}
+                    className="w-full px-4 py-2 border border-[#E5E5E7] rounded-lg focus:ring-1 focus:ring-primary focus:border-primary bg-white"
+                    placeholder="+91 9876543210"
+                  />
+                </div>
+                <div>
+                  <label className="block font-label-sm text-label-sm text-secondary mb-1">
+                    WhatsApp Number
+                  </label>
+                  <input
+                    type="tel"
+                    value={formData.whatsappNumber}
+                    onChange={(e) =>
+                      handleChange("whatsappNumber", e.target.value)
+                    }
+                    className="w-full px-4 py-2 border border-[#E5E5E7] rounded-lg focus:ring-1 focus:ring-primary focus:border-primary bg-white"
+                    placeholder="+91 9876543210"
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block font-label-sm text-label-sm text-secondary mb-1">
+                    Address
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.address}
+                    onChange={(e) => handleChange("address", e.target.value)}
+                    className="w-full px-4 py-2 border border-[#E5E5E7] rounded-lg focus:ring-1 focus:ring-primary focus:border-primary bg-white"
+                    placeholder="123 Main St, City, Country"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Identification & Documents (Aadhar & Resume) */}
           <h4 className="font-title-md text-title-md text-on-surface-variant mb-3">
-            Personal &amp; Contact Information
+            Identification &amp; Documents
           </h4>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block font-label-sm text-label-sm text-secondary mb-1">
-                Full Name *
+                Aadhar Number
               </label>
               <input
                 type="text"
-                value={formData.name}
-                onChange={(e) => handleChange("name", e.target.value)}
+                maxLength={14}
+                value={formData.aadharNumber}
+                onChange={(e) => handleChange("aadharNumber", e.target.value)}
                 className={`w-full px-4 py-2 border rounded-lg focus:ring-1 focus:ring-primary focus:border-primary ${
-                  errors.name ? "border-red-500" : "border-[#E5E5E7]"
+                  errors.aadharNumber ? "border-red-500" : "border-[#E5E5E7]"
                 } bg-white`}
-                placeholder="Enter full name"
+                placeholder="1234 5678 9012"
               />
-              {errors.name && (
-                <p className="text-red-500 text-sm mt-1">{errors.name}</p>
+              {errors.aadharNumber && (
+                <p className="text-red-500 text-sm mt-1">
+                  {errors.aadharNumber}
+                </p>
               )}
             </div>
+
             <div>
               <label className="block font-label-sm text-label-sm text-secondary mb-1">
-                Email
+                Employee Resume
               </label>
-              <input
-                type="email"
-                value={formData.email}
-                onChange={(e) => handleChange("email", e.target.value)}
-                className={`w-full px-4 py-2 border rounded-lg focus:ring-1 focus:ring-primary focus:border-primary ${
-                  errors.email ? "border-red-500" : "border-[#E5E5E7]"
-                } bg-white`}
-                placeholder="name@example.com"
-              />
-              {errors.email && (
-                <p className="text-red-500 text-sm mt-1">{errors.email}</p>
-              )}
+              <div className="flex items-center gap-2">
+                <label className="px-4 py-2 bg-surface border border-outline-variant rounded-lg text-on-surface font-label-md text-label-md hover:bg-surface-container-low cursor-pointer transition-colors flex items-center gap-2 shrink-0">
+                  <span className="material-symbols-outlined text-[18px]">
+                    upload_file
+                  </span>
+                  Choose File
+                  <input
+                    type="file"
+                    accept=".pdf,.doc,.docx,image/*"
+                    onChange={handleResumeChange}
+                    className="hidden"
+                  />
+                </label>
+                <span className="text-xs text-secondary truncate">
+                  {formData.resumeName ||
+                    (formData.resume ? "Resume Attached" : "No file chosen")}
+                </span>
+              </div>
             </div>
+          </div>
+
+          {/* Bank Details */}
+          <h4 className="font-title-md text-title-md text-on-surface-variant mb-3">
+            Bank Details
+          </h4>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-gray-50 p-4 rounded-xl border border-gray-200">
             <div>
               <label className="block font-label-sm text-label-sm text-secondary mb-1">
-                Phone Number
+                Account Holder Name
               </label>
               <input
-                type="tel"
-                value={formData.number}
-                onChange={(e) => handleChange("number", e.target.value)}
-                className="w-full px-4 py-2 border border-[#E5E5E7] rounded-lg focus:ring-1 focus:ring-primary focus:border-primary bg-white"
-                placeholder="+1 (555) 000-0000"
-              />
-            </div>
-            <div>
-              <label className="block font-label-sm text-label-sm text-secondary mb-1">
-                WhatsApp Number
-              </label>
-              <input
-                type="tel"
-                value={formData.whatsappNumber}
+                type="text"
+                value={formData.bankDetails.accountHolderName}
                 onChange={(e) =>
-                  handleChange("whatsappNumber", e.target.value)
+                  handleBankChange("accountHolderName", e.target.value)
                 }
                 className="w-full px-4 py-2 border border-[#E5E5E7] rounded-lg focus:ring-1 focus:ring-primary focus:border-primary bg-white"
-                placeholder="+1 (555) 000-0000"
+                placeholder="Name as per bank record"
+              />
+            </div>
+            <div>
+              <label className="block font-label-sm text-label-sm text-secondary mb-1">
+                Bank Name
+              </label>
+              <input
+                type="text"
+                value={formData.bankDetails.bankName}
+                onChange={(e) => handleBankChange("bankName", e.target.value)}
+                className="w-full px-4 py-2 border border-[#E5E5E7] rounded-lg focus:ring-1 focus:ring-primary focus:border-primary bg-white"
+                placeholder="e.g. HDFC Bank, SBI"
+              />
+            </div>
+            <div>
+              <label className="block font-label-sm text-label-sm text-secondary mb-1">
+                Account Number
+              </label>
+              <input
+                type="text"
+                value={formData.bankDetails.accountNumber}
+                onChange={(e) =>
+                  handleBankChange("accountNumber", e.target.value)
+                }
+                className="w-full px-4 py-2 border border-[#E5E5E7] rounded-lg focus:ring-1 focus:ring-primary focus:border-primary bg-white"
+                placeholder="Bank account number"
+              />
+            </div>
+            <div>
+              <label className="block font-label-sm text-label-sm text-secondary mb-1">
+                IFSC Code
+              </label>
+              <input
+                type="text"
+                value={formData.bankDetails.ifscCode}
+                onChange={(e) =>
+                  handleBankChange("ifscCode", e.target.value.toUpperCase())
+                }
+                className="w-full px-4 py-2 border border-[#E5E5E7] rounded-lg focus:ring-1 focus:ring-primary focus:border-primary bg-white uppercase"
+                placeholder="e.g. HDFC0001234"
               />
             </div>
             <div className="md:col-span-2">
               <label className="block font-label-sm text-label-sm text-secondary mb-1">
-                Address
+                UPI ID (Optional)
               </label>
               <input
                 type="text"
-                value={formData.address}
-                onChange={(e) => handleChange("address", e.target.value)}
+                value={formData.bankDetails.upiId}
+                onChange={(e) => handleBankChange("upiId", e.target.value)}
                 className="w-full px-4 py-2 border border-[#E5E5E7] rounded-lg focus:ring-1 focus:ring-primary focus:border-primary bg-white"
-                placeholder="123 Main St, City, Country"
+                placeholder="name@upi"
               />
             </div>
           </div>
 
+          {/* Job & Position Details */}
           <h4 className="font-title-md text-title-md text-on-surface-variant mb-3">
             Job &amp; Position Details
           </h4>
@@ -313,7 +624,7 @@ export default function EditMemberModal({ isOpen, onClose, onSuccess, member }) 
           <h4 className="font-title-md text-title-md text-on-surface-variant mb-3">
             Work &amp; Status Details
           </h4>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4">
             <div>
               <label className="block font-label-sm text-label-sm text-secondary mb-1">
                 Status
@@ -332,31 +643,115 @@ export default function EditMemberModal({ isOpen, onClose, onSuccess, member }) 
                 ))}
               </select>
             </div>
+
+            {/* Individual Assigned Works */}
             <div>
               <label className="block font-label-sm text-label-sm text-secondary mb-1">
                 Assigned Works
               </label>
-              <input
-                type="text"
-                value={formData.assignedWorks}
-                onChange={(e) => handleChange("assignedWorks", e.target.value)}
-                className="w-full px-4 py-2 border border-[#E5E5E7] rounded-lg focus:ring-1 focus:ring-primary focus:border-primary bg-white"
-                placeholder="Comma-separated work items"
-              />
+              <div className="flex flex-wrap gap-2 mb-2 p-2 bg-gray-50 rounded-lg border border-gray-200 min-h-[42px]">
+                {formData.assignedWorks.length > 0 ? (
+                  formData.assignedWorks.map((work, idx) => (
+                    <span
+                      key={`work-item-${idx}`}
+                      className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-50 text-emerald-800 rounded-lg text-xs border border-emerald-200 font-medium"
+                    >
+                      <span>{work}</span>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveWorkItem(idx)}
+                        className="hover:bg-emerald-200 p-0.5 rounded-full text-emerald-700 transition-colors"
+                        title="Remove work"
+                      >
+                        <span className="material-symbols-outlined text-[14px]">
+                          close
+                        </span>
+                      </button>
+                    </span>
+                  ))
+                ) : (
+                  <span className="text-xs text-gray-400 italic py-1">
+                    No works added yet
+                  </span>
+                )}
+              </div>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={newWorkInput}
+                  onChange={(e) => setNewWorkInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      handleAddWorkItem();
+                    }
+                  }}
+                  className="flex-1 px-4 py-2 border border-[#E5E5E7] rounded-lg focus:ring-1 focus:ring-primary focus:border-primary bg-white text-sm"
+                  placeholder="Type a work item name and press Add"
+                />
+                <button
+                  type="button"
+                  onClick={handleAddWorkItem}
+                  className="px-4 py-2 bg-emerald-600 text-white rounded-lg font-label-md text-label-md hover:bg-emerald-700 transition-colors shrink-0"
+                >
+                  Add Work
+                </button>
+              </div>
             </div>
-            <div className="md:col-span-2">
+
+            {/* Individual Clients Handling */}
+            <div>
               <label className="block font-label-sm text-label-sm text-secondary mb-1">
                 Clients Handling
               </label>
-              <input
-                type="text"
-                value={formData.clientHandling}
-                onChange={(e) =>
-                  handleChange("clientHandling", e.target.value)
-                }
-                className="w-full px-4 py-2 border border-[#E5E5E7] rounded-lg focus:ring-1 focus:ring-primary focus:border-primary bg-white"
-                placeholder="Comma-separated client names"
-              />
+              <div className="flex flex-wrap gap-2 mb-2 p-2 bg-gray-50 rounded-lg border border-gray-200 min-h-[42px]">
+                {formData.clientHandling.length > 0 ? (
+                  formData.clientHandling.map((client, idx) => (
+                    <span
+                      key={`client-item-${idx}`}
+                      className="inline-flex items-center gap-1.5 px-3 py-1 bg-blue-50 text-blue-800 rounded-lg text-xs border border-blue-200 font-medium"
+                    >
+                      <span>{client}</span>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveClientItem(idx)}
+                        className="hover:bg-blue-200 p-0.5 rounded-full text-blue-700 transition-colors"
+                        title="Remove client"
+                      >
+                        <span className="material-symbols-outlined text-[14px]">
+                          close
+                        </span>
+                      </button>
+                    </span>
+                  ))
+                ) : (
+                  <span className="text-xs text-gray-400 italic py-1">
+                    No clients added yet
+                  </span>
+                )}
+              </div>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={newClientInput}
+                  onChange={(e) => setNewClientInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      handleAddClientItem();
+                    }
+                  }}
+                  className="flex-1 px-4 py-2 border border-[#E5E5E7] rounded-lg focus:ring-1 focus:ring-primary focus:border-primary bg-white text-sm"
+                  placeholder="Type client name and press Add"
+                />
+                <button
+                  type="button"
+                  onClick={handleAddClientItem}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg font-label-md text-label-md hover:bg-blue-700 transition-colors shrink-0"
+                >
+                  Add Client
+                </button>
+              </div>
             </div>
           </div>
 

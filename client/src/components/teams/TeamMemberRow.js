@@ -82,7 +82,12 @@ export default function TeamMemberRow({ member, onEdit, onDelete }) {
             )}
           </div>
           <div>
-            <div className="font-title-lg text-title-lg text-on-surface">{member.name}</div>
+            <div className="flex items-center gap-2">
+              <span className="font-title-lg text-title-lg text-on-surface">{member.name}</span>
+              <span className="px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 font-mono text-[11px] border border-gray-200">
+                TM-{member.id}
+              </span>
+            </div>
             <div className="text-tertiary">{member.designation || member.department || "Team Member"}</div>
           </div>
         </Link>

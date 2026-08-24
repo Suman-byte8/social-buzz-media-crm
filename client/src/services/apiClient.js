@@ -22,13 +22,23 @@ export const apiClient = async (endpoint, options = {}) => {
     const response = await fetch(url, config);
     
     if (!response.ok) {
+      let errorMessage = `HTTP error! status: ${response.status} ${response.statusText}`;
       try {
-        const data = await response.json();
-        const message = data.message || `HTTP error! status: ${response.status}`;
-        throw new Error(message);
+        const text = await response.text();
+        if (text && text.trim()) {
+          try {
+            const data = JSON.parse(text);
+            if (data && (data.message || data.error)) {
+              errorMessage = data.message || data.error;
+            }
+          } catch {
+            errorMessage = text;
+          }
+        }
       } catch {
-        throw new Error(`Failed to parse error response: ${response.statusText}`);
+        // Fallback to HTTP error message
       }
+      throw new Error(errorMessage);
     }
 
     const data = await response.json();

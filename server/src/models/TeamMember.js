@@ -12,6 +12,10 @@ const teamMemberModel = (sequelize) => {
       number: { type: DataTypes.STRING, allowNull: true },
       whatsappNumber: { type: DataTypes.STRING, allowNull: true },
       address: { type: DataTypes.STRING, allowNull: true },
+      aadharNumber: { type: DataTypes.STRING, allowNull: true },
+      avatar: { type: DataTypes.TEXT, allowNull: true },
+      resume: { type: DataTypes.TEXT, allowNull: true },
+      bankDetails: { type: DataTypes.TEXT, allowNull: true },
 
       // Job & Position Details
       designation: { type: DataTypes.STRING, allowNull: true },

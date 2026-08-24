@@ -10,6 +10,13 @@ const formatField = (val) => {
   return val;
 };
 
+// Helper to safely parse dates without producing Invalid Date errors
+const parseDate = (val) => {
+  if (!val) return null;
+  const d = new Date(val);
+  return isNaN(d.getTime()) ? null : d;
+};
+
 // POST /api/team-members - Create a new team member
 router.post("/team-members", async (req, res) => {
   try {
@@ -23,6 +30,14 @@ router.post("/team-members", async (req, res) => {
       whatsappNumber,
       whatsapp_number,
       address,
+      aadharNumber,
+      aadhar_number,
+      avatar,
+      profileImage,
+      profile_image,
+      resume,
+      bankDetails,
+      bank_details,
 
       // 2. Job & Position Details
       designation,
@@ -55,12 +70,16 @@ router.post("/team-members", async (req, res) => {
       number: number || phoneNumber || null,
       whatsappNumber: whatsappNumber || whatsapp_number || null,
       address: address || null,
+      aadharNumber: aadharNumber || aadhar_number || null,
+      avatar: avatar || profileImage || profile_image || null,
+      resume: resume || null,
+      bankDetails: formatField(bankDetails !== undefined ? bankDetails : bank_details),
 
       // Job & Position Details
       designation: designation || null,
       department: department || designation || null,
       employmentType: employmentType || type_of_employment || null,
-      hireDate: hireDate || hire_date ? new Date(hireDate || hire_date) : null,
+      hireDate: parseDate(hireDate || hire_date),
       managerReportTo: managerReportTo || manager_report_to || null,
 
       // Work & Status Details
@@ -146,6 +165,14 @@ router.put("/team-members/:id", async (req, res) => {
       whatsappNumber,
       whatsapp_number,
       address,
+      aadharNumber,
+      aadhar_number,
+      avatar,
+      profileImage,
+      profile_image,
+      resume,
+      bankDetails,
+      bank_details,
       designation,
       department,
       employmentType,
@@ -173,6 +200,19 @@ router.put("/team-members/:id", async (req, res) => {
           ? whatsappNumber || whatsapp_number
           : teamMember.whatsappNumber,
       address: address !== undefined ? address : teamMember.address,
+      aadharNumber:
+        (aadharNumber || aadhar_number) !== undefined
+          ? aadharNumber || aadhar_number
+          : teamMember.aadharNumber,
+      avatar:
+        (avatar || profileImage || profile_image) !== undefined
+          ? avatar || profileImage || profile_image
+          : teamMember.avatar,
+      resume: resume !== undefined ? resume : teamMember.resume,
+      bankDetails:
+        bankDetails !== undefined || bank_details !== undefined
+          ? formatField(bankDetails ?? bank_details)
+          : teamMember.bankDetails,
       designation:
         designation !== undefined ? designation : teamMember.designation,
       department: department !== undefined ? department : teamMember.department,
@@ -181,8 +221,8 @@ router.put("/team-members/:id", async (req, res) => {
           ? employmentType || type_of_employment
           : teamMember.employmentType,
       hireDate:
-        (hireDate || hire_date) !== undefined
-          ? new Date(hireDate || hire_date)
+        hireDate !== undefined || hire_date !== undefined
+          ? parseDate(hireDate ?? hire_date)
           : teamMember.hireDate,
       managerReportTo:
         (managerReportTo || manager_report_to) !== undefined

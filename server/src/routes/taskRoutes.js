@@ -156,10 +156,15 @@ router.get("/tasks", async (req, res) => {
     }
 
     if (assigneeId && assigneeId !== "all") {
-      const assigneeIdInt = parseInt(assigneeId);
-      where.assignees = {
-        [Op.like]: `%${assigneeIdInt}%`
-      };
+      const idStr = String(parseInt(assigneeId));
+      where[Op.or] = [
+        { assignees: { [Op.like]: `[${idStr}]` } },
+        { assignees: { [Op.like]: `[${idStr},%` } },
+        { assignees: { [Op.like]: `%,${idStr},%` } },
+        { assignees: { [Op.like]: `%,${idStr}]` } },
+        { assignees: { [Op.like]: `%, ${idStr},%` } },
+        { assignees: { [Op.like]: `%, ${idStr}]` } },
+      ];
     }
 
     const { count, rows } = await Task.findAndCountAll({

@@ -24,8 +24,19 @@ export default function TasksPageShell({ tasks: initialTasks, clients, teamMembe
   const [statusFilter, setStatusFilter] = useState("all");
   const [priorityFilter, setPriorityFilter] = useState("all");
   const [clientFilter, setClientFilter] = useState("all");
+  const [assigneeFilter, setAssigneeFilter] = useState("all");
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingTask, setEditingTask] = useState(null);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const urlAssignee = params.get("assigneeId");
+      const urlSearch = params.get("search");
+      if (urlAssignee) setAssigneeFilter(urlAssignee);
+      if (urlSearch) setSearchTerm(urlSearch);
+    }
+  }, []);
 
   const refreshTasks = useCallback(async () => {
     try {
@@ -34,12 +45,13 @@ export default function TasksPageShell({ tasks: initialTasks, clients, teamMembe
         status: statusFilter !== "all" ? statusFilter : undefined,
         priority: priorityFilter !== "all" ? priorityFilter : undefined,
         clientId: clientFilter !== "all" ? clientFilter : undefined,
+        assigneeId: assigneeFilter !== "all" ? assigneeFilter : undefined,
       });
       setTasks(response.data || []);
     } catch (error) {
       console.error("Error fetching tasks:", error);
     }
-  }, [searchTerm, statusFilter, priorityFilter, clientFilter]);
+  }, [searchTerm, statusFilter, priorityFilter, clientFilter, assigneeFilter]);
 
   useEffect(() => {
     refreshTasks();
@@ -182,6 +194,24 @@ export default function TasksPageShell({ tasks: initialTasks, clients, teamMembe
             {clients.map((client) => (
               <option key={client.id} value={client.id}>
                 {client.name}
+              </option>
+            ))}
+          </select>
+          <span className="material-symbols-outlined absolute right-2 top-1/2 -translate-y-1/2 text-[16px] text-gray-400 pointer-events-none">
+            expand_more
+          </span>
+        </div>
+
+        <div className="relative">
+          <select
+            value={assigneeFilter}
+            onChange={(e) => setAssigneeFilter(e.target.value)}
+            className="appearance-none bg-gray-50 border border-gray-300 text-on-surface rounded-lg pl-3 pr-8 py-2 text-sm focus:ring-1 focus:ring-primary focus:border-primary outline-none"
+          >
+            <option value="all">All Assignees</option>
+            {(teamMembers || []).map((member) => (
+              <option key={member.id} value={member.id}>
+                {member.name} (TM-{member.id})
               </option>
             ))}
           </select>
