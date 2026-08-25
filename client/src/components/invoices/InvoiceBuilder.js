@@ -7,11 +7,11 @@ import React, {
   useRef,
   useMemo,
 } from "react";
-import { fetchClients } from "@/services/clientService";
+import { fetchClients, uploadInvoiceToDrive } from "@/services/clientService";
 import InvoiceToolbar from "./Invoicetoolbar";
 import InvoiceDocument from "./Invoicedocument";
 import { numberToIndianWords } from "../../lib/Numbertowords";
-import { exportInvoiceToPdf } from "../../lib/Pdfexport";
+import { exportInvoiceToPdf, getInvoicePdfBlob } from "../../lib/Pdfexport";
 
 const DEFAULT_ROWS = [
   {
@@ -79,6 +79,7 @@ export default function InvoiceBuilder() {
   const [bankDetails, setBankDetails] = useState(DEFAULT_BANK);
   const [advancePaid, setAdvancePaid] = useState(0);
   const [isSavingPdf, setIsSavingPdf] = useState(false);
+  const [isSavingToDrive, setIsSavingToDrive] = useState(false);
 
   const invoiceSheetRef = useRef(null);
 
@@ -204,6 +205,21 @@ export default function InvoiceBuilder() {
     }
   }, [invoiceNumber]);
 
+  const handleSaveToDrive = useCallback(async () => {
+    if (!invoiceSheetRef.current || !selectedClientId) return;
+    setIsSavingToDrive(true);
+    try {
+      const pdfBlob = await getInvoicePdfBlob(invoiceSheetRef.current);
+      await uploadInvoiceToDrive(pdfBlob, selectedClientId, invoiceNumber);
+      alert("Invoice saved to Google Drive successfully!");
+    } catch (e) {
+      console.error("Google Drive upload failed:", e);
+      alert(e.message || "Failed to save invoice to Google Drive. Please try again.");
+    } finally {
+      setIsSavingToDrive(false);
+    }
+  }, [invoiceNumber, selectedClientId]);
+
   const handleShare = useCallback(async () => {
     const shareText = `Invoice ${invoiceNumber} — ${new Intl.NumberFormat(
       "en-IN",
@@ -241,8 +257,11 @@ export default function InvoiceBuilder() {
         stampMode={stampMode}
         onStampModeChange={setStampMode}
         onSavePdf={handleSavePdf}
+        onSaveToDrive={handleSaveToDrive}
         onShare={handleShare}
         isSavingPdf={isSavingPdf}
+        isSavingToDrive={isSavingToDrive}
+        selectedClientId={selectedClientId}
       />
 
       <main className="mx-auto my-8 max-w-full">

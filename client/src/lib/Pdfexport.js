@@ -28,7 +28,7 @@ const A4_HEIGHT_MM = 297;
  *    values here, input/textarea contents can render blank in the
  *    captured canvas even though they look correct on screen.
  */
-export async function exportInvoiceToPdf(node, filename) {
+async function generateInvoicePdfBlob(node) {
   if (!node) throw new Error("Invoice element not found");
 
   const canvas = await html2canvas(node, {
@@ -96,5 +96,21 @@ export async function exportInvoiceToPdf(node, filename) {
     "FAST",
   );
 
-  pdf.save(filename);
+  return pdf.output("blob");
+}
+
+export async function exportInvoiceToPdf(node, filename) {
+  const blob = await generateInvoicePdfBlob(node);
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
+export async function getInvoicePdfBlob(node) {
+  return generateInvoicePdfBlob(node);
 }

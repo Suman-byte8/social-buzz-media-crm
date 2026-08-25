@@ -65,3 +65,38 @@ export const formatClientData = (formData) => {
     contentCalendar: formData.contentCalendar ? formData.contentCalendar.split(',').map(s => s.trim()).filter(Boolean) : [],
   };
 };
+
+export const uploadInvoiceToDrive = async (pdfBlob, clientId, invoiceNumber) => {
+  const formData = new FormData();
+  formData.append('file', pdfBlob, `Invoice-${invoiceNumber || 'draft'}.pdf`);
+  formData.append('clientId', clientId.toString());
+  formData.append('documentType', 'invoice');
+
+  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+  const response = await fetch(`${API_BASE_URL}/documents/upload`, {
+    method: 'POST',
+    body: formData,
+  });
+
+  if (!response.ok) {
+    let errorMessage = `HTTP error! status: ${response.status} ${response.statusText}`;
+    try {
+      const text = await response.text();
+      if (text && text.trim()) {
+        try {
+          const data = JSON.parse(text);
+          if (data && (data.message || data.error)) {
+            errorMessage = data.message || data.error;
+          }
+        } catch {
+          errorMessage = text;
+        }
+      }
+    } catch {
+      // Fallback to HTTP error message
+    }
+    throw new Error(errorMessage);
+  }
+
+  return response.json();
+};
