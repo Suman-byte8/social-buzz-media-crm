@@ -1,15 +1,35 @@
 "use client";
 import React from "react";
+import ShareMenu from "./Sharemenu";
 
+// This is the actual Google Drive triangle logo. The previous version used
+// a generic globe/language icon path, which is why "Save to Drive" never
+// visually looked like Drive even when it was rendering.
 const GoogleDriveIcon = ({ className = "w-5 h-5" }) => (
-  <svg
-    className={className}
-    viewBox="0 0 24 24"
-    fill="currentColor"
-    aria-hidden="true"
-  >
+  <svg className={className} viewBox="0 0 87.3 78" aria-hidden="true">
     <path
-      d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"
+      d="m6.6 66.85 3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8h-27.5c0 1.55.4 3.1 1.2 4.5z"
+      fill="#0066DA"
+    />
+    <path
+      d="m43.65 25-13.75-23.8c-1.35.8-2.5 1.9-3.3 3.3l-25.4 44a9.06 9.06 0 0 0 -1.2 4.5h27.5z"
+      fill="#00AC47"
+    />
+    <path
+      d="m73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75 7.65-13.25c.8-1.4 1.2-2.95 1.2-4.5h-27.502l5.852 11.5z"
+      fill="#EA4335"
+    />
+    <path
+      d="m43.65 25 13.75-23.8c-1.35-.8-2.9-1.2-4.5-1.2h-18.5c-1.6 0-3.15.45-4.5 1.2z"
+      fill="#00832D"
+    />
+    <path
+      d="m59.8 53h-32.3l-13.75 23.8c1.35.8 2.9 1.2 4.5 1.2h50.8c1.6 0 3.15-.45 4.5-1.2z"
+      fill="#2684FC"
+    />
+    <path
+      d="m73.4 26.5-12.7-22c-.8-1.4-1.95-2.5-3.3-3.3l-13.75 23.8 16.15 28h27.45c0-1.55-.4-3.1-1.2-4.5z"
+      fill="#FFBA00"
     />
   </svg>
 );
@@ -25,11 +45,14 @@ export default function InvoiceToolbar({
   stampMode,
   onStampModeChange,
   onSavePdf,
-  onShare,
   onSaveToDrive,
   isSavingPdf,
   isSavingToDrive,
   selectedClientId,
+  selectedClient,
+  isSharing,
+  onSendWhatsApp,
+  onSendEmail,
 }) {
   return (
     <div className="no-print sticky top-0 z-30 bg-ink text-white">
@@ -106,27 +129,34 @@ export default function InvoiceToolbar({
           {isSavingPdf ? "Saving…" : "Save PDF"}
         </button>
 
-        {selectedClientId && (
-          <button
-            type="button"
-            onClick={onSaveToDrive}
-            disabled={isSavingToDrive}
-            id="btnSaveToDrive"
-            className="rounded bg-[#4285F4] px-3 py-1.5 text-[12px] font-semibold tracking-wide hover:bg-[#3367D6] focus:outline-none focus:ring-2 focus:ring-white/60 disabled:opacity-60 flex items-center gap-2"
-            title="Save to Google Drive"
-          >
-            <GoogleDriveIcon />
-            {isSavingToDrive ? "Uploading…" : "Save to Drive"}
-          </button>
-        )}
-
+        {/*
+          Always rendered now (previously this whole block, icon included,
+          was omitted from the DOM until a client was selected — so there
+          was no visual indication a button was even supposed to be there).
+          It now stays visible and disables with a tooltip instead.
+        */}
         <button
           type="button"
-          className="ml-auto rounded border border-white/30 px-3 py-1.5 text-[12px] font-semibold tracking-wide hover:bg-white hover:text-ink focus:outline-none focus:ring-2 focus:ring-white/60"
-          onClick={onShare}
+          onClick={onSaveToDrive}
+          disabled={isSavingToDrive || !selectedClientId}
+          id="btnSaveToDrive"
+          title={
+            selectedClientId
+              ? "Save to Google Drive"
+              : "Select a client above to enable Drive upload"
+          }
+          className="flex items-center gap-2 rounded bg-[#4285F4] px-3 py-1.5 text-[12px] font-semibold tracking-wide hover:bg-[#3367D6] focus:outline-none focus:ring-2 focus:ring-white/60 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          Share
+          <GoogleDriveIcon />
+          {isSavingToDrive ? "Uploading…" : "Save to Drive"}
         </button>
+
+        <ShareMenu
+          client={selectedClient}
+          isSending={isSharing}
+          onSendWhatsApp={onSendWhatsApp}
+          onSendEmail={onSendEmail}
+        />
       </div>
     </div>
   );
