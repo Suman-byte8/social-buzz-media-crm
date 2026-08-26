@@ -2,14 +2,16 @@
 
 import React from "react";
 
-export default function MetricsGrid() {
-  const metrics = [
-    { title: "Active Clients", value: "42", change: "+3 this mo", changeType: "positive", icon: "domain" },
-    { title: "MRR", value: "$128k", change: "12%", changeType: "positive", icon: "payments" },
-    { title: "Out. Invoices", value: "$24.5k", change: "4 Overdue", changeType: "negative", icon: "receipt_long" },
-    { title: "Active Google Ads", value: "156", change: "All Healthy", icon: "ads_click" },
-    { title: "Active Meta Camp.", value: "89", change: "$12k/day spend", icon: "campaign" },
-  ];
+export default function MetricsGrid({ metrics = [], loading }) {
+  if (loading) {
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-stack-sm md:gap-stack-md">
+        {Array.from({ length: 5 }).map((_, i) => (
+          <div key={i} className="bg-white rounded-lg border border-[#E5E5E7] p-card-padding shadow-[0px_2px_4px_rgba(0,0,0,0.05)] h-[104px] animate-pulse" />
+        ))}
+      </div>
+    );
+  }
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-stack-sm md:gap-stack-md">
@@ -27,7 +29,7 @@ export default function MetricsGrid() {
             </span>
           </div>
           {metric.change && (
-            <span className={`font-label-sm text-label-sm mt-2 ${metric.changeType === 'positive' ? 'text-emerald-600' : 'text-red-600'}`}>
+            <span className={`font-label-sm text-label-sm mt-2 ${metric.changeType === "positive" ? "text-emerald-600" : metric.changeType === "negative" ? "text-amber-700" : "text-on-surface-variant"}`}>
               {metric.change}
             </span>
           )}

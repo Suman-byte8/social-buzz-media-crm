@@ -47,7 +47,9 @@ export default function ContentCalendarTable({
   if (loading) {
     return (
       <div className="py-8 text-center text-gray-500">
-        <span className="animate-spin material-symbols-outlined text-[24px]">progress_activity</span>
+        <span className="animate-spin material-symbols-outlined text-[24px]">
+          progress_activity
+        </span>
       </div>
     );
   }
@@ -55,8 +57,12 @@ export default function ContentCalendarTable({
   if ((!entries || entries.length === 0) && !hasDrafts) {
     return (
       <div className="py-8 px-6 text-center text-gray-500">
-        <span className="material-symbols-outlined text-[40px] mb-1.5">event_note</span>
-        <p className="font-body-sm text-xs">No content calendar entries found.</p>
+        <span className="material-symbols-outlined text-[40px] mb-1.5">
+          event_note
+        </span>
+        <p className="font-body-sm text-xs">
+          No content calendar entries found.
+        </p>
       </div>
     );
   }
@@ -66,20 +72,44 @@ export default function ContentCalendarTable({
       <table className="w-full text-left border-collapse text-xs">
         <thead>
           <tr className="bg-gray-50 border-b border-gray-200">
-            <th className="py-1.5 px-2 font-label-sm text-[10px] text-gray-700 uppercase tracking-wider whitespace-nowrap">Date</th>
-            <th className="py-1.5 px-2 font-label-sm text-[10px] text-gray-700 uppercase tracking-wider whitespace-nowrap">Day</th>
+            <th className="py-1.5 px-2 font-label-sm text-[10px] text-gray-700 uppercase tracking-wider whitespace-nowrap">
+              Date
+            </th>
+            <th className="py-1.5 px-2 font-label-sm text-[10px] text-gray-700 uppercase tracking-wider whitespace-nowrap">
+              Day
+            </th>
             {showClientColumn && (
-              <th className="py-1.5 px-2 font-label-sm text-[10px] text-gray-700 uppercase tracking-wider whitespace-nowrap">Client</th>
+              <th className="py-1.5 px-2 font-label-sm text-[10px] text-gray-700 uppercase tracking-wider whitespace-nowrap">
+                Client
+              </th>
             )}
-            <th className="py-1.5 px-2 font-label-sm text-[10px] text-gray-700 uppercase tracking-wider min-w-[110px]">Holiday</th>
-            <th className="py-1.5 px-2 font-label-sm text-[10px] text-gray-700 uppercase tracking-wider min-w-[150px]">Post Title</th>
-            <th className="py-1.5 px-2 font-label-sm text-[10px] text-gray-700 uppercase tracking-wider min-w-[220px]">Content</th>
-            <th className="py-1.5 px-2 font-label-sm text-[10px] text-gray-700 uppercase tracking-wider min-w-[220px]">Caption</th>
-            <th className="py-1.5 px-2 font-label-sm text-[10px] text-gray-700 uppercase tracking-wider min-w-[160px]">Hashtags</th>
-            <th className="py-1.5 px-2 font-label-sm text-[10px] text-gray-700 uppercase tracking-wider whitespace-nowrap">Platforms</th>
-            <th className="py-1.5 px-2 font-label-sm text-[10px] text-gray-700 uppercase tracking-wider whitespace-nowrap">Creatives</th>
-            <th className="py-1.5 px-2 font-label-sm text-[10px] text-gray-700 uppercase tracking-wider whitespace-nowrap">Posted</th>
-            <th className="py-1.5 px-2 font-label-sm text-[10px] text-gray-700 uppercase tracking-wider text-right whitespace-nowrap">Actions</th>
+            <th className="py-1.5 px-2 font-label-sm text-[10px] text-gray-700 uppercase tracking-wider min-w-[110px]">
+              Holiday
+            </th>
+            <th className="py-1.5 px-2 font-label-sm text-[10px] text-gray-700 uppercase tracking-wider min-w-[150px]">
+              Post Title
+            </th>
+            <th className="py-1.5 px-2 font-label-sm text-[10px] text-gray-700 uppercase tracking-wider min-w-[220px]">
+              Content
+            </th>
+            <th className="py-1.5 px-2 font-label-sm text-[10px] text-gray-700 uppercase tracking-wider min-w-[220px]">
+              Caption
+            </th>
+            <th className="py-1.5 px-2 font-label-sm text-[10px] text-gray-700 uppercase tracking-wider min-w-[160px]">
+              Hashtags
+            </th>
+            <th className="py-1.5 px-2 font-label-sm text-[10px] text-gray-700 uppercase tracking-wider whitespace-nowrap">
+              Platforms
+            </th>
+            <th className="py-1.5 px-2 font-label-sm text-[10px] text-gray-700 uppercase tracking-wider whitespace-nowrap">
+              Creatives
+            </th>
+            <th className="py-1.5 px-2 font-label-sm text-[10px] text-gray-700 uppercase tracking-wider whitespace-nowrap">
+              Posted
+            </th>
+            <th className="py-1.5 px-2 font-label-sm text-[10px] text-gray-700 uppercase tracking-wider text-right whitespace-nowrap">
+              Actions
+            </th>
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-200">
@@ -92,10 +122,16 @@ export default function ContentCalendarTable({
               fixedClientName={draftClientName}
               values={draft}
               stagedFiles={draft.stagedFiles || []}
-              onChange={(field, value) => onDraftChange(draft.tempId, field, value)}
-              onTogglePlatform={(platform) => onDraftTogglePlatform(draft.tempId, platform)}
+              onChange={(field, value) =>
+                onDraftChange(draft.tempId, field, value)
+              }
+              onTogglePlatform={(platform) =>
+                onDraftTogglePlatform(draft.tempId, platform)
+              }
               onStageFiles={(files) => onDraftStageFiles(draft.tempId, files)}
-              onRemoveStagedFile={(index) => onDraftRemoveStagedFile(draft.tempId, index)}
+              onRemoveStagedFile={(index) =>
+                onDraftRemoveStagedFile(draft.tempId, index)
+              }
               onSave={() => onSaveDraft(draft.tempId)}
               onCancel={() => onDiscardDraft(draft.tempId)}
               saving={savingDraftId === draft.tempId}
@@ -133,18 +169,27 @@ export default function ContentCalendarTable({
             const creatives = entry.creatives || [];
 
             return (
-              <tr key={entry.id} className={`hover:bg-gray-50 ${entry.holiday ? "bg-amber-50/60" : ""}`}>
+              <tr
+                key={entry.id}
+                className={`hover:bg-gray-50 ${entry.holiday ? "bg-amber-50/60" : ""}`}
+              >
                 <td className="py-4 px-2 text-gray-900 whitespace-nowrap font-medium align-top">
                   {formatDateDisplay(entry.date)}
                 </td>
-                <td className="py-4 px-2 text-gray-600 whitespace-nowrap align-top">{getWeekDay(entry.date)}</td>
+                <td className="py-4 px-2 text-gray-600 whitespace-nowrap align-top">
+                  {getWeekDay(entry.date)}
+                </td>
                 {showClientColumn && (
-                  <td className="py-4 px-2 text-gray-600 whitespace-nowrap align-top">{entry.clientName || "—"}</td>
+                  <td className="py-4 px-2 text-gray-600 whitespace-nowrap align-top">
+                    {entry.clientName || "—"}
+                  </td>
                 )}
                 <td className="py-4 px-2 text-gray-700 align-top">
                   {entry.holiday ? (
                     <span className="inline-flex items-start gap-1 px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-800 font-medium whitespace-normal break-words">
-                      <span className="material-symbols-outlined text-[12px] shrink-0">celebration</span>
+                      <span className="material-symbols-outlined text-[12px] shrink-0">
+                        celebration
+                      </span>
                       <span>{entry.holiday}</span>
                     </span>
                   ) : (
@@ -165,68 +210,97 @@ export default function ContentCalendarTable({
                 </td>
                 <td className="py-4 px-2 align-top">
                   <div className="flex flex-wrap gap-1">
-                    {entry.platforms && entry.platforms.length > 0 ? (
-                      entry.platforms.map((p) => {
-                        const meta = getPlatformMeta(p);
-                        return (
-                          <span
-                            key={p}
-                            title={meta.label}
-                            className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-white border border-gray-200 overflow-hidden shrink-0"
-                          >
-                            {meta.logo ? (
-                              <img src={meta.logo} alt={meta.label} className="w-4 h-4 object-contain" />
-                            ) : (
-                              <span className="material-symbols-outlined text-[13px]">{meta.icon}</span>
-                            )}
-                          </span>
-                        );
-                      })
-                    ) : (
-                      "—"
-                    )}
+                    {entry.platforms && entry.platforms.length > 0
+                      ? entry.platforms.map((p) => {
+                          const meta = getPlatformMeta(p);
+                          return (
+                            <span
+                              key={p}
+                              title={meta.label}
+                              className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-white border border-gray-200 overflow-hidden shrink-0"
+                            >
+                              {meta.logo ? (
+                                <img
+                                  src={meta.logo}
+                                  alt={meta.label}
+                                  className="w-4 h-4 object-contain"
+                                />
+                              ) : (
+                                <span className="material-symbols-outlined text-[13px]">
+                                  {meta.icon}
+                                </span>
+                              )}
+                            </span>
+                          );
+                        })
+                      : "—"}
                   </div>
                 </td>
                 <td className="py-3 px-2 align-top">
-                  {creatives.length > 0 ? (() => {
-                    const thumbSize = creatives.length === 1 ? "w-24 h-24" : creatives.length === 2 ? "w-16 h-16" : "w-12 h-12";
-                    const iconSize = creatives.length === 1 ? "text-[32px]" : creatives.length === 2 ? "text-[22px]" : "text-[16px]";
-                    const playSize = creatives.length === 1 ? "text-[26px]" : creatives.length === 2 ? "text-[18px]" : "text-[13px]";
-                    const gap = creatives.length > 2 ? "gap-1" : "gap-2";
-                    return (
-                      <div className={`grid grid-cols-3 ${gap} w-fit`}>
-                        {creatives.map((creative) => (
-                          <a
-                            key={creative.fileId}
-                            href={creative.webViewLink || creative.driveLink}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            title={creative.fileName}
-                            className={`relative ${thumbSize} aspect-square rounded-lg border border-gray-200 shadow-sm overflow-hidden bg-gray-100 hover:ring-2 hover:ring-primary/50 transition-shadow shrink-0`}
-                          >
-                            {creative.thumbnailLink ? (
-                              <img
-                                src={creative.thumbnailLink}
-                                alt={creative.fileName}
-                                className="w-full h-full object-cover"
-                              />
-                            ) : (
-                              <span className={`material-symbols-outlined ${iconSize} text-gray-400 flex items-center justify-center w-full h-full`}>
-                                {creative.mimeType?.startsWith("video/") ? "movie" : "image"}
-                              </span>
-                            )}
-                            {creative.mimeType?.startsWith("video/") && (
-                              <span className="absolute inset-0 flex items-center justify-center bg-black/20">
-                                <span className={`material-symbols-outlined ${playSize} text-white`}>play_arrow</span>
-                              </span>
-                            )}
-                          </a>
-                        ))}
-                      </div>
-                    );
-                  })() : (
-                    "—"
-                  )}
+                  {creatives.length > 0
+                    ? (() => {
+                        const thumbSize =
+                          creatives.length === 1
+                            ? "w-24 h-24"
+                            : creatives.length === 2
+                              ? "w-16 h-16"
+                              : "w-12 h-12";
+                        const iconSize =
+                          creatives.length === 1
+                            ? "text-[32px]"
+                            : creatives.length === 2
+                              ? "text-[22px]"
+                              : "text-[16px]";
+                        const playSize =
+                          creatives.length === 1
+                            ? "text-[26px]"
+                            : creatives.length === 2
+                              ? "text-[18px]"
+                              : "text-[13px]";
+                        const gap = creatives.length > 2 ? "gap-1" : "gap-2";
+                        return (
+                          <div className={`grid grid-cols-3 ${gap} w-fit`}>
+                            {creatives.map((creative) => (
+                              <a
+                                key={creative.fileId}
+                                href={
+                                  creative.webViewLink || creative.driveLink
+                                }
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                title={creative.fileName}
+                                className={`relative ${thumbSize} aspect-square rounded-lg border border-gray-200 shadow-sm overflow-hidden bg-gray-100 hover:ring-2 hover:ring-primary/50 transition-shadow shrink-0`}
+                              >
+                                {creative.thumbnailLink ? (
+                                  <img
+                                    src={creative.thumbnailLink}
+                                    alt={creative.fileName}
+                                    className="w-full h-full object-cover"
+                                  />
+                                ) : (
+                                  <span
+                                    className={`material-symbols-outlined ${iconSize} text-gray-400 flex items-center justify-center w-full h-full`}
+                                  >
+                                    {creative.mimeType?.startsWith("video/")
+                                      ? "movie"
+                                      : "image"}
+                                  </span>
+                                )}
+                                {creative.mimeType?.startsWith("video/") && (
+                                  <span className="absolute inset-0 flex items-center justify-center bg-black/20">
+                                    <span
+                                      className={`material-symbols-outlined ${playSize} text-white`}
+                                    >
+                                      play_arrow
+                                    </span>
+                                  </span>
+                                )}
+                              </a>
+                            ))}
+                          </div>
+                        );
+                      })()
+                    : "—"}
                 </td>
                 <td className="py-4 px-2 whitespace-nowrap align-top">
                   <button
@@ -251,14 +325,18 @@ export default function ContentCalendarTable({
                       className="p-1 text-gray-600 hover:text-primary hover:bg-gray-100 rounded"
                       title="Edit"
                     >
-                      <span className="material-symbols-outlined text-[16px]">edit</span>
+                      <span className="material-symbols-outlined text-[16px]">
+                        edit
+                      </span>
                     </button>
                     <button
                       onClick={() => onDelete(entry)}
                       className="p-1 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded"
                       title="Delete"
                     >
-                      <span className="material-symbols-outlined text-[16px]">delete</span>
+                      <span className="material-symbols-outlined text-[16px]">
+                        delete
+                      </span>
                     </button>
                   </div>
                 </td>
