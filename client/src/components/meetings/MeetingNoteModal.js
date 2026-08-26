@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from "react";
+import { useDispatch } from "react-redux";
+import { createMeetingNote, updateMeetingNote } from "@/redux/slices/meetingNotesSlice";
 
 export default function MeetingNoteModal({
   open,
@@ -9,6 +11,7 @@ export default function MeetingNoteModal({
   meetingNoteToEdit = null,
   isEdit = false,
 }) {
+  const dispatch = useDispatch();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [meetingDate, setMeetingDate] = useState("");
@@ -66,37 +69,25 @@ export default function MeetingNoteModal({
       };
 
       if (isEdit && meetingNoteToEdit?.id) {
-        const response = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api"}/meeting-notes/${meetingNoteToEdit.id}`,
-          {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload),
-          }
-        );
-        const data = await response.json();
-        if (!response.ok) throw new Error(data.message || "Failed to update meeting note");
+        const data = await dispatch(
+          updateMeetingNote({ id: meetingNoteToEdit.id, updateData: payload })
+        ).unwrap();
         setLoading(false);
-        onSuccess(data.data);
+        onSuccess(data?.data);
         onClose();
       } else {
-        const response = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api"}/meeting-notes`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload),
-          }
-        );
-        const data = await response.json();
-        if (!response.ok) throw new Error(data.message || "Failed to create meeting note");
+        const data = await dispatch(createMeetingNote(payload)).unwrap();
         setLoading(false);
-        onSuccess(data.data);
+        onSuccess(data?.data);
         onClose();
       }
     } catch (err) {
       setLoading(false);
-      setError(err.message || "Failed to process meeting note");
+      setError(
+        typeof err === "string"
+          ? err
+          : err?.message || "Failed to process meeting note"
+      );
     }
   };
 

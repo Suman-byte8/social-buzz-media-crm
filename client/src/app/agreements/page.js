@@ -1,82 +1,49 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { useDispatch, useSelector } from "react-redux";
 import AgreementUploadModal from "@/components/clients/AgreementUploadModal";
 import AgreementViewModal from "@/components/clients/AgreementViewModal";
-import {
-  fetchAgreements,
-  fetchClients,
-  deleteAgreement,
-} from "@/services/documentService";
-import * as documentService from "@/services/documentService";
+import { fetchClients } from "@/redux/slices/clientsSlice";
+import { fetchAgreements, deleteAgreement } from "@/redux/slices/documentsSlice";
 
 export default function AgreementsPage() {
-  const [clients, setClients] = useState([]);
-  const [agreements, setAgreements] = useState([]);
+  const dispatch = useDispatch();
+  const { clients, loading: loadingClients } = useSelector((state) => state.clients);
+  const { agreements, loadingAgreements, error } = useSelector((state) => state.documents);
+
   const [selectedClientId, setSelectedClientId] = useState(null);
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [viewModalOpen, setViewModalOpen] = useState(false);
   const [editingAgreement, setEditingAgreement] = useState(null);
   const [viewingAgreement, setViewingAgreement] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
   const [deleteLoading, setDeleteLoading] = useState({});
 
   useEffect(() => {
-    const loadData = async () => {
-      try {
-        const clientsData = await fetchClients();
-        setClients(clientsData.data || []);
-        
-        const agreementsData = await fetchAgreements();
-        setAgreements(agreementsData.data || []);
-      } catch (err) {
-        setError("Failed to load initial data");
-      } finally {
-        setLoading(false);
-      }
-    };
-    
-    loadData();
-  }, []);
+    dispatch(fetchClients());
+  }, [dispatch]);
 
-  const loadAgreementsByClient = async (clientId) => {
-    if (!clientId) return;
-    setLoading(true);
-    setError(null);
-    try {
-      const data = await fetchAgreements(clientId);
-      setAgreements(data.data || []);
-    } catch (err) {
-      setError("Failed to load agreements");
-    } finally {
-      setLoading(false);
-    }
-  };
+  useEffect(() => {
+    dispatch(fetchAgreements(selectedClientId || undefined));
+  }, [dispatch, selectedClientId]);
 
   const handleClientChange = (e) => {
     const rawValue = e.target.value;
     const clientId = rawValue === "" ? null : Number(rawValue);
     if (clientId !== null && isNaN(clientId)) return;
     setSelectedClientId(clientId);
-    loadAgreementsByClient(clientId);
   };
 
   const handleResetFilter = () => {
     setSelectedClientId(null);
-    loadAgreements();
   };
 
-  const handleUploadSuccess = (agreement) => {
-    setAgreements((prev) => [...prev, agreement]);
+  const handleUploadSuccess = () => {
     setUploadModalOpen(false);
   };
 
-  const handleEditSuccess = (updated) => {
-    setAgreements((prev) =>
-      prev.map((a) => (a.id === updated.id ? updated : a))
-    );
+  const handleEditSuccess = () => {
     setEditModalOpen(false);
     setEditingAgreement(null);
   };
@@ -85,16 +52,14 @@ export default function AgreementsPage() {
     if (!window.confirm("Are you sure you want to delete this agreement?"))
       return;
     try {
-      setError(null);
-      await deleteAgreement(id);
-      setAgreements((prev) => prev.filter((a) => a.id !== id));
+      await dispatch(deleteAgreement(id)).unwrap();
       setDeleteLoading((prev) => {
         const copy = { ...prev };
         delete copy[id];
         return copy;
       });
     } catch (err) {
-      setError(err.message || "Failed to delete agreement");
+      // Failure is surfaced via state.documents.error
     }
   };
 
@@ -106,19 +71,6 @@ export default function AgreementsPage() {
   const handleView = (agreement) => {
     setViewingAgreement(agreement);
     setViewModalOpen(true);
-  };
-
-  const loadAgreements = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const data = await fetchAgreements();
-      setAgreements(data.data || []);
-    } catch (err) {
-      setError("Failed to load agreements");
-    } finally {
-      setLoading(false);
-    }
   };
 
   const statusColors = {
@@ -143,7 +95,7 @@ export default function AgreementsPage() {
     return getClientName(agreement.clientId);
   };
 
-  if (loading && (!clients.length || !agreements.length)) {
+  if ((loadingClients || loadingAgreements) && (!clients.length || !agreements.length)) {
     return (
       <div className="p-6">
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
@@ -331,7 +283,6 @@ export default function AgreementsPage() {
         onSuccess={handleUploadSuccess}
         clientId={selectedClientId}
         clientName={selectedClientId ? getClientName(selectedClientId) : null}
-        documentService={documentService}
       />
 
       <AgreementUploadModal
@@ -345,7 +296,6 @@ export default function AgreementsPage() {
         onSuccess={handleEditSuccess}
         clientId={selectedClientId || editingAgreement?.clientId}
         clientName={getClientNameForAgreement(editingAgreement)}
-        documentService={documentService}
       />
 
       <AgreementViewModal

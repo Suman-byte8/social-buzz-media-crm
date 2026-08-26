@@ -1,72 +1,78 @@
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
-import { apiClient } from "@/services/apiClient";
+import {
+  fetchClients as fetchClientsApi,
+  fetchClientById as fetchClientByIdApi,
+  createClient as createClientApi,
+  updateClient as updateClientApi,
+  deleteClient as deleteClientApi,
+  exportClients as exportClientsApi,
+} from "@/services/clientService";
 
 export const fetchClients = createAsyncThunk(
   "clients/fetchClients",
-  async (params = {}) => {
-    const queryString = new URLSearchParams(params).toString();
-    const response = await apiClient(`/clients?${queryString}`);
-    return response;
+  async (params = {}, { rejectWithValue }) => {
+    try {
+      return await fetchClientsApi(params);
+    } catch (error) {
+      return rejectWithValue(error.message || "Failed to fetch clients");
+    }
   }
 );
 
 export const fetchClientById = createAsyncThunk(
   "clients/fetchClientById",
-  async (id) => {
-    const response = await apiClient(`/clients/${id}`);
-    return response;
+  async (id, { rejectWithValue }) => {
+    try {
+      return await fetchClientByIdApi(id);
+    } catch (error) {
+      return rejectWithValue(error.message || "Failed to fetch client");
+    }
   }
 );
 
 export const createClient = createAsyncThunk(
   "clients/createClient",
-  async (clientData) => {
-    const response = await apiClient("/clients", {
-      method: "POST",
-      body: clientData,
-    });
-    return response;
+  async (clientData, { rejectWithValue }) => {
+    try {
+      return await createClientApi(clientData);
+    } catch (error) {
+      return rejectWithValue(error.message || "Failed to create client");
+    }
   }
 );
 
 export const updateClient = createAsyncThunk(
   "clients/updateClient",
-  async ({ id, clientData }) => {
-    const response = await apiClient(`/clients/${id}`, {
-      method: "PUT",
-      body: clientData,
-    });
-    return response;
+  async ({ id, clientData }, { rejectWithValue }) => {
+    try {
+      return await updateClientApi(id, clientData);
+    } catch (error) {
+      return rejectWithValue(error.message || "Failed to update client");
+    }
   }
 );
 
 export const deleteClient = createAsyncThunk(
   "clients/deleteClient",
-  async (id) => {
-    const response = await apiClient(`/clients/${id}`, {
-      method: "DELETE",
-    });
-    return response;
+  async (id, { rejectWithValue }) => {
+    try {
+      await deleteClientApi(id);
+      return id;
+    } catch (error) {
+      return rejectWithValue(error.message || "Failed to delete client");
+    }
   }
 );
 
 export const exportClients = createAsyncThunk(
   "clients/exportClients",
-  async (params = {}) => {
-    const queryString = new URLSearchParams(params).toString();
-    const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api";
-    const response = await fetch(`${API_BASE_URL}/clients/export?${queryString}`, {
-      method: "GET",
-      headers: {
-        Accept: "text/csv",
-      },
-    });
-    if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`Failed to export clients: ${error}`);
+  async (params = {}, { rejectWithValue }) => {
+    try {
+      const blob = await exportClientsApi(params);
+      return { blob, filename: "clients-export.csv" };
+    } catch (error) {
+      return rejectWithValue(error.message || "Failed to export clients");
     }
-    const blob = await response.blob();
-    return { blob, filename: "clients-export.csv" };
   }
 );
 
@@ -106,11 +112,12 @@ const clientsSlice = createSlice({
     });
     builder.addCase(fetchClients.rejected, (state, action) => {
       state.loading = false;
-      state.error = action.payload?.message || "Failed to fetch clients";
+      state.error = action.payload || "Failed to fetch clients";
     });
     // fetchClientById
     builder.addCase(fetchClientById.pending, (state) => {
       state.loadingClient = true;
+      state.error = null;
     });
     builder.addCase(fetchClientById.fulfilled, (state, action) => {
       state.loadingClient = false;
@@ -118,41 +125,41 @@ const clientsSlice = createSlice({
     });
     builder.addCase(fetchClientById.rejected, (state, action) => {
       state.loadingClient = false;
-      state.error = action.payload?.message || "Failed to fetch client";
+      state.error = action.payload || "Failed to fetch client";
     });
     // createClient
     builder.addCase(createClient.pending, (state) => {
       state.error = null;
     });
-    builder.addCase(createClient.fulfilled, (state, action) => {
+    builder.addCase(createClient.fulfilled, (state) => {
       state.successMessage = "Client created successfully";
       state.error = null;
       state.currentPage = 1;
     });
     builder.addCase(createClient.rejected, (state, action) => {
-      state.error = action.payload?.message || "Failed to create client";
+      state.error = action.payload || "Failed to create client";
     });
     // updateClient
     builder.addCase(updateClient.pending, (state) => {
       state.error = null;
     });
-    builder.addCase(updateClient.fulfilled, (state, action) => {
+    builder.addCase(updateClient.fulfilled, (state) => {
       state.successMessage = "Client updated successfully";
       state.error = null;
     });
     builder.addCase(updateClient.rejected, (state, action) => {
-      state.error = action.payload?.message || "Failed to update client";
+      state.error = action.payload || "Failed to update client";
     });
     // deleteClient
     builder.addCase(deleteClient.pending, (state) => {
       state.error = null;
     });
-    builder.addCase(deleteClient.fulfilled, (state, action) => {
+    builder.addCase(deleteClient.fulfilled, (state) => {
       state.successMessage = "Client deleted successfully";
       state.error = null;
     });
     builder.addCase(deleteClient.rejected, (state, action) => {
-      state.error = action.payload?.message || "Failed to delete client";
+      state.error = action.payload || "Failed to delete client";
     });
     // exportClients
     builder.addCase(exportClients.pending, (state) => {
@@ -170,7 +177,7 @@ const clientsSlice = createSlice({
       state.successMessage = "Clients exported successfully";
     });
     builder.addCase(exportClients.rejected, (state, action) => {
-      state.error = action.payload?.message || "Failed to export clients";
+      state.error = action.payload || "Failed to export clients";
     });
   },
 });

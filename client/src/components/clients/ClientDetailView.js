@@ -1,48 +1,23 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect } from "react";
+import { useDispatch, useSelector } from "react-redux";
 import Link from "next/link";
 import ClientDetailShell from "@/components/clients/ClientDetailShell";
-import { fetchClientById } from "@/services/clientService";
+import { fetchClientById } from "@/redux/slices/clientsSlice";
 
 // Fetches the client in the browser after the page loads (static export safe).
 // ClientDetailShell stays untouched, so existing UI/styling/behavior is preserved.
 export default function ClientDetailView({ clientId }) {
-  const [client, setClient] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const dispatch = useDispatch();
+  const client = useSelector((state) => state.clients.client);
+  const loading = useSelector((state) => state.clients.loadingClient);
+  const error = useSelector((state) => state.clients.error);
 
   useEffect(() => {
-    if (!clientId) {
-      setLoading(false);
-      return;
-    }
-
-    let cancelled = false;
-
-    const loadClient = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const response = await fetchClientById(clientId);
-        if (cancelled) return;
-        setClient(response?.data || response || null);
-      } catch (err) {
-        if (cancelled) return;
-        console.error("Error fetching client:", err);
-        setError(err?.message || "Failed to load client");
-        setClient(null);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    };
-
-    loadClient();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [clientId]);
+    if (!clientId) return;
+    dispatch(fetchClientById(clientId));
+  }, [dispatch, clientId]);
 
   if (loading) {
     return (

@@ -36,11 +36,7 @@ export const deleteClient = async (id) => {
 
 export const exportClients = async (params = {}) => {
   const queryString = new URLSearchParams(params).toString();
-  const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'}/clients/export?${queryString}`);
-  if (!response.ok) {
-    throw new Error('Failed to export clients');
-  }
-  return response.blob();
+  return apiClient(`/clients/export?${queryString}`, { responseType: 'blob' });
 };
 
 export const formatClientData = (formData) => {
@@ -72,31 +68,8 @@ export const uploadInvoiceToDrive = async (pdfBlob, clientId, invoiceNumber) => 
   formData.append('clientId', clientId.toString());
   formData.append('documentType', 'invoice');
 
-  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
-  const response = await fetch(`${API_BASE_URL}/documents/upload`, {
+  return apiClient('/documents/upload', {
     method: 'POST',
     body: formData,
   });
-
-  if (!response.ok) {
-    let errorMessage = `HTTP error! status: ${response.status} ${response.statusText}`;
-    try {
-      const text = await response.text();
-      if (text && text.trim()) {
-        try {
-          const data = JSON.parse(text);
-          if (data && (data.message || data.error)) {
-            errorMessage = data.message || data.error;
-          }
-        } catch {
-          errorMessage = text;
-        }
-      }
-    } catch {
-      // Fallback to HTTP error message
-    }
-    throw new Error(errorMessage);
-  }
-
-  return response.json();
 };

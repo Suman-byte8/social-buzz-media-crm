@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from "react";
+import { useDispatch } from "react-redux";
+import { uploadAgreement, updateAgreement } from "@/redux/slices/documentsSlice";
 
 const DatePicker = ({ value, onChange, disabled, min }) => {
   const handleDateChange = (e) => {
@@ -49,9 +51,9 @@ export default function AgreementUploadModal({
   clientId,
   clientName,
   agreementToEdit = null,
-  documentService,
   isEdit = false,
 }) {
+  const dispatch = useDispatch();
   const [title, setTitle] = useState(isEdit ? "Edit Agreement" : "Upload Agreement");
   const [formData, setFormData] = useState({
     file: null,
@@ -63,8 +65,6 @@ export default function AgreementUploadModal({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [selectedFile, setSelectedFile] = useState(null);
-
-  const { uploadAgreement, updateAgreement } = documentService || {};
 
   useEffect(() => {
     if (agreementToEdit) {
@@ -141,7 +141,7 @@ export default function AgreementUploadModal({
           formDataToSend.append("expiryDate", expiryDate);
           formDataToSend.append("status", status);
           formDataToSend.append("description", description);
-          const result = await uploadAgreement(formDataToSend);
+          const result = await dispatch(uploadAgreement(formDataToSend)).unwrap();
           setLoading(false);
           onSuccess(result);
           onClose();
@@ -152,7 +152,9 @@ export default function AgreementUploadModal({
             status,
             description,
           };
-          const response = await updateAgreement(agreementToEdit.id, updateData);
+          const response = await dispatch(
+            updateAgreement({ id: agreementToEdit.id, updateData })
+          ).unwrap();
           setLoading(false);
           onSuccess(response.data);
           onClose();
@@ -168,14 +170,14 @@ export default function AgreementUploadModal({
         formDataToSend.append("status", status);
         formDataToSend.append("description", description);
 
-        const result = await uploadAgreement(formDataToSend);
+        const result = await dispatch(uploadAgreement(formDataToSend)).unwrap();
         setLoading(false);
         onSuccess(result);
         onClose();
       }
     } catch (err) {
       setLoading(false);
-      setError(err.message || "Failed to process agreement");
+      setError(err?.message || err || "Failed to process agreement");
     }
   };
 

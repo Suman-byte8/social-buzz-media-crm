@@ -1,7 +1,5 @@
 import { apiClient } from "./apiClient";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
-
 // ── Documents ────────────────────────────────────────────────────────────
 
 export const fetchDocuments = async (params = {}) => {
@@ -26,18 +24,10 @@ export const uploadDocument = async (file, clientId, description = "") => {
   if (clientId) formData.append("clientId", clientId);
   if (description) formData.append("description", description);
 
-  const response = await fetch(`${API_BASE_URL}/documents/upload`, {
+  return apiClient("/documents/upload", {
     method: "POST",
     body: formData,
   });
-
-  const data = await response.json();
-
-  if (!response.ok) {
-    throw new Error(data.message || `HTTP error! status: ${response.status}`);
-  }
-
-  return data;
 };
 
 export const deleteDocument = async (id) => {
@@ -59,18 +49,11 @@ export const fetchAgreement = async (id) => {
 };
 
 export const uploadAgreement = async (formData) => {
-  const response = await fetch(`${API_BASE_URL}/agreements/upload`, {
+  const response = await apiClient("/agreements/upload", {
     method: "POST",
     body: formData,
   });
-
-  const data = await response.json();
-
-  if (!response.ok) {
-    throw new Error(data.message || `HTTP error! status: ${response.status}`);
-  }
-
-  return data.data;
+  return response.data;
 };
 
 export const updateAgreement = async (id, updateData) => {
@@ -87,13 +70,7 @@ export const deleteAgreement = async (id) => {
 };
 
 export const downloadAgreement = async (id) => {
-  const response = await fetch(`${API_BASE_URL}/agreements/${id}/download`);
-
-  if (!response.ok) {
-    throw new Error("Failed to download agreement");
-  }
-
-  return response.blob();
+  return apiClient(`/agreements/${id}/download`, { responseType: "blob" });
 };
 
 export { fetchClients } from "./clientService";

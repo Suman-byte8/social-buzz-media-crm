@@ -1,9 +1,11 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
-import { parseArrayField, updateTeamMember } from "@/services/teamService";
-import { fetchClients, updateClient } from "@/services/clientService";
-import { createTask, fetchTasksByAssignee, updateTask, deleteTask } from "@/services/taskService";
+import { useDispatch, useSelector } from "react-redux";
+import { parseArrayField } from "@/services/teamService";
+import { updateTeamMember } from "@/redux/slices/teamSlice";
+import { fetchClients, updateClient } from "@/redux/slices/clientsSlice";
+import { createTask, fetchTasksByAssignee, updateTask, deleteTask } from "@/redux/slices/tasksSlice";
 import EditMemberModal from "@/components/teams/EditMemberModal";
 import TeamMemberProfileHeader from "@/components/teams/TeamMemberProfileHeader";
 import ContactInfoCard from "@/components/teams/ContactInfoCard";
@@ -27,18 +29,18 @@ const BLANK_WORK_FORM = {
 };
 
 export default function TeamMemberProfileShell({ member, onRefresh }) {
+  const dispatch = useDispatch();
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isAssignWorkModalOpen, setIsAssignWorkModalOpen] = useState(false);
   const [isAssignClientModalOpen, setIsAssignClientModalOpen] = useState(false);
 
   // All clients for selection
-  const [allClients, setAllClients] = useState([]);
-  const [assignedClientsList, setAssignedClientsList] = useState([]);
-  const [loadingClients, setLoadingClients] = useState(false);
+  const allClients = useSelector((state) => state.clients.clients);
+  const loadingClients = useSelector((state) => state.clients.loading);
 
   // Member Tasks from DB
-  const [memberTasks, setMemberTasks] = useState([]);
-  const [loadingTasks, setLoadingTasks] = useState(false);
+  const memberTasks = useSelector((state) => state.tasks.memberTasks);
+  const loadingTasks = useSelector((state) => state.tasks.loadingMemberTasks);
 
   // Assign Work Form State
   const [workForm, setWorkForm] = useState(BLANK_WORK_FORM);
@@ -73,19 +75,12 @@ export default function TeamMemberProfileShell({ member, onRefresh }) {
   }
 
   // Fetch Member Tasks from API
-  const loadMemberTasks = useCallback(async () => {
-    if (!member?.id) return;
-    setLoadingTasks(true);
-    try {
-      const response = await fetchTasksByAssignee(member.id);
-      const tasks = response?.data || response || [];
-      setMemberTasks(Array.isArray(tasks) ? tasks : []);
-    } catch (err) {
-      console.error("Error loading tasks for member:", err);
-    } finally {
-      setLoadingTasks(false);
-    }
-  }, [member?.id]);
+  const loadMemberTasks = useCallback(() => {
+    if (!member?.id) return Promise.resolve();
+    // dispatch() on a createAsyncThunk resolves with the fulfilled/rejected
+    // action rather than throwing; errors surface via state.tasks.error.
+    return dispatch(fetchTasksByAssignee(member.id));
+  }, [dispatch, member.id]);
 
   useEffect(() => {
     loadMemberTasks();
@@ -117,38 +112,18 @@ export default function TeamMemberProfileShell({ member, onRefresh }) {
 
   // Load clients managed by this team member
   useEffect(() => {
-    let isMounted = true;
-    const loadClientsData = async () => {
-      setLoadingClients(true);
-      try {
-        const response = await fetchClients({ limit: 100 });
-        const clients = response?.data || response || [];
-        if (!isMounted) return;
-
-        setAllClients(clients);
-
-        const assigned = clients.filter((c) => {
-          const isManagedBy = String(c.clientManagedBy) === String(member.id);
-          const isNameInHandling = clientHandlingNames.some((name) => name.toLowerCase() === c.name.toLowerCase());
-          return isManagedBy || isNameInHandling;
-        });
-
-        setAssignedClientsList(assigned);
-      } catch (err) {
-        console.error("Error loading clients:", err);
-      } finally {
-        if (isMounted) setLoadingClients(false);
-      }
-    };
-
     if (member?.id) {
-      loadClientsData();
+      dispatch(fetchClients({ limit: 100 }));
     }
+  }, [dispatch, member?.id, member?.clientHandling]);
 
-    return () => {
-      isMounted = false;
-    };
-  }, [member?.id, member?.clientHandling]);
+  const assignedClientsList = React.useMemo(() => {
+    return allClients.filter((c) => {
+      const isManagedBy = String(c.clientManagedBy) === String(member.id);
+      const isNameInHandling = clientHandlingNames.some((name) => name.toLowerCase() === c.name.toLowerCase());
+      return isManagedBy || isNameInHandling;
+    });
+  }, [allClients, clientHandlingNames, member.id]);
 
   const tenureMonths =
     member.hireDate && !isNaN(new Date(member.hireDate))
@@ -166,20 +141,24 @@ export default function TeamMemberProfileShell({ member, onRefresh }) {
 
     setAssignWorkLoading(true);
     try {
-      await createTask({
-        title: workForm.title,
-        description: workForm.description || null,
-        status: workForm.status || "in_progress",
-        priority: workForm.priority || "medium",
-        clientId: workForm.clientId ? parseInt(workForm.clientId) : null,
-        assignees: [member.id],
-        dueDate: workForm.dueDate || null,
-      });
+      await dispatch(
+        createTask({
+          title: workForm.title,
+          description: workForm.description || null,
+          status: workForm.status || "in_progress",
+          priority: workForm.priority || "medium",
+          clientId: workForm.clientId ? parseInt(workForm.clientId) : null,
+          assignees: [member.id],
+          dueDate: workForm.dueDate || null,
+        })
+      ).unwrap();
 
       const updatedWorks = [...assignedWorksRaw];
       if (!updatedWorks.includes(workForm.title)) {
         updatedWorks.push(workForm.title);
-        await updateTeamMember(member.id, { assignedWorks: JSON.stringify(updatedWorks) });
+        await dispatch(
+          updateTeamMember({ id: member.id, memberData: { assignedWorks: JSON.stringify(updatedWorks) } })
+        ).unwrap();
       }
 
       setIsAssignWorkModalOpen(false);
@@ -217,20 +196,27 @@ export default function TeamMemberProfileShell({ member, onRefresh }) {
     setEditTaskLoading(true);
     try {
       if (editingTask.id) {
-        await updateTask(editingTask.id, {
-          title: editingTask.title,
-          status: editingTask.status,
-          priority: editingTask.priority,
-          clientId: editingTask.clientId ? parseInt(editingTask.clientId) : null,
-          dueDate: editingTask.dueDate || null,
-          description: editingTask.description || null,
-        });
+        await dispatch(
+          updateTask({
+            id: editingTask.id,
+            taskData: {
+              title: editingTask.title,
+              status: editingTask.status,
+              priority: editingTask.priority,
+              clientId: editingTask.clientId ? parseInt(editingTask.clientId) : null,
+              dueDate: editingTask.dueDate || null,
+              description: editingTask.description || null,
+            },
+          })
+        ).unwrap();
       } else {
         const updated = assignedWorksRaw.map((item) => {
           const t = typeof item === "string" ? item : item.title || item.name;
           return t === editingTask.originalTitle ? editingTask.title : item;
         });
-        await updateTeamMember(member.id, { assignedWorks: JSON.stringify(updated) });
+        await dispatch(
+          updateTeamMember({ id: member.id, memberData: { assignedWorks: JSON.stringify(updated) } })
+        ).unwrap();
       }
 
       setIsEditTaskModalOpen(false);
@@ -251,20 +237,22 @@ export default function TeamMemberProfileShell({ member, onRefresh }) {
     setDeletingTaskId(taskItem.id || taskItem.title);
     try {
       if (taskItem.id) {
-        await deleteTask(taskItem.id);
+        await dispatch(deleteTask(taskItem.id)).unwrap();
       } else {
         const updatedWorks = assignedWorksRaw.filter((item) => {
           const t = typeof item === "string" ? item : item.title || item.name;
           return t !== taskItem.title;
         });
-        await updateTeamMember(member.id, { assignedWorks: JSON.stringify(updatedWorks) });
+        await dispatch(
+          updateTeamMember({ id: member.id, memberData: { assignedWorks: JSON.stringify(updatedWorks) } })
+        ).unwrap();
       }
 
       await loadMemberTasks();
       if (onRefresh) onRefresh();
     } catch (err) {
       console.error("Error deleting task:", err);
-      alert(err.message || "Failed to delete task. Please try again.");
+      alert(err?.message || err || "Failed to delete task. Please try again.");
     } finally {
       setDeletingTaskId(null);
     }
@@ -278,12 +266,14 @@ export default function TeamMemberProfileShell({ member, onRefresh }) {
     try {
       const selectedClient = allClients.find((c) => String(c.id) === String(selectedClientId));
 
-      await updateClient(selectedClientId, { clientManagedBy: member.id });
+      await dispatch(updateClient({ id: selectedClientId, clientData: { clientManagedBy: member.id } })).unwrap();
 
       let updatedClientNames = [...clientHandlingNames];
       if (selectedClient && !updatedClientNames.some((name) => name.toLowerCase() === selectedClient.name.toLowerCase())) {
         updatedClientNames.push(selectedClient.name);
-        await updateTeamMember(member.id, { clientHandling: JSON.stringify(updatedClientNames) });
+        await dispatch(
+          updateTeamMember({ id: member.id, memberData: { clientHandling: JSON.stringify(updatedClientNames) } })
+        ).unwrap();
       }
 
       setIsAssignClientModalOpen(false);

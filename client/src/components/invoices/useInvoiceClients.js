@@ -1,50 +1,34 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { fetchClients } from "@/services/clientService";
+import { useDispatch, useSelector } from "react-redux";
+import { fetchClients } from "@/redux/slices/clientsSlice";
 
 export function useInvoiceClients({ onClientSelected } = {}) {
-  const [clients, setClients] = useState([]);
+  const dispatch = useDispatch();
+  const rawClients = useSelector((state) => state.clients.clients);
+  const isClientLoading = useSelector((state) => state.clients.loading);
   const [selectedClientId, setSelectedClientId] = useState("");
-  const [isClientLoading, setIsClientLoading] = useState(false);
 
   useEffect(() => {
-    let isMounted = true;
+    dispatch(fetchClients());
+  }, [dispatch]);
 
-    const loadClients = async () => {
-      setIsClientLoading(true);
-      try {
-        const response = await fetchClients();
-        const arr = Array.isArray(response)
-          ? response
-          : Array.isArray(response?.data)
-            ? response.data
-            : [];
-        const clientList = arr.map((c) => ({
-          id: c.id,
-          name: c.name || c.clientName || "",
-          email: c.email || "",
-          // Keep both numbers distinct so the share menu can offer the
-          // WhatsApp-specific number and the general phone as selectable
-          // destinations. `phone` stays as a fallback for older callers.
-          phone: c.whatsappNumber || c.phoneNumber || "",
-          whatsappNumber: c.whatsappNumber || "",
-          phoneNumber: c.phoneNumber || "",
-          address: c.address || c.billingAddress || "",
-        }));
-        if (isMounted) setClients(clientList);
-      } catch (e) {
-        console.error("Could not load clients:", e);
-      } finally {
-        if (isMounted) setIsClientLoading(false);
-      }
-    };
-
-    loadClients();
-    return () => {
-      isMounted = false;
-    };
-  }, []);
+  const clients = useMemo(() => {
+    const arr = Array.isArray(rawClients) ? rawClients : [];
+    return arr.map((c) => ({
+      id: c.id,
+      name: c.name || c.clientName || "",
+      email: c.email || "",
+      // Keep both numbers distinct so the share menu can offer the
+      // WhatsApp-specific number and the general phone as selectable
+      // destinations. `phone` stays as a fallback for older callers.
+      phone: c.whatsappNumber || c.phoneNumber || "",
+      whatsappNumber: c.whatsappNumber || "",
+      phoneNumber: c.phoneNumber || "",
+      address: c.address || c.billingAddress || "",
+    }));
+  }, [rawClients]);
 
   const handleClientChange = useCallback(
     (id) => {

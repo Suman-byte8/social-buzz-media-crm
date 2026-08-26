@@ -1,11 +1,12 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
-import { fetchClients } from "@/services/clientService";
-import { fetchTasks, updateTask } from "@/services/taskService";
-import { fetchTeamMembers } from "@/services/teamService";
-import { fetchAgreements } from "@/services/documentService";
-import { fetchContentCalendarEntries } from "@/services/contentCalendarService";
+import React, { useEffect, useMemo } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import { fetchClients } from "@/redux/slices/clientsSlice";
+import { fetchTasks, updateTask, setTaskStatusLocal } from "@/redux/slices/tasksSlice";
+import { fetchTeamMembers } from "@/redux/slices/teamSlice";
+import { fetchAgreements } from "@/redux/slices/documentsSlice";
+import { fetchContentCalendarEntries } from "@/redux/slices/contentCalendarSlice";
 import MetricsGrid from "./MetricsGrid";
 import TeamWorkload from "./TeamWorkload";
 import TasksDueToday from "./TasksDueToday";
@@ -14,47 +15,42 @@ import ClientHealthScore from "./ClientHealthScore";
 const isSameDay = (a, b) => a.toDateString() === b.toDateString();
 
 export default function DashboardShell() {
-  const [clients, setClients] = useState([]);
-  const [tasks, setTasks] = useState([]);
-  const [teamMembers, setTeamMembers] = useState([]);
-  const [agreements, setAgreements] = useState([]);
-  const [contentEntries, setContentEntries] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const dispatch = useDispatch();
+
+  const clients = useSelector((state) => state.clients.clients);
+  const clientsLoading = useSelector((state) => state.clients.loading);
+  const tasks = useSelector((state) => state.tasks.tasks);
+  const tasksLoading = useSelector((state) => state.tasks.loading);
+  const teamMembers = useSelector((state) => state.team.teamMembers);
+  const teamLoading = useSelector((state) => state.team.loading);
+  const agreements = useSelector((state) => state.documents.agreements);
+  const agreementsLoading = useSelector((state) => state.documents.loadingAgreements);
+  const contentEntries = useSelector((state) => state.contentCalendar.entries);
+  const contentLoading = useSelector((state) => state.contentCalendar.loading);
+
+  // The dashboard shows a single combined "loading" flag across five
+  // independent slices. OR-ing them together reproduces the previous
+  // Promise.all behavior: the dashboard is considered loading as long as
+  // any one of the five fetches is still in flight, and stops the instant
+  // the last one settles.
+  const loading = clientsLoading || tasksLoading || teamLoading || agreementsLoading || contentLoading;
 
   useEffect(() => {
-    loadAll();
-  }, []);
-
-  const loadAll = async () => {
-    setLoading(true);
-    try {
-      const [clientsRes, tasksRes, teamRes, agreementsRes, contentRes] = await Promise.all([
-        fetchClients({ limit: 500 }).catch(() => ({ data: [] })),
-        fetchTasks({ limit: 500 }).catch(() => ({ data: [] })),
-        fetchTeamMembers().catch(() => []),
-        fetchAgreements().catch(() => ({ data: [] })),
-        fetchContentCalendarEntries({}).catch(() => ({ data: [] })),
-      ]);
-      setClients(clientsRes.data || clientsRes || []);
-      setTasks(tasksRes.data || tasksRes || []);
-      setTeamMembers(teamRes || []);
-      setAgreements(agreementsRes.data || agreementsRes || []);
-      setContentEntries(contentRes.data || contentRes || []);
-    } catch (error) {
-      console.error("Error loading dashboard data:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
+    dispatch(fetchClients({ limit: 500 }));
+    dispatch(fetchTasks({ limit: 500 }));
+    dispatch(fetchTeamMembers());
+    dispatch(fetchAgreements());
+    dispatch(fetchContentCalendarEntries({}));
+  }, [dispatch]);
 
   const handleToggleTaskComplete = async (task) => {
     const nextStatus = task.status === "completed" ? "todo" : "completed";
-    setTasks((prev) => prev.map((t) => (t.id === task.id ? { ...t, status: nextStatus } : t)));
+    dispatch(setTaskStatusLocal({ id: task.id, status: nextStatus }));
     try {
-      await updateTask(task.id, { status: nextStatus });
+      await dispatch(updateTask({ id: task.id, taskData: { status: nextStatus } })).unwrap();
     } catch (error) {
       console.error("Error updating task:", error);
-      setTasks((prev) => prev.map((t) => (t.id === task.id ? { ...t, status: task.status } : t)));
+      dispatch(setTaskStatusLocal({ id: task.id, status: task.status }));
     }
   };
 

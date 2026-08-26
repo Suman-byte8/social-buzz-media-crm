@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { createTeamMember } from "@/services/teamService";
+import { useDispatch } from "react-redux";
+import { createTeamMember } from "@/redux/slices/teamSlice";
 
 const DEPARTMENTS = [
   "Social Media",
@@ -15,6 +16,7 @@ const EMPLOYMENT_TYPES = ["full-time", "internship", "freelance"];
 const STATUSES = ["active", "inactive", "null"];
 
 export default function AddTeamMemberModal({ isOpen, onClose, onSuccess }) {
+  const dispatch = useDispatch();
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -213,7 +215,7 @@ export default function AddTeamMemberModal({ isOpen, onClose, onSuccess }) {
             : null,
       };
 
-      await createTeamMember(payload);
+      await dispatch(createTeamMember(payload)).unwrap();
       onSuccess();
     } catch (error) {
       console.error("Error adding team member:", error);

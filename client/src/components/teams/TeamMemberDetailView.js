@@ -1,34 +1,22 @@
 "use client";
 
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useCallback } from "react";
+import { useDispatch, useSelector } from "react-redux";
 import Link from "next/link";
 import TeamMemberProfileShell from "@/components/teams/TeamMemberProfileShell";
-import { fetchTeamMemberById } from "@/services/teamService";
+import { fetchTeamMemberById } from "@/redux/slices/teamSlice";
 
 // Fetches the team member in the browser after the page loads (static export safe).
 export default function TeamMemberDetailView({ memberId }) {
-  const [member, setMember] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const dispatch = useDispatch();
+  const member = useSelector((state) => state.team.member);
+  const loading = useSelector((state) => state.team.loadingMember);
+  const error = useSelector((state) => state.team.error);
 
-  const loadMember = useCallback(async () => {
-    if (!memberId) {
-      setLoading(false);
-      return;
-    }
-    setLoading(true);
-    setError(null);
-    try {
-      const response = await fetchTeamMemberById(memberId);
-      setMember(response?.data || response || null);
-    } catch (err) {
-      console.error("Error fetching team member:", err);
-      setError(err?.message || "Failed to load team member");
-      setMember(null);
-    } finally {
-      setLoading(false);
-    }
-  }, [memberId]);
+  const loadMember = useCallback(() => {
+    if (!memberId) return;
+    dispatch(fetchTeamMemberById(memberId));
+  }, [dispatch, memberId]);
 
   useEffect(() => {
     loadMember();

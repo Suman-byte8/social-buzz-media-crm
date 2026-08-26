@@ -1,7 +1,10 @@
 "use client";
 
-import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
-import { fetchTasks, deleteTask, updateTask } from "@/services/taskService";
+import React, { useState, useEffect, useMemo } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import { fetchTasks, deleteTask, updateTask, setTaskStatusLocal } from "@/redux/slices/tasksSlice";
+import { fetchClients } from "@/redux/slices/clientsSlice";
+import { fetchTeamMembers } from "@/redux/slices/teamSlice";
 import AddTaskModal from "@/components/tasks/AddTaskModal";
 import TasksToolbar from "@/components/tasks/TasksToolbar";
 import TasksFilters from "@/components/tasks/TasksFilters";
@@ -10,9 +13,11 @@ import TasksBoard from "@/components/tasks/TasksBoard";
 const COLUMN_IDS = ["todo", "in_progress", "review", "completed"];
 const SEARCH_DEBOUNCE_MS = 350;
 
-export default function TasksPageShell({ tasks: initialTasks, clients, teamMembers }) {
-  const [tasks, setTasks] = useState(initialTasks || []);
-  const [loading, setLoading] = useState(false);
+export default function TasksPageShell() {
+  const dispatch = useDispatch();
+  const { tasks, loading } = useSelector((state) => state.tasks);
+  const { clients } = useSelector((state) => state.clients);
+  const { teamMembers } = useSelector((state) => state.team);
 
   const [searchInput, setSearchInput] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
@@ -43,42 +48,34 @@ export default function TasksPageShell({ tasks: initialTasks, clients, teamMembe
     return () => clearTimeout(timer);
   }, [searchInput]);
 
-  const isFirstRun = useRef(true);
-
-  const refreshTasks = useCallback(async () => {
-    setLoading(true);
-    try {
-      const response = await fetchTasks({
-        limit: 200,
-        search: searchTerm,
-        status: statusFilter !== "all" ? statusFilter : undefined,
-        priority: priorityFilter !== "all" ? priorityFilter : undefined,
-        clientId: clientFilter !== "all" ? clientFilter : undefined,
-        assigneeId: assigneeFilter !== "all" ? assigneeFilter : undefined,
-      });
-      setTasks(response.data || []);
-    } catch (error) {
-      console.error("Error fetching tasks:", error);
-    } finally {
-      setLoading(false);
-    }
-  }, [searchTerm, statusFilter, priorityFilter, clientFilter, assigneeFilter]);
-
+  // Fetch clients and team members once on mount (client-side, so the board
+  // never trusts stale build-time data from the static export).
   useEffect(() => {
-    // The server component already fetched the unfiltered initial task list —
-    // skip the redundant duplicate fetch on first mount.
-    if (isFirstRun.current) {
-      isFirstRun.current = false;
-      return;
-    }
-    refreshTasks();
-  }, [refreshTasks]);
+    dispatch(fetchClients({ limit: 100 }));
+    dispatch(fetchTeamMembers());
+  }, [dispatch]);
+
+  const currentFilters = useMemo(
+    () => ({
+      limit: 200,
+      search: searchTerm,
+      status: statusFilter !== "all" ? statusFilter : undefined,
+      priority: priorityFilter !== "all" ? priorityFilter : undefined,
+      clientId: clientFilter !== "all" ? clientFilter : undefined,
+      assigneeId: assigneeFilter !== "all" ? assigneeFilter : undefined,
+    }),
+    [searchTerm, statusFilter, priorityFilter, clientFilter, assigneeFilter]
+  );
+
+  // Re-fetch tasks on mount and whenever a filter changes.
+  useEffect(() => {
+    dispatch(fetchTasks(currentFilters));
+  }, [dispatch, currentFilters]);
 
   const handleDelete = async (task) => {
     if (!confirm(`Delete task "${task.title}"?`)) return;
     try {
-      await deleteTask(task.id);
-      setTasks((prev) => prev.filter((t) => t.id !== task.id));
+      await dispatch(deleteTask(task.id)).unwrap();
     } catch (error) {
       console.error("Error deleting task:", error);
       alert("Failed to delete task.");
@@ -86,12 +83,12 @@ export default function TasksPageShell({ tasks: initialTasks, clients, teamMembe
   };
 
   const handleStatusChange = async (task, newStatus) => {
-    setTasks((prev) => prev.map((t) => (t.id === task.id ? { ...t, status: newStatus } : t)));
+    dispatch(setTaskStatusLocal({ id: task.id, status: newStatus }));
     try {
-      await updateTask(task.id, { status: newStatus });
+      await dispatch(updateTask({ id: task.id, taskData: { status: newStatus } })).unwrap();
     } catch (error) {
       console.error("Error updating task status:", error);
-      setTasks((prev) => prev.map((t) => (t.id === task.id ? { ...t, status: task.status } : t)));
+      dispatch(setTaskStatusLocal({ id: task.id, status: task.status }));
       alert("Failed to update task status.");
     }
   };
@@ -101,7 +98,7 @@ export default function TasksPageShell({ tasks: initialTasks, clients, teamMembe
   const handleSuccess = () => {
     setShowAddModal(false);
     setEditingTask(null);
-    refreshTasks();
+    dispatch(fetchTasks(currentFilters));
   };
 
   const tasksByColumn = useMemo(() => {
@@ -155,8 +152,6 @@ export default function TasksPageShell({ tasks: initialTasks, clients, teamMembe
         isOpen={showAddModal}
         onClose={() => setShowAddModal(false)}
         onSuccess={handleSuccess}
-        clients={clients}
-        teamMembers={teamMembers}
         editTask={null}
       />
 
@@ -165,8 +160,6 @@ export default function TasksPageShell({ tasks: initialTasks, clients, teamMembe
           isOpen={true}
           onClose={() => setEditingTask(null)}
           onSuccess={handleSuccess}
-          clients={clients}
-          teamMembers={teamMembers}
           editTask={editingTask}
         />
       )}
