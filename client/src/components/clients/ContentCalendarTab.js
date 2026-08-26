@@ -1,154 +1,427 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import { fetchDocumentsByClient, deleteDocument } from "@/services/documentService";
+import React, { useState, useEffect, useRef } from "react";
+import {
+  fetchContentCalendarEntries,
+  createContentCalendarEntry,
+  updateContentCalendarEntry,
+  deleteContentCalendarEntry,
+  uploadCreatives,
+  deleteCreative,
+} from "@/services/contentCalendarService";
+import ContentCalendarTable from "@/components/content-calendar/ContentCalendarTable";
+import ContentCalendarPrintView from "@/components/content-calendar/ContentCalendarPrintView";
+import { exportContentCalendarToPdf } from "@/lib/ContentCalendarPdfExport";
 
-export default function ContentCalendarTab({ clientId, clientName }) {
-  const [documents, setDocuments] = useState([]);
+let draftIdCounter = 0;
+const nextDraftId = () => `draft-${Date.now()}-${draftIdCounter++}`;
+
+const blankDraft = (clientId) => ({
+  tempId: nextDraftId(),
+  clientId,
+  date: "",
+  holiday: "",
+  postTitle: "",
+  content: "",
+  caption: "",
+  hashtags: "",
+  platforms: [],
+  posted: false,
+  stagedFiles: [],
+});
+
+export default function ContentCalendarTab({ clientId, client }) {
+  const clientName = client?.name || "";
+
+  const [entries, setEntries] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [deletingId, setDeletingId] = useState(null);
+
+  const [draftRows, setDraftRows] = useState([]);
+  const [savingDraftId, setSavingDraftId] = useState(null);
+  const [draftErrors, setDraftErrors] = useState({});
+  const [savingAll, setSavingAll] = useState(false);
+
+  const [editingId, setEditingId] = useState(null);
+  const [editValues, setEditValues] = useState(null);
+  const [editExistingCreatives, setEditExistingCreatives] = useState([]);
+  const [editStagedFiles, setEditStagedFiles] = useState([]);
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [editError, setEditError] = useState("");
+
+  const [exporting, setExporting] = useState(false);
+  const printRef = useRef(null);
 
   useEffect(() => {
     if (clientId) {
-      loadDocuments();
+      loadEntries();
     }
   }, [clientId]);
 
-  const loadDocuments = async () => {
+  const loadEntries = async () => {
     setLoading(true);
     try {
-      const response = await fetchDocumentsByClient(clientId);
-      const docs = response.data || response || [];
-      setDocuments(docs);
+      const response = await fetchContentCalendarEntries({ clientId });
+      setEntries(response.data || []);
     } catch (error) {
-      console.error("Error fetching documents:", error);
-      setDocuments([]);
+      console.error("Error fetching content calendar entries:", error);
+      setEntries([]);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleDelete = async (doc) => {
-    if (!confirm(`Delete "${doc.fileName}"? This action cannot be undone.`)) return;
-    setDeletingId(doc.id);
-    try {
-      await deleteDocument(doc.id);
-      setDocuments(documents.filter((d) => d.id !== doc.id));
-    } catch (error) {
-      console.error("Error deleting document:", error);
-      alert("Failed to delete document.");
-    } finally {
-      setDeletingId(null);
-    }
+  // ── Bulk add (draft rows) ────────────────────────────────────────────
+  const handleAddRow = () => {
+    setDraftRows((prev) => [...prev, blankDraft(clientId)]);
   };
 
-  const formatFileSize = (bytes) => {
-    if (!bytes) return "N/A";
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-    return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+  const handleAddRows = (count) => {
+    setDraftRows((prev) => [...prev, ...Array.from({ length: count }, () => blankDraft(clientId))]);
   };
 
-  const formatDate = (dateStr) => {
-    if (!dateStr) return "";
-    const date = new Date(dateStr);
-    return date.toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
+  const handleDraftChange = (tempId, field, value) => {
+    setDraftRows((prev) => prev.map((d) => (d.tempId === tempId ? { ...d, [field]: value } : d)));
+  };
+
+  const handleDraftTogglePlatform = (tempId, platform) => {
+    setDraftRows((prev) =>
+      prev.map((d) =>
+        d.tempId === tempId
+          ? { ...d, platforms: d.platforms.includes(platform) ? d.platforms.filter((p) => p !== platform) : [...d.platforms, platform] }
+          : d
+      )
+    );
+  };
+
+  const handleDraftStageFiles = (tempId, files) => {
+    setDraftRows((prev) => prev.map((d) => (d.tempId === tempId ? { ...d, stagedFiles: [...d.stagedFiles, ...files] } : d)));
+  };
+
+  const handleDraftRemoveStagedFile = (tempId, index) => {
+    setDraftRows((prev) =>
+      prev.map((d) => (d.tempId === tempId ? { ...d, stagedFiles: d.stagedFiles.filter((_, i) => i !== index) } : d))
+    );
+  };
+
+  const handleDiscardDraft = (tempId) => {
+    setDraftRows((prev) => prev.filter((d) => d.tempId !== tempId));
+    setDraftErrors((prev) => {
+      const next = { ...prev };
+      delete next[tempId];
+      return next;
     });
   };
 
+  const persistDraft = async (draft) => {
+    if (!draft.date) throw new Error("Pick a date.");
+
+    const payload = {
+      clientId: parseInt(draft.clientId),
+      date: draft.date,
+      holiday: draft.holiday.trim(),
+      postTitle: draft.postTitle.trim(),
+      content: draft.content.trim(),
+      caption: draft.caption.trim(),
+      hashtags: draft.hashtags.trim(),
+      platforms: draft.platforms,
+      posted: draft.posted,
+    };
+
+    const response = await createContentCalendarEntry(payload);
+    const entryId = response.data.id;
+
+    if (draft.stagedFiles.length > 0) {
+      await uploadCreatives(entryId, draft.stagedFiles);
+    }
+  };
+
+  const handleSaveDraft = async (tempId) => {
+    const draft = draftRows.find((d) => d.tempId === tempId);
+    if (!draft) return;
+
+    setSavingDraftId(tempId);
+    setDraftErrors((prev) => ({ ...prev, [tempId]: undefined }));
+    try {
+      await persistDraft(draft);
+      setDraftRows((prev) => prev.filter((d) => d.tempId !== tempId));
+      loadEntries();
+    } catch (error) {
+      setDraftErrors((prev) => ({ ...prev, [tempId]: error.message || "Failed to save." }));
+    } finally {
+      setSavingDraftId(null);
+    }
+  };
+
+  const handleSaveAllDrafts = async () => {
+    setSavingAll(true);
+    const failed = [];
+    for (const draft of draftRows) {
+      try {
+        await persistDraft(draft);
+      } catch (error) {
+        failed.push(draft.tempId);
+        setDraftErrors((prev) => ({ ...prev, [draft.tempId]: error.message || "Failed to save." }));
+      }
+    }
+    setDraftRows((prev) => prev.filter((d) => failed.includes(d.tempId)));
+    setSavingAll(false);
+    loadEntries();
+  };
+
+  // ── Inline edit of an existing entry ────────────────────────────────
+  const handleStartEdit = (entry) => {
+    setEditingId(entry.id);
+    setEditValues({
+      clientId: entry.clientId,
+      date: entry.date,
+      holiday: entry.holiday || "",
+      postTitle: entry.postTitle || "",
+      content: entry.content || "",
+      caption: entry.caption || "",
+      hashtags: entry.hashtags || "",
+      platforms: entry.platforms || [],
+      posted: !!entry.posted,
+    });
+    setEditExistingCreatives(entry.creatives || []);
+    setEditStagedFiles([]);
+    setEditError("");
+  };
+
+  const handleCancelEdit = () => {
+    setEditingId(null);
+    setEditValues(null);
+    setEditExistingCreatives([]);
+    setEditStagedFiles([]);
+    setEditError("");
+  };
+
+  const handleEditChange = (field, value) => {
+    setEditValues((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleEditTogglePlatform = (platform) => {
+    setEditValues((prev) => ({
+      ...prev,
+      platforms: prev.platforms.includes(platform) ? prev.platforms.filter((p) => p !== platform) : [...prev.platforms, platform],
+    }));
+  };
+
+  const handleEditStageFiles = (files) => {
+    setEditStagedFiles((prev) => [...prev, ...files]);
+  };
+
+  const handleEditRemoveStagedFile = (index) => {
+    setEditStagedFiles((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleEditRemoveExistingCreative = async (fileId) => {
+    if (!confirm("Remove this creative?")) return;
+    try {
+      await deleteCreative(editingId, fileId);
+      setEditExistingCreatives((prev) => prev.filter((c) => c.fileId !== fileId));
+    } catch (error) {
+      alert(error.message || "Failed to remove creative.");
+    }
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editValues.date) {
+      setEditError("Pick a date.");
+      return;
+    }
+    setSavingEdit(true);
+    setEditError("");
+    try {
+      await updateContentCalendarEntry(editingId, {
+        date: editValues.date,
+        holiday: editValues.holiday.trim(),
+        postTitle: editValues.postTitle.trim(),
+        content: editValues.content.trim(),
+        caption: editValues.caption.trim(),
+        hashtags: editValues.hashtags.trim(),
+        platforms: editValues.platforms,
+        posted: editValues.posted,
+      });
+
+      if (editStagedFiles.length > 0) {
+        await uploadCreatives(editingId, editStagedFiles);
+      }
+
+      handleCancelEdit();
+      loadEntries();
+    } catch (error) {
+      setEditError(error.message || "Failed to save changes.");
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
+  // ── Delete / toggle / share ──────────────────────────────────────────
+  const handleDelete = async (entry) => {
+    if (!confirm(`Delete the content calendar entry "${entry.postTitle || entry.date}"? This cannot be undone.`)) return;
+    try {
+      await deleteContentCalendarEntry(entry.id);
+      setEntries((prev) => prev.filter((e) => e.id !== entry.id));
+    } catch (error) {
+      console.error("Error deleting entry:", error);
+      alert("Failed to delete entry.");
+    }
+  };
+
+  const handleTogglePosted = async (entry) => {
+    const nextPosted = !entry.posted;
+    setEntries((prev) => prev.map((e) => (e.id === entry.id ? { ...e, posted: nextPosted } : e)));
+    try {
+      await updateContentCalendarEntry(entry.id, { posted: nextPosted });
+    } catch (error) {
+      console.error("Error updating posted status:", error);
+      setEntries((prev) => prev.map((e) => (e.id === entry.id ? { ...e, posted: entry.posted } : e)));
+      alert("Failed to update posted status.");
+    }
+  };
+
+  const handleShare = (entry) => {
+    const whatsappNumber = client?.whatsappNumber || client?.phoneNumber || "";
+
+    if (!whatsappNumber) {
+      alert("No WhatsApp number found for this client.");
+      return;
+    }
+
+    const cleanedNumber = whatsappNumber.replace(/[^0-9]/g, "");
+    const lines = [
+      `Content Calendar Entry${entry.postTitle ? `: ${entry.postTitle}` : ""}`,
+      `Date: ${entry.date}`,
+      entry.caption ? `Caption: ${entry.caption}` : null,
+      entry.hashtags ? `Hashtags: ${entry.hashtags}` : null,
+      entry.creatives && entry.creatives.length > 0
+        ? `Creatives: ${entry.creatives.map((c) => c.webViewLink || c.driveLink).join(", ")}`
+        : null,
+    ].filter(Boolean);
+
+    const message = encodeURIComponent(lines.join("\n"));
+    window.open(`https://wa.me/${cleanedNumber}?text=${message}`, "_blank");
+  };
+
+  // ── PDF export ───────────────────────────────────────────────────────
+  const handleExportPdf = async () => {
+    if (entries.length === 0) {
+      alert("No entries to export.");
+      return;
+    }
+    setExporting(true);
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      const filename = `content-calendar-${clientName.replace(/\s+/g, "_")}-${new Date().toISOString().slice(0, 10)}.pdf`;
+      await exportContentCalendarToPdf(printRef.current, filename);
+    } catch (error) {
+      console.error("Error exporting PDF:", error);
+      alert("Failed to export PDF.");
+    } finally {
+      setExporting(false);
+    }
+  };
+
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
+    <div className="space-y-3">
+      <div className="flex items-center justify-between flex-wrap gap-2">
         <h3 className="font-title-lg text-title-lg text-on-surface flex items-center gap-2">
-          <span className="material-symbols-outlined text-primary text-[20px]">description</span>
-          Content Documents
+          <span className="material-symbols-outlined text-primary text-[20px]">event_note</span>
+          Content Calendar
         </h3>
-        <a
-          href="/calendar"
-          className="text-primary font-label-md text-label-md hover:underline flex items-center gap-1"
-        >
-          <span className="material-symbols-outlined text-[16px]">upload_file</span>
-          Upload New
-        </a>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleExportPdf}
+            disabled={exporting}
+            className="px-3 py-1.5 bg-white border border-gray-300 text-gray-700 rounded-lg text-xs font-medium hover:bg-gray-50 flex items-center gap-1.5 disabled:opacity-50"
+          >
+            <span className="material-symbols-outlined text-[15px]">
+              {exporting ? "progress_activity" : "picture_as_pdf"}
+            </span>
+            {exporting ? "Exporting..." : "Export PDF"}
+          </button>
+          <button
+            onClick={handleAddRow}
+            className="px-3 py-1.5 bg-primary text-white rounded-lg text-xs font-medium hover:bg-primary/90 flex items-center gap-1.5"
+          >
+            <span className="material-symbols-outlined text-[15px]">add</span>
+            Add Row
+          </button>
+          <button
+            onClick={() => handleAddRows(5)}
+            className="px-2 py-1.5 bg-primary/10 text-primary rounded-lg text-xs font-medium hover:bg-primary/20"
+            title="Add 5 rows at once"
+          >
+            +5
+          </button>
+          {draftRows.length > 0 && (
+            <button
+              onClick={handleSaveAllDrafts}
+              disabled={savingAll}
+              className="px-3 py-1.5 bg-green-600 text-white rounded-lg text-xs font-semibold hover:bg-green-700 disabled:opacity-50 flex items-center gap-1.5"
+            >
+              <span className="material-symbols-outlined text-[15px]">
+                {savingAll ? "progress_activity" : "save"}
+              </span>
+              Save All ({draftRows.length})
+            </button>
+          )}
+        </div>
       </div>
 
       {loading ? (
         <div className="py-8 text-center text-gray-500">
           <span className="animate-spin material-symbols-outlined text-[24px]">progress_activity</span>
         </div>
-      ) : documents.length > 0 ? (
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-gray-50 border-b border-gray-200">
-                <th className="py-2 px-3 font-label-sm text-label-sm text-gray-700">File</th>
-                <th className="py-2 px-3 font-label-sm text-label-sm text-gray-700">Size</th>
-                <th className="py-2 px-3 font-label-sm text-label-sm text-gray-700">Uploaded</th>
-                <th className="py-2 px-3 font-label-sm text-label-sm text-gray-700 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200">
-              {documents.map((doc) => (
-                <tr key={doc.id} className="hover:bg-gray-50">
-                  <td className="py-2 px-3">
-                    <div className="flex items-center gap-2">
-                      <span className="material-symbols-outlined text-red-500 text-[20px]">picture_as_pdf</span>
-                      <div>
-                        <a
-                          href={doc.googleUserContentLink}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="font-body-sm text-body-sm text-blue-600 hover:underline"
-                        >
-                          {doc.fileName}
-                        </a>
-                        {doc.description && (
-                          <p className="text-xs text-gray-500 mt-0.5">{doc.description}</p>
-                        )}
-                      </div>
-                    </div>
-                  </td>
-                  <td className="py-2 px-3 text-body-sm text-gray-600">
-                    {formatFileSize(doc.fileSize)}
-                  </td>
-                  <td className="py-2 px-3 text-body-sm text-gray-600">
-                    {formatDate(doc.createdAt)}
-                  </td>
-                  <td className="py-2 px-3 text-right">
-                    <div className="flex items-center justify-end gap-1">
-                      <a
-                        href={`/api/documents/${doc.id}/stream`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="p-1 text-gray-600 hover:text-primary hover:bg-gray-100 rounded"
-                        title="View PDF"
-                      >
-                        <span className="material-symbols-outlined text-[16px]">visibility</span>
-                      </a>
-                      <button
-                        onClick={() => handleDelete(doc)}
-                        disabled={deletingId === doc.id}
-                        className="p-1 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded disabled:opacity-50"
-                        title="Delete"
-                      >
-                        <span className="material-symbols-outlined text-[16px]">delete</span>
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
       ) : (
+        <ContentCalendarTable
+          entries={entries}
+          loading={false}
+          showClientColumn={false}
+          onEdit={handleStartEdit}
+          onDelete={handleDelete}
+          onTogglePosted={handleTogglePosted}
+          onShare={handleShare}
+          draftRows={draftRows}
+          draftClientName={clientName}
+          onDraftChange={handleDraftChange}
+          onDraftTogglePlatform={handleDraftTogglePlatform}
+          onDraftStageFiles={handleDraftStageFiles}
+          onDraftRemoveStagedFile={handleDraftRemoveStagedFile}
+          onSaveDraft={handleSaveDraft}
+          onDiscardDraft={handleDiscardDraft}
+          savingDraftId={savingDraftId}
+          draftErrors={draftErrors}
+          editingId={editingId}
+          editValues={editValues}
+          editExistingCreatives={editExistingCreatives}
+          editStagedFiles={editStagedFiles}
+          editClientName={clientName}
+          onEditChange={handleEditChange}
+          onEditTogglePlatform={handleEditTogglePlatform}
+          onEditStageFiles={handleEditStageFiles}
+          onEditRemoveStagedFile={handleEditRemoveStagedFile}
+          onEditRemoveExistingCreative={handleEditRemoveExistingCreative}
+          onSaveEdit={handleSaveEdit}
+          onCancelEdit={handleCancelEdit}
+          savingEdit={savingEdit}
+          editError={editError}
+        />
+      )}
+
+      {entries.length === 0 && draftRows.length === 0 && !loading && (
         <div className="py-6 text-center text-gray-500 border border-dashed border-gray-200 rounded-lg">
-          <span className="material-symbols-outlined text-[32px] mb-2">document_scanner</span>
-          <p className="font-body-sm text-body-sm">No content documents uploaded for {clientName}.</p>
+          <span className="material-symbols-outlined text-[32px] mb-2">event_note</span>
+          <p className="font-body-sm text-body-sm">No content calendar entries for {clientName} yet.</p>
         </div>
       )}
+
+      {/* Off-screen printable snapshot used for PDF export */}
+      <div style={{ position: "fixed", top: 0, left: "-99999px", zIndex: -1 }}>
+        <div ref={printRef}>
+          <ContentCalendarPrintView entries={entries} title={clientName} showClientColumn={false} />
+        </div>
+      </div>
     </div>
   );
 }

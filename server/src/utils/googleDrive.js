@@ -94,6 +94,12 @@ export const uploadFileToDrive = async (fileBuffer, fileName, mimeType, folderId
   }
 };
 
+export const deleteFileFromDrive = async (fileId) => {
+  const drive = getDriveClient();
+  await drive.files.delete({ fileId });
+  return { success: true };
+};
+
 export const getFileStreamFromDrive = async (fileId) => {
   const drive = getDriveClient();
   const response = await drive.files.get(

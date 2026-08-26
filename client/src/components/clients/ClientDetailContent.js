@@ -138,7 +138,7 @@ export default function ClientDetailContent({ activeTab, setActiveTab, client = 
       ) : activeTab === "renewal" ? (
         <Renewal client={client} />
       ) : activeTab === "content_calendar" ? (
-        <ContentCalendarTab clientId={clientId} clientName={client.name} />
+        <ContentCalendarTab clientId={clientId} client={client} />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-12 gap-stack-lg">
           {/* Company Details Card */}
