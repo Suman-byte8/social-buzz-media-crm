@@ -89,6 +89,7 @@ router.get('/clients', async (req, res) => {
       industry,
       healthMin,
       healthMax,
+      managedBy,
     } = req.query;
 
     const offset = (page - 1) * limit;
@@ -103,6 +104,7 @@ router.get('/clients', async (req, res) => {
     }
 
     if (industry) where.industry = industry;
+    if (managedBy) where.clientManagedBy = parseInt(managedBy);
     if (healthMin || healthMax) {
       where.clientHealth = {};
       if (healthMin) where.clientHealth[Op.gte] = parseInt(healthMin);

@@ -86,14 +86,4 @@ export const deleteAgreement = async (id) => {
   return response;
 };
 
-export const downloadAgreement = async (id) => {
-  const response = await fetch(`${API_BASE_URL}/agreements/${id}/download`);
-
-  if (!response.ok) {
-    throw new Error("Failed to download agreement");
-  }
-
-  return response.blob();
-};
-
 export { fetchClients } from "./clientService";

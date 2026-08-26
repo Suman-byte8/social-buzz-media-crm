@@ -2,11 +2,7 @@
 
 import React from "react";
 import SearchBar from "@/components/dashboard/SearchBar";
-import MetricCard from "@/components/ui/MetricCard";
-import MetricsGrid from "@/components/dashboard/MetricsGrid";
-import TeamWorkload from "@/components/dashboard/TeamWorkload";
-import TasksDueToday from "@/components/dashboard/TasksDueToday";
-import ClientHealthScore from "@/components/dashboard/ClientHealthScore";
+import DashboardShell from "@/components/dashboard/DashboardShell";
 
 export default function DashboardPage() {
   return (
@@ -62,23 +58,7 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-stack-md lg:gap-stack-lg">
-          <div className="lg:col-span-12">
-            <MetricsGrid />
-          </div>
-
-          <div className="lg:col-span-7">
-            <TeamWorkload />
-          </div>
-
-          <div className="lg:col-span-5">
-            <TasksDueToday />
-          </div>
-
-          <div className="lg:col-span-12">
-            <ClientHealthScore />
-          </div>
-        </div>
+        <DashboardShell />
       </main>
     </>
   );

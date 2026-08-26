@@ -6,7 +6,7 @@ import TasksPageShell from "@/components/tasks/TasksPageShell";
 async function fetchInitialData() {
   try {
     const [taskRes, clientRes, memberRes] = await Promise.all([
-      fetchTasks({ limit: 50 }),
+      fetchTasks({ limit: 200 }),
       fetchClients({ limit: 100 }),
       fetchTeamMembers(),
     ]);
@@ -29,18 +29,5 @@ async function fetchInitialData() {
 export default async function TasksPage() {
   const { tasks, clients, teamMembers } = await fetchInitialData();
 
-  return (
-    <TasksPageShell
-      tasks={tasks}
-      clients={clients}
-      teamMembers={teamMembers}
-      stats={{
-        totalTasks: tasks.length,
-        todo: tasks.filter((t) => t.status === "todo").length,
-        in_progress: tasks.filter((t) => t.status === "in_progress").length,
-        review: tasks.filter((t) => t.status === "review").length,
-        completed: tasks.filter((t) => t.status === "completed").length,
-      }}
-    />
-  );
+  return <TasksPageShell tasks={tasks} clients={clients} teamMembers={teamMembers} />;
 }
