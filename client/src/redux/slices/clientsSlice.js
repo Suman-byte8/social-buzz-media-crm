@@ -79,6 +79,7 @@ const initialState = {
   successMessage: null,
   totalPages: 1,
   currentPage: 1,
+  totalItems: 0,
 };
 
 const clientsSlice = createSlice({
@@ -101,6 +102,7 @@ const clientsSlice = createSlice({
       state.clients = action.payload.data;
       state.totalPages = action.payload.pagination?.totalPages || 1;
       state.currentPage = action.payload.pagination?.page || 1;
+      state.totalItems = action.payload.pagination?.total || 0;
     });
     builder.addCase(fetchClients.rejected, (state, action) => {
       state.loading = false;
