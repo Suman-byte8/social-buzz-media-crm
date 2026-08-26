@@ -1,31 +1,22 @@
-import { notFound } from "next/navigation";
 import TeamPageShell from "@/components/teams/TeamPageShell";
 import { fetchTeamMembers } from "@/services/teamService";
+import { fetchTasks } from "@/services/taskService";
 
-async function getTeamMembers() {
+async function fetchInitialData() {
   try {
-    const members = await fetchTeamMembers();
-    return members || [];
+    const [members, taskRes] = await Promise.all([
+      fetchTeamMembers(),
+      fetchTasks({ limit: 500 }),
+    ]);
+    return { teamMembers: members || [], tasks: taskRes.data || [] };
   } catch (error) {
-    console.error("Error fetching team members:", error);
-    return [];
+    console.error("Error fetching team page data:", error);
+    return { teamMembers: [], tasks: [] };
   }
 }
 
 export default async function TeamPage() {
-  const teamMembers = await getTeamMembers();
+  const { teamMembers, tasks } = await fetchInitialData();
 
-  const stats = {
-    totalMembers: teamMembers.length,
-    activeNow: teamMembers.filter(m => (m.status || '').toLowerCase() === 'active').length,
-    available: teamMembers.filter(m => (m.status || '').toLowerCase() === 'active').length,
-    completedThisWeek: teamMembers.length * 2,
-  };
-
-  return (
-    <TeamPageShell
-      teamMembers={teamMembers}
-      stats={stats}
-    />
-  );
+  return <TeamPageShell teamMembers={teamMembers} tasks={tasks} />;
 }
