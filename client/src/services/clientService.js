@@ -27,6 +27,16 @@ export const updateClient = async (id, clientData) => {
   return response;
 };
 
+export const uploadClientLogo = async (id, file) => {
+  const formData = new FormData();
+  formData.append('logo', file);
+  const response = await apiClient(`/clients/${id}/upload-logo`, {
+    method: 'POST',
+    body: formData,
+  });
+  return response;
+};
+
 export const deleteClient = async (id) => {
   const response = await apiClient(`/clients/${id}`, {
     method: 'DELETE',

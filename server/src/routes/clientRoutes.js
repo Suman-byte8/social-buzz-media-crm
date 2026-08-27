@@ -1,8 +1,22 @@
 import express from 'express';
+import multer from 'multer';
 import { Op } from 'sequelize';
 import { encryptText, decryptText } from '../utils/encryption.js';
+import { uploadFileToDrive, getOrCreateClientFolder } from '../utils/googleDrive.js';
 
 const router = express.Router();
+
+const logoUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype.startsWith('image/')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only image files are allowed'), false);
+    }
+  },
+});
 
 // Credentials are stored as an array of { id, platform, username, password, notes }.
 // Passwords are encrypted at rest; decrypt here so the client only ever sees plaintext.
@@ -233,6 +247,30 @@ router.get('/clients/:id', async (req, res) => {
     res.json({ success: true, data: formatArrayFields(client.toJSON()) });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Error fetching client', error: error.message });
+  }
+});
+
+// POST /api/clients/:id/upload-logo - Upload/replace a client's logo
+router.post('/clients/:id/upload-logo', logoUpload.single('logo'), async (req, res) => {
+  try {
+    const { Client } = req.app.locals.models;
+    const client = await Client.findByPk(req.params.id);
+    if (!client) {
+      return res.status(404).json({ success: false, message: 'Client not found' });
+    }
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: 'No logo file provided or file exceeds 5MB limit' });
+    }
+
+    const clientFolder = await getOrCreateClientFolder(client.name, client.id);
+    const driveResult = await uploadFileToDrive(req.file.buffer, req.file.originalname, req.file.mimetype, clientFolder.folderId);
+
+    await client.update({ logo: driveResult.proxyLink });
+
+    res.json({ success: true, message: 'Logo uploaded successfully', data: formatArrayFields(client.toJSON()) });
+  } catch (error) {
+    console.error('Error uploading client logo:', error);
+    res.status(500).json({ success: false, message: error.message || 'Error uploading logo', error: error.message });
   }
 });
 

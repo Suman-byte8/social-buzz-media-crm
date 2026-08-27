@@ -1,10 +1,11 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useDispatch } from "react-redux";
-import { createClient, updateClient } from "@/redux/slices/clientsSlice";
+import { createClient, updateClient, uploadClientLogo } from "@/redux/slices/clientsSlice";
 
 const INDUSTRY_OPTIONS = ["SaaS", "E-commerce", "Healthcare", "Finance", "Education", "Real Estate", "Other"];
+const MAX_LOGO_SIZE = 5 * 1024 * 1024;
 
 const toArray = (value) =>
   Array.isArray(value) ? value : value ? value.split(",").map((s) => s.trim()).filter(Boolean) : [];
@@ -48,6 +49,11 @@ function ClientForm({ client, teamMembers, onClose, onSuccess }) {
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
 
+  const logoInputRef = useRef(null);
+  const [logoFile, setLogoFile] = useState(null);
+  const [logoPreview, setLogoPreview] = useState(null);
+  const [logoError, setLogoError] = useState("");
+
   useEffect(() => {
     if (client) {
       setFormData({
@@ -63,8 +69,29 @@ function ClientForm({ client, teamMembers, onClose, onSuccess }) {
         notes: client.notes || "",
         renewal: client.renewal ? new Date(client.renewal).toISOString().split("T")[0] : "",
       });
+      setLogoPreview(client.logo || null);
     }
+    setLogoFile(null);
+    setLogoError("");
   }, [client]);
+
+  const handleLogoChange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      setLogoError("Only image files are allowed");
+      e.target.value = "";
+      return;
+    }
+    if (file.size > MAX_LOGO_SIZE) {
+      setLogoError("Logo must be under 5MB");
+      e.target.value = "";
+      return;
+    }
+    setLogoError("");
+    setLogoFile(file);
+    setLogoPreview(URL.createObjectURL(file));
+  };
 
   const handleChange = (field, value) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -98,11 +125,23 @@ function ClientForm({ client, teamMembers, onClose, onSuccess }) {
         renewal: formData.renewal ? new Date(formData.renewal).toISOString() : null,
       };
 
+      let clientId = client?.id;
+
       if (client) {
         await dispatch(updateClient({ id: client.id, clientData: payload })).unwrap();
       } else {
-        await dispatch(createClient(payload)).unwrap();
+        const created = await dispatch(createClient(payload)).unwrap();
+        clientId = created?.data?.id;
       }
+
+      if (logoFile && clientId) {
+        try {
+          await dispatch(uploadClientLogo({ id: clientId, file: logoFile })).unwrap();
+        } catch (logoErr) {
+          alert((typeof logoErr === "string" ? logoErr : logoErr?.message) || "Client saved, but the logo failed to upload.");
+        }
+      }
+
       onSuccess();
     } catch (error) {
       console.error("Error saving client:", error);
@@ -114,6 +153,31 @@ function ClientForm({ client, teamMembers, onClose, onSuccess }) {
 
   return (
     <form onSubmit={handleSubmit} className="p-6 space-y-6">
+      <div className="flex items-center gap-4">
+        <div className="w-20 h-20 rounded-xl border border-outline-variant bg-primary-container/10 flex items-center justify-center overflow-hidden shrink-0">
+          {logoPreview ? (
+            <img src={logoPreview} alt="Client logo" className="w-full h-full object-cover" />
+          ) : (
+            <span className="font-display-md text-display-md text-primary font-bold">
+              {formData.name?.[0]?.toUpperCase() || "?"}
+            </span>
+          )}
+        </div>
+        <div>
+          <button
+            type="button"
+            onClick={() => logoInputRef.current?.click()}
+            className="px-3 py-1.5 rounded-lg border border-outline-variant text-secondary font-label-sm text-label-sm hover:bg-gray-50 transition-colors flex items-center gap-1.5"
+          >
+            <span className="material-symbols-outlined text-[16px]">upload</span>
+            {logoPreview ? "Change Logo" : "Upload Logo"}
+          </button>
+          <p className="font-label-sm text-label-sm text-secondary mt-1">Image, up to 5MB</p>
+          {logoError && <p className="text-red-500 text-xs mt-1">{logoError}</p>}
+          <input ref={logoInputRef} type="file" accept="image/*" onChange={handleLogoChange} className="hidden" />
+        </div>
+      </div>
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div>
           <label className="block font-label-sm text-label-sm text-secondary mb-1">Client Name *</label>

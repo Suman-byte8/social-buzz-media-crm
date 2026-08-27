@@ -6,6 +6,7 @@ const clientModel = (sequelize) => {
     {
       id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
       name: { type: DataTypes.STRING, allowNull: false },
+      logo: { type: DataTypes.TEXT, allowNull: true },
       industry: { type: DataTypes.STRING, allowNull: true },
       phoneNumber: { type: DataTypes.STRING, allowNull: true },
       whatsappNumber: { type: DataTypes.STRING, allowNull: true },

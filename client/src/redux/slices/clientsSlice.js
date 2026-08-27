@@ -6,6 +6,7 @@ import {
   updateClient as updateClientApi,
   deleteClient as deleteClientApi,
   exportClients as exportClientsApi,
+  uploadClientLogo as uploadClientLogoApi,
 } from "@/services/clientService";
 
 export const fetchClients = createAsyncThunk(
@@ -48,6 +49,17 @@ export const updateClient = createAsyncThunk(
       return await updateClientApi(id, clientData);
     } catch (error) {
       return rejectWithValue(error.message || "Failed to update client");
+    }
+  }
+);
+
+export const uploadClientLogo = createAsyncThunk(
+  "clients/uploadLogo",
+  async ({ id, file }, { rejectWithValue }) => {
+    try {
+      return await uploadClientLogoApi(id, file);
+    } catch (error) {
+      return rejectWithValue(error.message || "Failed to upload logo");
     }
   }
 );
@@ -149,6 +161,19 @@ const clientsSlice = createSlice({
     });
     builder.addCase(updateClient.rejected, (state, action) => {
       state.error = action.payload || "Failed to update client";
+    });
+    // uploadClientLogo
+    builder.addCase(uploadClientLogo.fulfilled, (state, action) => {
+      const updated = action.payload?.data;
+      if (updated?.id) {
+        if (state.client?.id === updated.id) state.client = updated;
+        const idx = state.clients.findIndex((c) => c.id === updated.id);
+        if (idx !== -1) state.clients[idx] = updated;
+      }
+      state.successMessage = "Logo uploaded successfully";
+    });
+    builder.addCase(uploadClientLogo.rejected, (state, action) => {
+      state.error = action.payload || "Failed to upload logo";
     });
     // deleteClient
     builder.addCase(deleteClient.pending, (state) => {

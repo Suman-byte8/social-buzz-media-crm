@@ -59,9 +59,13 @@ export default function ClientDetailContent({ activeTab, setActiveTab, client = 
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-stack-md bg-surface p-card-padding rounded-xl border border-outline-variant shadow-sm">
         <div className="flex items-center gap-stack-md">
           <div className="w-16 h-16 rounded-xl overflow-hidden border border-surface-variant bg-primary-container flex items-center justify-center shrink-0 shadow-sm">
-            <span className="font-display-md text-display-md text-primary font-bold">
-              {clientName[0]?.toUpperCase()}
-            </span>
+            {client.logo ? (
+              <img src={client.logo} alt={clientName} className="w-full h-full object-cover" />
+            ) : (
+              <span className="font-display-md text-display-md text-primary font-bold">
+                {clientName[0]?.toUpperCase()}
+              </span>
+            )}
           </div>
           <div className="flex flex-col">
             <div className="flex items-center gap-3 flex-wrap">
