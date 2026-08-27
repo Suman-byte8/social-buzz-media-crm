@@ -18,6 +18,7 @@ import AddEditClientModal from "@/components/clients/AddEditClientModal";
 import { fetchClientById } from "@/redux/slices/clientsSlice";
 import { fetchTeamMembers } from "@/redux/slices/teamSlice";
 import { getAssetUrl } from "@/services/apiClient";
+import { useAuth } from "@/app/login/context/AuthContext";
 
 const tabs = [
   { id: "overview", label: "Overview", icon: "grid_view" },
@@ -28,7 +29,7 @@ const tabs = [
   { id: "meta_ads", label: "Meta Ads", icon: "campaign" },
   { id: "social", label: "Social", icon: "thumb_up" },
   { id: "reports", label: "Reports", icon: "bar_chart" },
-  { id: "invoices", label: "Invoices", icon: "receipt_long" },
+  { id: "invoices", label: "Invoices", icon: "receipt_long", adminOnly: true },
   { id: "notes", label: "Notes", icon: "event_note" },
   { id: "renewal", label: "Renewal", icon: "autorenew" },
   { id: "content_calendar", label: "Content Calendar", icon: "calendar_today" },
@@ -38,6 +39,8 @@ export default function ClientDetailContent({ activeTab, setActiveTab, client = 
   const dispatch = useDispatch();
   const teamMembers = useSelector((state) => state.team.teamMembers);
   const [editModalOpen, setEditModalOpen] = useState(false);
+  const { isAdmin } = useAuth();
+  const visibleTabs = tabs.filter((tab) => !tab.adminOnly || isAdmin);
 
   useEffect(() => {
     if (teamMembers.length === 0) {
@@ -136,7 +139,7 @@ export default function ClientDetailContent({ activeTab, setActiveTab, client = 
           aria-label="Tabs"
           className="flex flex-wrap items-center gap-1 text-xs"
         >
-          {tabs.map((tab) => (
+          {visibleTabs.map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab?.(tab.id)}
@@ -170,7 +173,7 @@ export default function ClientDetailContent({ activeTab, setActiveTab, client = 
         <SocialMedia client={client} />
       ) : activeTab === "reports" ? (
         <Reports client={client} />
-      ) : activeTab === "invoices" ? (
+      ) : activeTab === "invoices" && isAdmin ? (
         <Invoices client={client} />
       ) : activeTab === "notes" ? (
         <Notes client={client} clientId={clientId} />

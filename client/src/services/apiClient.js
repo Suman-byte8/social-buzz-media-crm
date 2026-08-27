@@ -1,3 +1,5 @@
+import { getFromStorage, removeFromStorage } from "@/utils/storage";
+
 export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
 
 // Server-relative asset URLs (e.g. "/api/settings/logo-proxy/:fileId") need the
@@ -40,10 +42,15 @@ export const apiClient = async (endpoint, options = {}) => {
   const { method = "GET", body, headers = {}, responseType, ...customConfig } = options;
 
   const isFormData = typeof FormData !== "undefined" && body instanceof FormData;
+  const token = getFromStorage("auth_token");
 
   const config = {
     method,
-    headers: isFormData ? { ...headers } : { "Content-Type": "application/json", ...headers },
+    headers: {
+      ...(isFormData ? {} : { "Content-Type": "application/json" }),
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...headers,
+    },
     ...customConfig,
   };
 
@@ -55,6 +62,15 @@ export const apiClient = async (endpoint, options = {}) => {
 
   try {
     const response = await fetch(url, config);
+
+    if (response.status === 401) {
+      removeFromStorage("auth_token");
+      removeFromStorage("auth_user");
+      if (typeof window !== "undefined" && window.location.pathname !== "/login") {
+        window.location.href = "/login";
+      }
+      throw new Error(await parseErrorMessage(response));
+    }
 
     if (!response.ok) {
       throw new Error(await parseErrorMessage(response));

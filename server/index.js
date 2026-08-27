@@ -122,6 +122,27 @@ import meetingNoteRoutes from "./src/routes/meetingNoteRoutes.js";
 import contentCalendarRoutes from "./src/routes/contentCalendarRoutes.js";
 import miscTaskRoutes from "./src/routes/miscTaskRoutes.js";
 import authRoutes from "./src/routes/authRoutes.js";
+import { authenticate } from "./src/middleware/auth.js";
+
+// Auth routes (/login, /logout, /me, admin user management) are mounted
+// first so login itself never requires a token. Every other /api route
+// requires a valid JWT — except image/file streams embedded via plain
+// <img>/<a> tags, which can't send an Authorization header; those stay
+// public (the Drive file IDs they key off are long and unguessable).
+app.use("/api/auth", authRoutes);
+
+const PUBLIC_ASSET_PATHS = [
+  /^\/api\/settings\/logo-proxy\//,
+  /^\/api\/documents\/\d+\/stream$/,
+];
+
+app.use("/api", (req, res, next) => {
+  if (PUBLIC_ASSET_PATHS.some((pattern) => pattern.test(req.originalUrl))) {
+    return next();
+  }
+  return authenticate(req, res, next);
+});
+
 app.use("/api", clientRoutes);
 app.use("/api", teamRoutes);
 app.use("/api", settingRoutes);
@@ -130,9 +151,6 @@ app.use("/api", taskRoutes);
 app.use("/api", meetingNoteRoutes);
 app.use("/api", contentCalendarRoutes);
 app.use("/api", miscTaskRoutes);
-// Auth routes define /login + /logout, so mount under /api/auth to match the
-// client's call to `/api/auth/login`.
-app.use("/api/auth", authRoutes);
 
 app.get("/", (req, res) => {
   res.json({

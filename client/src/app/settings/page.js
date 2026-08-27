@@ -3,10 +3,13 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { fetchSettings, saveSettings, uploadLogo, clearMessages } from '@/redux/slices/settingsSlice';
+import { useAuth } from '@/app/login/context/AuthContext';
+import LoginAccessCard from '@/components/settings/LoginAccessCard';
 
 export default function SettingsPage() {
   const dispatch = useDispatch();
   const fileInputRef = useRef(null);
+  const { isAdmin } = useAuth();
 
   const { data: settingsData, loading, uploadingLogo, error, successMessage } = useSelector(
     (state) => state.settings
@@ -345,6 +348,8 @@ export default function SettingsPage() {
             </div>
           </form>
         </section>
+
+        {isAdmin && <LoginAccessCard />}
       </div>
     </main>
   );

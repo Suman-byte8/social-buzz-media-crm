@@ -45,6 +45,15 @@ const formatArrayFields = (data) => ({
   contentCalendar: data.contentCalendar ? data.contentCalendar.split(',').filter(Boolean) : [],
 });
 
+// Invoices are an admin-only view (Invoices page + client profile tab are
+// hidden from team members) — strip the field for non-admins on read, and
+// ignore attempts to write it on create/update.
+const redactForRole = (data, role) => {
+  if (role === 'admin') return data;
+  const { invoices, ...rest } = data;
+  return rest;
+};
+
 // Accepts array or comma-separated string, returns CSV string or null
 const toArrayString = (value) => {
   if (!value) return null;
@@ -94,13 +103,14 @@ router.post('/clients', async (req, res) => {
   try {
     const { Client } = req.app.locals.models;
     const clientData = prepareClientData(req.body);
+    if (req.user?.role !== 'admin') delete clientData.invoices;
 
     if (!clientData.name) {
       return res.status(400).json({ success: false, message: 'Client name is required' });
     }
 
     const client = await Client.create(clientData);
-    res.status(201).json({ success: true, message: 'Client created successfully', data: formatArrayFields(client.toJSON()) });
+    res.status(201).json({ success: true, message: 'Client created successfully', data: redactForRole(formatArrayFields(client.toJSON()), req.user?.role) });
   } catch (error) {
     console.error('Error creating client:', error);
     res.status(500).json({ success: false, message: 'Error creating client', error: error.message });
@@ -149,7 +159,7 @@ router.get('/clients', async (req, res) => {
       offset: parseInt(offset),
     });
 
-    const formattedRows = rows.map((c) => formatArrayFields(c.toJSON()));
+    const formattedRows = rows.map((c) => redactForRole(formatArrayFields(c.toJSON()), req.user?.role));
 
     res.json({
       success: true,
@@ -192,10 +202,11 @@ router.get('/clients/export', async (req, res) => {
       order: [['createdAt', 'DESC']],
     });
 
+    const isAdmin = req.user?.role === 'admin';
     const headers = [
       'ID', 'Name', 'Industry', 'Phone Number', 'WhatsApp Number', 'Address', 'Email',
       'Services Selected', 'Managed By', 'Client Health', 'Proposals', 'Credentials',
-      'Campaigns', 'Social Media Accounts', 'Reports', 'Invoices', 'Notes',
+      'Campaigns', 'Social Media Accounts', 'Reports', ...(isAdmin ? ['Invoices'] : []), 'Notes',
       'Renewal Date', 'Content Calendar', 'Created At', 'Updated At'
     ];
 
@@ -217,7 +228,7 @@ router.get('/clients/export', async (req, res) => {
         d.campaigns || '',
         d.socialMediaAccounts || '',
         d.reports || '',
-        d.invoices || '',
+        ...(isAdmin ? [d.invoices || ''] : []),
         d.notes || '',
         d.renewal ? new Date(d.renewal).toISOString().split('T')[0] : '',
         d.contentCalendar || '',
@@ -244,7 +255,7 @@ router.get('/clients/:id', async (req, res) => {
     if (!client) {
       return res.status(404).json({ success: false, message: 'Client not found' });
     }
-    res.json({ success: true, data: formatArrayFields(client.toJSON()) });
+    res.json({ success: true, data: redactForRole(formatArrayFields(client.toJSON()), req.user?.role) });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Error fetching client', error: error.message });
   }
@@ -267,7 +278,7 @@ router.post('/clients/:id/upload-logo', logoUpload.single('logo'), async (req, r
 
     await client.update({ logo: driveResult.proxyLink });
 
-    res.json({ success: true, message: 'Logo uploaded successfully', data: formatArrayFields(client.toJSON()) });
+    res.json({ success: true, message: 'Logo uploaded successfully', data: redactForRole(formatArrayFields(client.toJSON()), req.user?.role) });
   } catch (error) {
     console.error('Error uploading client logo:', error);
     res.status(500).json({ success: false, message: error.message || 'Error uploading logo', error: error.message });
@@ -284,9 +295,10 @@ router.put('/clients/:id', async (req, res) => {
     }
 
     const updateData = prepareClientData(req.body);
+    if (req.user?.role !== 'admin') delete updateData.invoices;
     await client.update(updateData);
 
-    res.json({ success: true, message: 'Client updated successfully', data: formatArrayFields(client.toJSON()) });
+    res.json({ success: true, message: 'Client updated successfully', data: redactForRole(formatArrayFields(client.toJSON()), req.user?.role) });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Error updating client', error: error.message });
   }

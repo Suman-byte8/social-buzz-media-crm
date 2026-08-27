@@ -9,6 +9,7 @@ import AgreementsFilters from "@/components/agreements/AgreementsFilters";
 import AgreementsTable from "@/components/agreements/AgreementsTable";
 import { fetchClients } from "@/redux/slices/clientsSlice";
 import { fetchAgreements, deleteAgreement } from "@/redux/slices/documentsSlice";
+import RequireAdmin from "@/components/auth/RequireAdmin";
 
 export default function AgreementsPage() {
   const dispatch = useDispatch();
@@ -82,6 +83,7 @@ export default function AgreementsPage() {
   }, [agreements, search, statusFilter]);
 
   return (
+    <RequireAdmin>
     <main className="flex-1 p-6 lg:p-8 max-w-[1600px] mx-auto w-full">
       <AgreementsToolbar onUpload={() => setUploadModalOpen(true)} />
 
@@ -139,5 +141,6 @@ export default function AgreementsPage() {
         agreement={viewingAgreement}
       />
     </main>
+    </RequireAdmin>
   );
 }

@@ -1,15 +1,15 @@
 "use client";
 
-"use client";
-
 import { createContext, useContext, useState, useEffect } from 'react';
 import { saveToStorage, getFromStorage, removeFromStorage } from '@/utils/storage';
+import { apiClient } from '@/services/apiClient';
 import { useRouter } from 'next/navigation';
 
 const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
   const router = useRouter();
+  const [user, setUser] = useState(() => getFromStorage('auth_user'));
   const [isAuthenticated, setIsAuthenticated] = useState(() => {
     const token = getFromStorage('auth_token');
     return token !== null;
@@ -28,6 +28,8 @@ export const AuthProvider = ({ children }) => {
       const data = await response.json();
       if (data.success && data.token) {
         saveToStorage('auth_token', data.token);
+        saveToStorage('auth_user', data.user);
+        setUser(data.user);
         setIsAuthenticated(true);
         router.push('/dashboard');
         return true;
@@ -42,24 +44,36 @@ export const AuthProvider = ({ children }) => {
 
   const logout = () => {
     removeFromStorage('auth_token');
+    removeFromStorage('auth_user');
+    setUser(null);
     setIsAuthenticated(false);
     router.push('/login');
   };
 
   useEffect(() => {
     if (isAuthenticated) {
-      // Optionally, you can add a token validation here
-    } else {
-      // If not authenticated and not on login page, redirect to login
-      // Note: We avoid redirecting on login page to prevent infinite loop
-      if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
-        router.push('/login');
-      }
+      // Re-validate the token and refresh role/name in case they changed
+      // (or the token has since expired) since it was last cached.
+      apiClient('/auth/me')
+        .then((data) => {
+          if (data?.user) {
+            saveToStorage('auth_user', data.user);
+            setUser(data.user);
+          }
+        })
+        .catch(() => {
+          // apiClient already clears storage and redirects on 401.
+        });
+    } else if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
+      router.push('/login');
     }
-  }, [isAuthenticated, router]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthenticated]);
+
+  const role = user?.role || null;
 
   return (
-    <AuthContext.Provider value={{ isAuthenticated, login, logout }}>
+    <AuthContext.Provider value={{ isAuthenticated, user, role, isAdmin: role === 'admin', login, logout }}>
       {children}
     </AuthContext.Provider>
   );

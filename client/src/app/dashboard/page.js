@@ -3,10 +3,11 @@
 import React from "react";
 import SearchBar from "@/components/dashboard/SearchBar";
 import DashboardShell from "@/components/dashboard/DashboardShell";
+import RequireAdmin from "@/components/auth/RequireAdmin";
 
 export default function DashboardPage() {
   return (
-    <>
+    <RequireAdmin>
       <header className="h-16 w-full sticky top-0 z-40 bg-surface dark:bg-surface border-b border-outline-variant shadow-sm flex justify-between items-center px-gutter">
         <button className="md:hidden text-primary hover:text-primary transition-colors cursor-pointer active:opacity-80 p-2">
           <span className="material-symbols-outlined">menu</span>
@@ -60,6 +61,6 @@ export default function DashboardPage() {
 
         <DashboardShell />
       </main>
-    </>
+    </RequireAdmin>
   );
 }

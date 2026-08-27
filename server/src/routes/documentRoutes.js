@@ -31,8 +31,16 @@ const mediaUpload = multer({
   },
 });
 
+// Agreements are admin-only (hidden from team members).
+const requireAdminForAgreements = (req, res, next) => {
+  if (req.user?.role !== "admin") {
+    return res.status(403).json({ success: false, message: "Admin access required" });
+  }
+  next();
+};
+
 // Upload agreement with specific subfolder
-router.post("/agreements/upload", upload.single("file"), async (req, res) => {
+router.post("/agreements/upload", requireAdminForAgreements, upload.single("file"), async (req, res) => {
   try {
     const { id, clientId, issuedDate, expiryDate, status, description } = req.body;
 
@@ -141,6 +149,10 @@ router.post("/agreements/upload", upload.single("file"), async (req, res) => {
 router.post("/documents/upload", upload.single("file"), async (req, res) => {
   try {
     const { clientId, description, documentType } = req.body;
+
+    if (documentType === "agreement" && req.user?.role !== "admin") {
+      return res.status(403).json({ success: false, message: "Admin access required" });
+    }
 
     if (!req.file) {
       return res.status(400).json({ success: false, message: "No PDF file provided" });
@@ -278,7 +290,10 @@ router.get("/documents", async (req, res) => {
       order: [["createdAt", "DESC"]],
     });
 
-    res.json({ success: true, data: documents });
+    const visibleDocuments =
+      req.user?.role === "admin" ? documents : documents.filter((d) => d.documentType !== "agreement");
+
+    res.json({ success: true, data: visibleDocuments });
   } catch (error) {
     res.status(500).json({
       success: false,
@@ -295,6 +310,9 @@ router.get("/documents/:id", async (req, res) => {
 
     if (!document) {
       return res.status(404).json({ success: false, message: "Document not found" });
+    }
+    if (document.documentType === "agreement" && req.user?.role !== "admin") {
+      return res.status(403).json({ success: false, message: "Admin access required" });
     }
 
     res.json({ success: true, data: document });
@@ -314,6 +332,9 @@ router.delete("/documents/:id", async (req, res) => {
 
     if (!document) {
       return res.status(404).json({ success: false, message: "Document not found" });
+    }
+    if (document.documentType === "agreement" && req.user?.role !== "admin") {
+      return res.status(403).json({ success: false, message: "Admin access required" });
     }
 
     await document.destroy();
