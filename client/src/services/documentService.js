@@ -52,6 +52,23 @@ export const uploadProposal = async (formData) => {
   return response;
 };
 
+// ── Brand Kit ────────────────────────────────────────────────────────────
+
+export const fetchBrandKitFiles = async (clientId) => {
+  const params = new URLSearchParams({ documentType: "brand_kit" });
+  if (clientId) params.append("clientId", clientId);
+  const response = await apiClient(`/documents?${params.toString()}`);
+  return response;
+};
+
+export const uploadBrandKitFile = async (formData) => {
+  const response = await apiClient("/documents/upload-media", {
+    method: "POST",
+    body: formData,
+  });
+  return response;
+};
+
 // ── Agreements ───────────────────────────────────────────────────────────
 
 export const fetchAgreements = async (clientId) => {

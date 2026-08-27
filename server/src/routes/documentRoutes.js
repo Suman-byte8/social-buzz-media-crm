@@ -17,6 +17,20 @@ const upload = multer({
   },
 });
 
+// Broader upload for media-capable document types (currently just brand kit assets):
+// logos, color palette images, and other brand imagery, plus PDF brand guidelines.
+const mediaUpload = multer({
+  storage: storage,
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype.startsWith("image/") || file.mimetype === "application/pdf") {
+      cb(null, true);
+    } else {
+      cb(new Error("Only image or PDF files are allowed"), false);
+    }
+  },
+});
+
 // Upload agreement with specific subfolder
 router.post("/agreements/upload", upload.single("file"), async (req, res) => {
   try {
@@ -182,6 +196,65 @@ router.post("/documents/upload", upload.single("file"), async (req, res) => {
     res.status(500).json({
       success: false,
       message: error.message || "Failed to upload document",
+      error: error.message,
+    });
+  }
+});
+
+// Upload media-capable document types (currently: brand kit logos/images/PDFs)
+router.post("/documents/upload-media", mediaUpload.single("file"), async (req, res) => {
+  try {
+    const { clientId, description, documentType } = req.body;
+
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: "No file provided" });
+    }
+    if (!clientId) {
+      return res.status(400).json({ success: false, message: "clientId is required" });
+    }
+
+    const { Document, Client } = req.app.locals.models;
+
+    const clientRecord = await Client.findByPk(parseInt(clientId));
+    if (!clientRecord) {
+      return res.status(404).json({ success: false, message: "Client not found" });
+    }
+
+    const clientFolder = await getOrCreateClientFolder(clientRecord.name, clientRecord.id);
+    const subfolderName = documentType === "brand_kit" ? "Brand Kit" : "Other";
+    const subfolder = await getOrCreateClientSubfolder(clientFolder.folderId, subfolderName);
+
+    const driveResult = await uploadFileToDrive(
+      req.file.buffer,
+      req.file.originalname,
+      req.file.mimetype,
+      subfolder.folderId
+    );
+
+    const document = await Document.create({
+      fileName: req.file.originalname,
+      fileType: req.file.mimetype,
+      fileSize: req.file.size,
+      fileId: driveResult.fileId,
+      driveLink: driveResult.googleUserContentLink,
+      webViewLink: driveResult.webViewLink,
+      googleUserContentLink: driveResult.googleUserContentLink,
+      folderId: subfolder.folderId,
+      clientId: parseInt(clientId),
+      description: description || null,
+      documentType: documentType || "other",
+    });
+
+    res.status(201).json({
+      success: true,
+      message: "File uploaded successfully",
+      data: document,
+    });
+  } catch (error) {
+    console.error("Error uploading media document:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message || "Failed to upload file",
       error: error.message,
     });
   }

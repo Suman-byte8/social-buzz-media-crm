@@ -5,6 +5,7 @@ import { useDispatch, useSelector } from "react-redux";
 import ProposalTab from "@/components/clients/ProposalTab";
 import Overview from "@/components/clients/Overview";
 import Credentials from "@/components/clients/Credentials";
+import BrandKit from "@/components/clients/BrandKit";
 import AdsTab from "@/components/clients/AdsTab";
 import MetaAdsTab from "@/components/clients/MetaAdsTab";
 import SocialMedia from "@/components/clients/SocialMedia";
@@ -16,11 +17,13 @@ import ContentCalendarTab from "@/components/clients/ContentCalendarTab";
 import AddEditClientModal from "@/components/clients/AddEditClientModal";
 import { fetchClientById } from "@/redux/slices/clientsSlice";
 import { fetchTeamMembers } from "@/redux/slices/teamSlice";
+import { getAssetUrl } from "@/services/apiClient";
 
 const tabs = [
   { id: "overview", label: "Overview", icon: "grid_view" },
   { id: "proposal", label: "Proposal", icon: "description" },
   { id: "credentials", label: "Credentials", icon: "key" },
+  { id: "brand_kit", label: "Brand Kit", icon: "palette" },
   { id: "google_ads", label: "Google Ads", icon: "ads_click" },
   { id: "meta_ads", label: "Meta Ads", icon: "campaign" },
   { id: "social", label: "Social", icon: "thumb_up" },
@@ -58,9 +61,13 @@ export default function ClientDetailContent({ activeTab, setActiveTab, client = 
       {/* Client Header Section */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-stack-md bg-surface p-card-padding rounded-xl border border-outline-variant shadow-sm">
         <div className="flex items-center gap-stack-md">
-          <div className="w-16 h-16 rounded-xl overflow-hidden border border-surface-variant bg-primary-container flex items-center justify-center shrink-0 shadow-sm">
+          <div
+            className={`w-28 h-28 rounded-xl flex items-center justify-center shrink-0 ${
+              client.logo ? "" : "border border-surface-variant bg-primary-container shadow-sm"
+            }`}
+          >
             {client.logo ? (
-              <img src={client.logo} alt={clientName} className="w-full h-full object-cover" />
+              <img src={getAssetUrl(client.logo)} alt={clientName} className="w-full h-full object-contain" />
             ) : (
               <span className="font-display-md text-display-md text-primary font-bold">
                 {clientName[0]?.toUpperCase()}
@@ -153,6 +160,8 @@ export default function ClientDetailContent({ activeTab, setActiveTab, client = 
         <ProposalTab client={client} clientId={clientId} />
       ) : activeTab === "credentials" ? (
         <Credentials client={client} clientId={clientId} />
+      ) : activeTab === "brand_kit" ? (
+        <BrandKit client={client} clientId={clientId} />
       ) : activeTab === "google_ads" ? (
         <AdsTab client={client} />
       ) : activeTab === "meta_ads" ? (

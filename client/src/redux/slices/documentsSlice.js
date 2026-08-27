@@ -5,6 +5,8 @@ import {
   deleteDocument as deleteDocumentApi,
   fetchProposals as fetchProposalsApi,
   uploadProposal as uploadProposalApi,
+  fetchBrandKitFiles as fetchBrandKitFilesApi,
+  uploadBrandKitFile as uploadBrandKitFileApi,
   fetchAgreements as fetchAgreementsApi,
   uploadAgreement as uploadAgreementApi,
   updateAgreement as updateAgreementApi,
@@ -83,6 +85,42 @@ export const deleteProposal = createAsyncThunk(
   }
 );
 
+// ── Brand Kit ────────────────────────────────────────────────────────────
+
+export const fetchBrandKit = createAsyncThunk(
+  "documents/fetchBrandKit",
+  async (clientId, { rejectWithValue }) => {
+    try {
+      return await fetchBrandKitFilesApi(clientId);
+    } catch (error) {
+      return rejectWithValue(error.message || "Failed to fetch brand kit files");
+    }
+  }
+);
+
+export const uploadBrandKit = createAsyncThunk(
+  "documents/uploadBrandKit",
+  async (formData, { rejectWithValue }) => {
+    try {
+      return await uploadBrandKitFileApi(formData);
+    } catch (error) {
+      return rejectWithValue(error.message || "Failed to upload file");
+    }
+  }
+);
+
+export const deleteBrandKit = createAsyncThunk(
+  "documents/deleteBrandKit",
+  async (id, { rejectWithValue }) => {
+    try {
+      await deleteDocumentApi(id);
+      return id;
+    } catch (error) {
+      return rejectWithValue(error.message || "Failed to delete file");
+    }
+  }
+);
+
 // ── Agreements ───────────────────────────────────────────────────────────
 
 export const fetchAgreements = createAsyncThunk(
@@ -133,9 +171,11 @@ export const deleteAgreement = createAsyncThunk(
 const initialState = {
   documents: [],
   proposals: [],
+  brandKit: [],
   agreements: [],
   loading: false,
   loadingProposals: false,
+  loadingBrandKit: false,
   loadingAgreements: false,
   error: null,
   successMessage: null,
@@ -205,6 +245,33 @@ const documentsSlice = createSlice({
       })
       .addCase(deleteProposal.rejected, (state, action) => {
         state.error = action.payload || "Failed to delete proposal";
+      })
+      .addCase(fetchBrandKit.pending, (state) => {
+        state.loadingBrandKit = true;
+        state.error = null;
+      })
+      .addCase(fetchBrandKit.fulfilled, (state, action) => {
+        state.loadingBrandKit = false;
+        state.brandKit = action.payload.data || [];
+      })
+      .addCase(fetchBrandKit.rejected, (state, action) => {
+        state.loadingBrandKit = false;
+        state.error = action.payload || "Failed to fetch brand kit files";
+      })
+      .addCase(uploadBrandKit.fulfilled, (state, action) => {
+        const doc = action.payload?.data || action.payload;
+        if (doc) state.brandKit.push(doc);
+        state.successMessage = "File uploaded successfully";
+      })
+      .addCase(uploadBrandKit.rejected, (state, action) => {
+        state.error = action.payload || "Failed to upload file";
+      })
+      .addCase(deleteBrandKit.fulfilled, (state, action) => {
+        state.brandKit = state.brandKit.filter((f) => f.id !== action.payload);
+        state.successMessage = "File deleted successfully";
+      })
+      .addCase(deleteBrandKit.rejected, (state, action) => {
+        state.error = action.payload || "Failed to delete file";
       })
       .addCase(fetchAgreements.pending, (state) => {
         state.loadingAgreements = true;
