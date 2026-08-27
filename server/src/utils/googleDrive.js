@@ -106,6 +106,7 @@ export const getFileStreamFromDrive = async (fileId) => {
     { fileId: fileId, alt: "media" },
     { responseType: "stream" }
   );
+  response.data.contentType = response.headers?.get?.("content-type");
   return response.data;
 };
 

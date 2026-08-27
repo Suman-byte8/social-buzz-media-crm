@@ -144,7 +144,7 @@ router.get("/settings/logo-proxy/:fileId", async (req, res) => {
   try {
     const { fileId } = req.params;
     const fileStream = await getFileStreamFromDrive(fileId);
-    res.setHeader("Content-Type", "image/png");
+    res.setHeader("Content-Type", fileStream.contentType || "image/png");
     res.setHeader("Cache-Control", "public, max-age=86400");
     fileStream.pipe(res);
   } catch (error) {

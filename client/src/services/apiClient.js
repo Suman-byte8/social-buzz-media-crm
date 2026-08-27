@@ -1,5 +1,17 @@
 export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
 
+// Server-relative asset URLs (e.g. "/api/settings/logo-proxy/:fileId") need the
+// API server's host prefixed before use in an <img src>, since the browser
+// would otherwise resolve them against the Next.js app's own origin.
+export const getAssetUrl = (url) => {
+  if (!url) return "";
+  if (url.startsWith("/api")) {
+    const host = API_BASE_URL.replace(/\/api\/?$/, "");
+    return `${host}${url}`;
+  }
+  return url;
+};
+
 const parseErrorMessage = async (response) => {
   let errorMessage = `HTTP error! status: ${response.status} ${response.statusText}`;
   try {

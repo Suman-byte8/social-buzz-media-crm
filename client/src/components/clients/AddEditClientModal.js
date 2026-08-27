@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useDispatch } from "react-redux";
 import { createClient, updateClient, uploadClientLogo } from "@/redux/slices/clientsSlice";
+import { getAssetUrl } from "@/services/apiClient";
 
 const INDUSTRY_OPTIONS = ["SaaS", "E-commerce", "Healthcare", "Finance", "Education", "Real Estate", "Other"];
 const MAX_LOGO_SIZE = 5 * 1024 * 1024;
@@ -154,9 +155,13 @@ function ClientForm({ client, teamMembers, onClose, onSuccess }) {
   return (
     <form onSubmit={handleSubmit} className="p-6 space-y-6">
       <div className="flex items-center gap-4">
-        <div className="w-20 h-20 rounded-xl border border-outline-variant bg-primary-container/10 flex items-center justify-center overflow-hidden shrink-0">
+        <div
+          className={`w-20 h-20 rounded-xl flex items-center justify-center shrink-0 ${
+            logoPreview ? "" : "border border-outline-variant bg-primary-container/10"
+          }`}
+        >
           {logoPreview ? (
-            <img src={logoPreview} alt="Client logo" className="w-full h-full object-cover" />
+            <img src={getAssetUrl(logoPreview)} alt="Client logo" className="w-full h-full object-contain" />
           ) : (
             <span className="font-display-md text-display-md text-primary font-bold">
               {formData.name?.[0]?.toUpperCase() || "?"}

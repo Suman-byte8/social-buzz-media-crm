@@ -8,7 +8,12 @@ dotenv.config();
 const app = express();
 
 app.use(cors());
-app.use(helmet());
+// Frontend and API are served from different origins (separate ports in dev,
+// separate domains in prod), so images/files streamed by this API (logo
+// proxy, document downloads) must be embeddable cross-origin. Helmet's
+// default same-origin CORP silently blocks the browser from rendering them
+// in an <img> tag even though the request itself succeeds with a 200.
+app.use(helmet({ crossOriginResourcePolicy: { policy: "cross-origin" } }));
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ limit: "10mb", extended: true }));
 
@@ -80,7 +85,12 @@ const connectWithRetry = async (retries = 5, delayMs = 3000) => {
     try {
       await sequelize.authenticate();
       console.log(`[DB] Connection established (attempt ${attempt})`);
-      await sequelize.sync({ alter: isDev });
+      // Non-destructive: creates tables that don't exist yet, but never alters
+      // existing columns. Every nodemon restart during dev re-runs this, and
+      // `alter: true` here was silently dropping/rewriting live columns and
+      // data on every file save. Run `npm run db:sync` explicitly (still with
+      // `alter: true`) when you intend an actual schema change.
+      await sequelize.sync();
       console.log("Database synchronized");
       return;
     } catch (err) {
