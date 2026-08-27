@@ -1,14 +1,29 @@
 import express from 'express';
 import { Op } from 'sequelize';
+import { encryptText, decryptText } from '../utils/encryption.js';
 
 const router = express.Router();
+
+// Credentials are stored as an array of { id, platform, username, password, notes }.
+// Passwords are encrypted at rest; decrypt here so the client only ever sees plaintext.
+const decryptCredentials = (value) => {
+  if (!value) return [];
+  const parsed = typeof value === 'string' ? JSON.parse(value) : value;
+  if (!Array.isArray(parsed)) return [];
+  return parsed.map((entry) => ({ ...entry, password: decryptText(entry.password) }));
+};
+
+const encryptCredentials = (value) => {
+  if (!Array.isArray(value)) return null;
+  return value.map((entry) => ({ ...entry, password: entry.password ? encryptText(entry.password) : entry.password }));
+};
 
 // Helper to format array fields
 const formatArrayFields = (data) => ({
   ...data,
   servicesSelected: data.servicesSelected ? data.servicesSelected.split(',').filter(Boolean) : [],
   proposals: data.proposals ? data.proposals.split(',').filter(Boolean) : [],
-  credentials: data.credentials ? JSON.parse(data.credentials) : {},
+  credentials: decryptCredentials(data.credentials),
   campaigns: data.campaigns ? data.campaigns.split(',').filter(Boolean) : [],
   socialMediaAccounts: data.socialMediaAccounts ? data.socialMediaAccounts.split(',').filter(Boolean) : [],
   reports: data.reports ? data.reports.split(',').filter(Boolean) : [],
@@ -48,7 +63,9 @@ const prepareClientData = (body) => ({
   clientManagedBy: body.clientManagedBy,
   clientHealth: body.clientHealth,
   proposals: toArrayString(body.proposals),
-  credentials: toJsonString(body.credentials),
+  credentials: Array.isArray(body.credentials)
+    ? JSON.stringify(encryptCredentials(body.credentials))
+    : toJsonString(body.credentials),
   campaigns: toArrayString(body.campaigns),
   socialMediaAccounts: toArrayString(body.socialMediaAccounts),
   reports: toArrayString(body.reports),

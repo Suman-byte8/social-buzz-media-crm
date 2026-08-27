@@ -701,6 +701,7 @@ Proxies Google Drive file streams directly to render logo images in HTML `<img>`
 | GOOGLE_DRIVE_CLIENT_ID | Google Drive API client ID | - |
 | GOOGLE_DRIVE_CLIENT_SECRET | Google Drive API client secret | - |
 | GOOGLE_DRIVE_REFRESH_TOKEN | Google Drive refresh token | - |
+| CREDENTIALS_ENCRYPTION_KEY | Key used to encrypt/decrypt client social media credential passwords at rest | - |
 
 ---
 

@@ -47,7 +47,6 @@ export default function ClientDetailContent({ activeTab, setActiveTab, client = 
   const clientHealth = client.clientHealth ?? 0;
   const healthLabel = clientHealth >= 80 ? "Excellent" : clientHealth >= 50 ? "Fair" : "At Risk";
   const healthColor = clientHealth >= 80 ? "green" : clientHealth >= 50 ? "amber" : "red";
-  const credentials = client.credentials && typeof client.credentials === "object" ? client.credentials : (client.credentials ? JSON.parse(client.credentials) : {});
 
   const handleEditSuccess = () => {
     setEditModalOpen(false);
@@ -149,7 +148,7 @@ export default function ClientDetailContent({ activeTab, setActiveTab, client = 
       {activeTab === "proposal" ? (
         <ProposalTab client={client} clientId={clientId} />
       ) : activeTab === "credentials" ? (
-        <Credentials client={client} credentials={credentials} />
+        <Credentials client={client} clientId={clientId} />
       ) : activeTab === "google_ads" ? (
         <AdsTab client={client} />
       ) : activeTab === "meta_ads" ? (
