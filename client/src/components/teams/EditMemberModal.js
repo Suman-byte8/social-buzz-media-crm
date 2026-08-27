@@ -1,7 +1,9 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { updateTeamMember, parseArrayField } from "@/services/teamService";
+import { useDispatch } from "react-redux";
+import { parseArrayField } from "@/services/teamService";
+import { updateTeamMember } from "@/redux/slices/teamSlice";
 
 const DEPARTMENTS = [
   "",
@@ -16,6 +18,7 @@ const EMPLOYMENT_TYPES = ["", "full-time", "internship", "freelance"];
 const STATUSES = ["", "active", "inactive"];
 
 export default function EditMemberModal({ isOpen, onClose, onSuccess, member }) {
+  const dispatch = useDispatch();
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -269,7 +272,7 @@ export default function EditMemberModal({ isOpen, onClose, onSuccess, member }) 
             : null,
       };
 
-      await updateTeamMember(member.id, payload);
+      await dispatch(updateTeamMember({ id: member.id, memberData: payload })).unwrap();
       onSuccess();
     } catch (error) {
       console.error("Error updating team member:", error);

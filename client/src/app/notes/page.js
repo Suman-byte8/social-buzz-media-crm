@@ -1,12 +1,13 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { useDispatch, useSelector } from "react-redux";
 import MeetingNoteModal from "@/components/meetings/MeetingNoteModal";
 import {
   fetchMeetingNotes,
   deleteMeetingNote,
-} from "@/services/meetingNoteService";
-import { fetchClients } from "@/services/clientService";
+} from "@/redux/slices/meetingNotesSlice";
+import { fetchClients } from "@/redux/slices/clientsSlice";
 
 const meetingTypeConfig = {
   client_sync: {
@@ -30,43 +31,25 @@ const meetingTypeConfig = {
 };
 
 export default function MeetingNotesPage() {
-  const [clients, setClients] = useState([]);
-  const [meetingNotes, setMeetingNotes] = useState([]);
+  const dispatch = useDispatch();
+  const { clients } = useSelector((state) => state.clients);
+  const { meetingNotes, loading, error } = useSelector(
+    (state) => state.meetingNotes
+  );
+
   const [selectedClientId, setSelectedClientId] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingNote, setEditingNote] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
   const [deleteLoading, setDeleteLoading] = useState({});
 
   useEffect(() => {
-    const loadData = async () => {
-      try {
-        const clientsData = await fetchClients();
-        setClients(clientsData.data || []);
-        const notesData = await fetchMeetingNotes();
-        setMeetingNotes(notesData.data || []);
-      } catch (err) {
-        setError("Failed to load initial data");
-      } finally {
-        setLoading(false);
-      }
-    };
-    loadData();
-  }, []);
+    dispatch(fetchClients());
+    dispatch(fetchMeetingNotes());
+  }, [dispatch]);
 
-  const loadNotesByClient = async (clientId) => {
+  const loadNotesByClient = (clientId) => {
     if (!clientId) return;
-    setLoading(true);
-    setError(null);
-    try {
-      const data = await fetchMeetingNotes(clientId);
-      setMeetingNotes(data.data || []);
-    } catch (err) {
-      setError("Failed to load meeting notes");
-    } finally {
-      setLoading(false);
-    }
+    dispatch(fetchMeetingNotes(clientId));
   };
 
   const handleClientChange = (e) => {
@@ -82,15 +65,8 @@ export default function MeetingNotesPage() {
     loadNotes();
   };
 
-  const handleSuccess = (note) => {
-    if (editingNote) {
-      setMeetingNotes((prev) =>
-        prev.map((n) => (n.id === note.id ? note : n))
-      );
-      setEditingNote(null);
-    } else {
-      setMeetingNotes((prev) => [note, ...prev]);
-    }
+  const handleSuccess = () => {
+    setEditingNote(null);
     setModalOpen(false);
   };
 
@@ -98,16 +74,14 @@ export default function MeetingNotesPage() {
     if (!window.confirm("Are you sure you want to delete this meeting note?"))
       return;
     try {
-      setError(null);
-      await deleteMeetingNote(id);
-      setMeetingNotes((prev) => prev.filter((n) => n.id !== id));
+      await dispatch(deleteMeetingNote(id)).unwrap();
       setDeleteLoading((prev) => {
         const copy = { ...prev };
         delete copy[id];
         return copy;
       });
     } catch (err) {
-      setError(err.message || "Failed to delete meeting note");
+      // Delete errors are surfaced via the meetingNotes slice's error state.
     }
   };
 
@@ -116,17 +90,8 @@ export default function MeetingNotesPage() {
     setModalOpen(true);
   };
 
-  const loadNotes = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const data = await fetchMeetingNotes();
-      setMeetingNotes(data.data || []);
-    } catch (err) {
-      setError("Failed to load meeting notes");
-    } finally {
-      setLoading(false);
-    }
+  const loadNotes = () => {
+    dispatch(fetchMeetingNotes());
   };
 
   const getClientName = (clientId) => {
@@ -229,7 +194,7 @@ export default function MeetingNotesPage() {
     );
   };
 
-  if (loading && (!clients.length || !meetingNotes.length)) {
+  if (loading) {
     return (
       <main className="flex-1 overflow-y-auto bg-background p-container-margin">
         <div className="max-w-6xl mx-auto">

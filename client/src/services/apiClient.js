@@ -1,48 +1,62 @@
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
+export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
 
+const parseErrorMessage = async (response) => {
+  let errorMessage = `HTTP error! status: ${response.status} ${response.statusText}`;
+  try {
+    const text = await response.text();
+    if (text && text.trim()) {
+      try {
+        const data = JSON.parse(text);
+        if (data && (data.message || data.error)) {
+          errorMessage = data.message || data.error;
+        }
+      } catch {
+        errorMessage = text;
+      }
+    }
+  } catch {
+    // Fallback to HTTP error message
+  }
+  return errorMessage;
+};
+
+// Single centralized HTTP client for the whole site. Handles plain JSON
+// bodies, FormData uploads (file/image endpoints), and blob responses
+// (CSV/PDF exports) through one consistent request/error path, so no
+// service file needs its own base URL, headers, or error parsing.
 export const apiClient = async (endpoint, options = {}) => {
-  const { method = 'GET', body, headers = {}, ...customConfig } = options;
+  const { method = "GET", body, headers = {}, responseType, ...customConfig } = options;
+
+  const isFormData = typeof FormData !== "undefined" && body instanceof FormData;
 
   const config = {
     method,
-    headers: {
-      'Content-Type': 'application/json',
-      ...headers,
-    },
+    headers: isFormData ? { ...headers } : { "Content-Type": "application/json", ...headers },
     ...customConfig,
   };
 
-  if (body) {
-    config.body = JSON.stringify(body);
+  if (body !== undefined) {
+    config.body = isFormData ? body : JSON.stringify(body);
   }
 
-  const url = `${API_BASE_URL}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
+  const url = `${API_BASE_URL}${endpoint.startsWith("/") ? endpoint : `/${endpoint}`}`;
 
   try {
     const response = await fetch(url, config);
-    
+
     if (!response.ok) {
-      let errorMessage = `HTTP error! status: ${response.status} ${response.statusText}`;
-      try {
-        const text = await response.text();
-        if (text && text.trim()) {
-          try {
-            const data = JSON.parse(text);
-            if (data && (data.message || data.error)) {
-              errorMessage = data.message || data.error;
-            }
-          } catch {
-            errorMessage = text;
-          }
-        }
-      } catch {
-        // Fallback to HTTP error message
-      }
-      throw new Error(errorMessage);
+      throw new Error(await parseErrorMessage(response));
     }
 
-    const data = await response.json();
-    return data;
+    if (responseType === "blob") {
+      return response.blob();
+    }
+
+    if (response.status === 204) {
+      return null;
+    }
+
+    return response.json();
   } catch (error) {
     console.error(`API Call Error [${method} ${endpoint}]:`, error);
     throw error;

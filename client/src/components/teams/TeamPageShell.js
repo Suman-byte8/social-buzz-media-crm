@@ -1,7 +1,9 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
-import { fetchTeamMembers, deleteTeamMember } from "@/services/teamService";
+import React, { useEffect, useState, useMemo } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import { fetchTeamMembers, deleteTeamMember } from "@/redux/slices/teamSlice";
+import { fetchTasks } from "@/redux/slices/tasksSlice";
 import TeamToolbar from "@/components/teams/TeamToolbar";
 import TeamStats from "@/components/teams/TeamStats";
 import TeamFilters from "@/components/teams/TeamFilters";
@@ -13,8 +15,11 @@ import EditMemberModal from "@/components/teams/EditMemberModal";
 const ITEMS_PER_PAGE = 10;
 const MS_PER_DAY = 1000 * 60 * 60 * 24;
 
-export default function TeamPageShell({ teamMembers: initialMembers, tasks = [] }) {
-  const [teamMembers, setTeamMembers] = useState(initialMembers || []);
+export default function TeamPageShell() {
+  const dispatch = useDispatch();
+  const teamMembers = useSelector((state) => state.team.teamMembers);
+  const tasks = useSelector((state) => state.tasks.tasks);
+
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
   const [departmentFilter, setDepartmentFilter] = useState("All");
@@ -22,10 +27,16 @@ export default function TeamPageShell({ teamMembers: initialMembers, tasks = [] 
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingMember, setEditingMember] = useState(null);
 
+  // Always fetch fresh data client-side on mount — this app is a fully
+  // static export, so build-time SSR data would otherwise go stale.
+  useEffect(() => {
+    dispatch(fetchTeamMembers());
+    dispatch(fetchTasks({ limit: 500 }));
+  }, [dispatch]);
+
   const handleTeamMemberUpdate = async () => {
     try {
-      const members = await fetchTeamMembers();
-      setTeamMembers(members || []);
+      await dispatch(fetchTeamMembers()).unwrap();
       setEditingMember(null);
       setCurrentPage(1);
     } catch (error) {
@@ -38,7 +49,7 @@ export default function TeamPageShell({ teamMembers: initialMembers, tasks = [] 
   const handleDelete = async (member) => {
     if (!window.confirm(`Delete ${member.name}? This action cannot be undone.`)) return;
     try {
-      await deleteTeamMember(member.id);
+      await dispatch(deleteTeamMember(member.id)).unwrap();
       handleTeamMemberUpdate();
     } catch (error) {
       console.error("Error deleting team member:", error);

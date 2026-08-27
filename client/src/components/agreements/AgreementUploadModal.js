@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { uploadAgreement, updateAgreement } from "@/services/documentService";
+import { useDispatch } from "react-redux";
+import { uploadAgreement, updateAgreement } from "@/redux/slices/documentsSlice";
 
 const defaultFormData = () => ({
   file: null,
@@ -20,6 +21,7 @@ export default function AgreementUploadModal({
   agreementToEdit = null,
   isEdit = false,
 }) {
+  const dispatch = useDispatch();
   const [clientId, setClientId] = useState("");
   const [formData, setFormData] = useState(defaultFormData);
   const [loading, setLoading] = useState(false);
@@ -100,10 +102,12 @@ export default function AgreementUploadModal({
           formDataToSend.append("expiryDate", expiryDate);
           formDataToSend.append("status", status);
           formDataToSend.append("description", description);
-          const result = await uploadAgreement(formDataToSend);
+          const result = await dispatch(uploadAgreement(formDataToSend)).unwrap();
           onSuccess(result);
         } else {
-          const response = await updateAgreement(agreementToEdit.id, { issuedDate, expiryDate, status, description });
+          const response = await dispatch(
+            updateAgreement({ id: agreementToEdit.id, updateData: { issuedDate, expiryDate, status, description } })
+          ).unwrap();
           onSuccess(response.data);
         }
       } else {
@@ -114,12 +118,12 @@ export default function AgreementUploadModal({
         formDataToSend.append("expiryDate", expiryDate);
         formDataToSend.append("status", status);
         formDataToSend.append("description", description);
-        const result = await uploadAgreement(formDataToSend);
+        const result = await dispatch(uploadAgreement(formDataToSend)).unwrap();
         onSuccess(result);
       }
       onClose();
     } catch (err) {
-      setError(err.message || "Failed to process agreement");
+      setError((typeof err === "string" ? err : err?.message) || "Failed to process agreement");
     } finally {
       setLoading(false);
     }

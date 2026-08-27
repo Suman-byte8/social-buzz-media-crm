@@ -1,16 +1,20 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from "react";
+import { useDispatch, useSelector } from "react-redux";
 import AgreementUploadModal from "@/components/agreements/AgreementUploadModal";
 import AgreementViewModal from "@/components/agreements/AgreementViewModal";
 import AgreementsToolbar from "@/components/agreements/AgreementsToolbar";
 import AgreementsFilters from "@/components/agreements/AgreementsFilters";
 import AgreementsTable from "@/components/agreements/AgreementsTable";
-import { fetchAgreements, fetchClients, deleteAgreement } from "@/services/documentService";
+import { fetchClients } from "@/redux/slices/clientsSlice";
+import { fetchAgreements, deleteAgreement } from "@/redux/slices/documentsSlice";
 
 export default function AgreementsPage() {
-  const [clients, setClients] = useState([]);
-  const [agreements, setAgreements] = useState([]);
+  const dispatch = useDispatch();
+  const { clients, loading: loadingClients } = useSelector((state) => state.clients);
+  const { agreements, loadingAgreements, error } = useSelector((state) => state.documents);
+
   const [search, setSearch] = useState("");
   const [clientFilter, setClientFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
@@ -21,59 +25,33 @@ export default function AgreementsPage() {
   const [editingAgreement, setEditingAgreement] = useState(null);
   const [viewingAgreement, setViewingAgreement] = useState(null);
 
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  useEffect(() => {
+    dispatch(fetchClients());
+  }, [dispatch]);
 
   useEffect(() => {
-    const loadInitial = async () => {
-      setLoading(true);
-      try {
-        const [clientsData, agreementsData] = await Promise.all([fetchClients(), fetchAgreements()]);
-        setClients(clientsData.data || []);
-        setAgreements(agreementsData.data || []);
-      } catch (err) {
-        setError("Failed to load agreements");
-      } finally {
-        setLoading(false);
-      }
-    };
-    loadInitial();
-  }, []);
-
-  const loadAgreements = async (clientId) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const data = await fetchAgreements(clientId || undefined);
-      setAgreements(data.data || []);
-    } catch (err) {
-      setError("Failed to load agreements");
-    } finally {
-      setLoading(false);
-    }
-  };
+    dispatch(fetchAgreements(clientFilter || undefined));
+  }, [dispatch, clientFilter]);
 
   const handleClientFilterChange = (value) => {
     setClientFilter(value);
-    loadAgreements(value);
   };
 
-  const handleUploadSuccess = (agreement) => {
-    setAgreements((prev) => [...prev, agreement]);
+  const handleUploadSuccess = () => {
+    setUploadModalOpen(false);
   };
 
-  const handleEditSuccess = (updated) => {
-    setAgreements((prev) => prev.map((a) => (a.id === updated.id ? updated : a)));
+  const handleEditSuccess = () => {
+    setEditModalOpen(false);
+    setEditingAgreement(null);
   };
 
   const handleDelete = async (id) => {
     if (!window.confirm("Are you sure you want to delete this agreement?")) return;
     try {
-      setError(null);
-      await deleteAgreement(id);
-      setAgreements((prev) => prev.filter((a) => a.id !== id));
+      await dispatch(deleteAgreement(id)).unwrap();
     } catch (err) {
-      setError(err.message || "Failed to delete agreement");
+      // Failure is surfaced via state.documents.error
     }
   };
 
@@ -120,13 +98,12 @@ export default function AgreementsPage() {
       {error && (
         <div className="mt-3 mb-1 p-4 rounded-lg flex items-center justify-between bg-red-50 text-red-800 border border-red-200">
           <span>{error}</span>
-          <button onClick={() => setError(null)} className="text-lg font-bold leading-none">×</button>
         </div>
       )}
 
       <AgreementsTable
         agreements={filteredAgreements}
-        loading={loading}
+        loading={loadingClients || loadingAgreements}
         getClientName={getClientName}
         onView={handleView}
         onEdit={handleEdit}

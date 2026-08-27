@@ -1,7 +1,5 @@
 import { apiClient } from "./apiClient";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
-
 const cleanParams = (params = {}) =>
   Object.entries(params).reduce((acc, [key, value]) => {
     if (value !== undefined && value !== null && value !== "") {
@@ -48,18 +46,10 @@ export const uploadCreatives = async (entryId, files) => {
     formData.append("files", file);
   }
 
-  const response = await fetch(`${API_BASE_URL}/content-calendar/${entryId}/creatives`, {
+  return apiClient(`/content-calendar/${entryId}/creatives`, {
     method: "POST",
     body: formData,
   });
-
-  const data = await response.json();
-
-  if (!response.ok) {
-    throw new Error(data.message || `HTTP error! status: ${response.status}`);
-  }
-
-  return data;
 };
 
 export const deleteCreative = async (entryId, fileId) => {

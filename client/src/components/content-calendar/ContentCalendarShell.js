@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, useRef } from "react";
-import { fetchClients } from "@/services/clientService";
+import { useDispatch, useSelector } from "react-redux";
+import { fetchClients } from "@/redux/slices/clientsSlice";
 import {
   fetchContentCalendarEntries,
   createContentCalendarEntry,
@@ -9,7 +10,8 @@ import {
   deleteContentCalendarEntry,
   uploadCreatives,
   deleteCreative,
-} from "@/services/contentCalendarService";
+  setEntryPostedLocal,
+} from "@/redux/slices/contentCalendarSlice";
 import ContentCalendarTable from "./ContentCalendarTable";
 import ContentCalendarPrintView from "./ContentCalendarPrintView";
 import { exportContentCalendarToPdf } from "@/lib/ContentCalendarPdfExport";
@@ -32,10 +34,10 @@ const blankDraft = (clientId) => ({
   stagedFiles: [],
 });
 
-export default function ContentCalendarShell({ clients: initialClients }) {
-  const [clients, setClients] = useState(initialClients || []);
-  const [entries, setEntries] = useState([]);
-  const [loading, setLoading] = useState(true);
+export default function ContentCalendarShell() {
+  const dispatch = useDispatch();
+  const { clients } = useSelector((state) => state.clients);
+  const { entries, loading } = useSelector((state) => state.contentCalendar);
 
   const [selectedClientId, setSelectedClientId] = useState("");
   const [platformFilter, setPlatformFilter] = useState("all");
@@ -59,46 +61,27 @@ export default function ContentCalendarShell({ clients: initialClients }) {
   const printRef = useRef(null);
 
   useEffect(() => {
-    if (!clients || clients.length === 0) {
-      loadClients();
-    }
-  }, []);
+    dispatch(fetchClients({ limit: 100 }));
+  }, [dispatch]);
 
   useEffect(() => {
     loadEntries();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedClientId, platformFilter, postedFilter, month]);
 
-  const loadClients = async () => {
-    try {
-      const response = await fetchClients({ limit: 100 });
-      setClients(response.data || response || []);
-    } catch (error) {
-      console.error("Error fetching clients:", error);
+  const loadEntries = () => {
+    const params = {
+      clientId: selectedClientId || undefined,
+      platform: platformFilter !== "all" ? platformFilter : undefined,
+      posted: postedFilter !== "all" ? postedFilter : undefined,
+    };
+    if (month) {
+      const [year, m] = month.split("-").map(Number);
+      const lastDay = new Date(year, m, 0).getDate();
+      params.from = `${month}-01`;
+      params.to = `${month}-${String(lastDay).padStart(2, "0")}`;
     }
-  };
-
-  const loadEntries = async () => {
-    setLoading(true);
-    try {
-      const params = {
-        clientId: selectedClientId || undefined,
-        platform: platformFilter !== "all" ? platformFilter : undefined,
-        posted: postedFilter !== "all" ? postedFilter : undefined,
-      };
-      if (month) {
-        const [year, m] = month.split("-").map(Number);
-        const lastDay = new Date(year, m, 0).getDate();
-        params.from = `${month}-01`;
-        params.to = `${month}-${String(lastDay).padStart(2, "0")}`;
-      }
-      const response = await fetchContentCalendarEntries(params);
-      setEntries(response.data || []);
-    } catch (error) {
-      console.error("Error fetching content calendar entries:", error);
-      setEntries([]);
-    } finally {
-      setLoading(false);
-    }
+    dispatch(fetchContentCalendarEntries(params));
   };
 
   const filteredEntries = useMemo(() => {
@@ -177,11 +160,11 @@ export default function ContentCalendarShell({ clients: initialClients }) {
       posted: draft.posted,
     };
 
-    const response = await createContentCalendarEntry(payload);
+    const response = await dispatch(createContentCalendarEntry(payload)).unwrap();
     const entryId = response.data.id;
 
     if (draft.stagedFiles.length > 0) {
-      await uploadCreatives(entryId, draft.stagedFiles);
+      await dispatch(uploadCreatives({ entryId, files: draft.stagedFiles })).unwrap();
     }
   };
 
@@ -196,7 +179,7 @@ export default function ContentCalendarShell({ clients: initialClients }) {
       setDraftRows((prev) => prev.filter((d) => d.tempId !== tempId));
       loadEntries();
     } catch (error) {
-      setDraftErrors((prev) => ({ ...prev, [tempId]: error.message || "Failed to save." }));
+      setDraftErrors((prev) => ({ ...prev, [tempId]: error?.message || error || "Failed to save." }));
     } finally {
       setSavingDraftId(null);
     }
@@ -210,7 +193,7 @@ export default function ContentCalendarShell({ clients: initialClients }) {
         await persistDraft(draft);
       } catch (error) {
         failed.push(draft.tempId);
-        setDraftErrors((prev) => ({ ...prev, [draft.tempId]: error.message || "Failed to save." }));
+        setDraftErrors((prev) => ({ ...prev, [draft.tempId]: error?.message || error || "Failed to save." }));
       }
     }
     setDraftRows((prev) => prev.filter((d) => failed.includes(d.tempId)));
@@ -267,10 +250,10 @@ export default function ContentCalendarShell({ clients: initialClients }) {
   const handleEditRemoveExistingCreative = async (fileId) => {
     if (!confirm("Remove this creative?")) return;
     try {
-      await deleteCreative(editingId, fileId);
+      await dispatch(deleteCreative({ entryId: editingId, fileId })).unwrap();
       setEditExistingCreatives((prev) => prev.filter((c) => c.fileId !== fileId));
     } catch (error) {
-      alert(error.message || "Failed to remove creative.");
+      alert(error?.message || error || "Failed to remove creative.");
     }
   };
 
@@ -282,25 +265,30 @@ export default function ContentCalendarShell({ clients: initialClients }) {
     setSavingEdit(true);
     setEditError("");
     try {
-      await updateContentCalendarEntry(editingId, {
-        date: editValues.date,
-        holiday: editValues.holiday.trim(),
-        postTitle: editValues.postTitle.trim(),
-        content: editValues.content.trim(),
-        caption: editValues.caption.trim(),
-        hashtags: editValues.hashtags.trim(),
-        platforms: editValues.platforms,
-        posted: editValues.posted,
-      });
+      await dispatch(
+        updateContentCalendarEntry({
+          id: editingId,
+          data: {
+            date: editValues.date,
+            holiday: editValues.holiday.trim(),
+            postTitle: editValues.postTitle.trim(),
+            content: editValues.content.trim(),
+            caption: editValues.caption.trim(),
+            hashtags: editValues.hashtags.trim(),
+            platforms: editValues.platforms,
+            posted: editValues.posted,
+          },
+        })
+      ).unwrap();
 
       if (editStagedFiles.length > 0) {
-        await uploadCreatives(editingId, editStagedFiles);
+        await dispatch(uploadCreatives({ entryId: editingId, files: editStagedFiles })).unwrap();
       }
 
       handleCancelEdit();
       loadEntries();
     } catch (error) {
-      setEditError(error.message || "Failed to save changes.");
+      setEditError(error?.message || error || "Failed to save changes.");
     } finally {
       setSavingEdit(false);
     }
@@ -310,8 +298,7 @@ export default function ContentCalendarShell({ clients: initialClients }) {
   const handleDelete = async (entry) => {
     if (!confirm(`Delete the content calendar entry "${entry.postTitle || entry.date}"? This cannot be undone.`)) return;
     try {
-      await deleteContentCalendarEntry(entry.id);
-      setEntries((prev) => prev.filter((e) => e.id !== entry.id));
+      await dispatch(deleteContentCalendarEntry(entry.id)).unwrap();
     } catch (error) {
       console.error("Error deleting entry:", error);
       alert("Failed to delete entry.");
@@ -320,12 +307,12 @@ export default function ContentCalendarShell({ clients: initialClients }) {
 
   const handleTogglePosted = async (entry) => {
     const nextPosted = !entry.posted;
-    setEntries((prev) => prev.map((e) => (e.id === entry.id ? { ...e, posted: nextPosted } : e)));
+    dispatch(setEntryPostedLocal({ id: entry.id, posted: nextPosted }));
     try {
-      await updateContentCalendarEntry(entry.id, { posted: nextPosted });
+      await dispatch(updateContentCalendarEntry({ id: entry.id, data: { posted: nextPosted } })).unwrap();
     } catch (error) {
       console.error("Error updating posted status:", error);
-      setEntries((prev) => prev.map((e) => (e.id === entry.id ? { ...e, posted: entry.posted } : e)));
+      dispatch(setEntryPostedLocal({ id: entry.id, posted: entry.posted }));
       alert("Failed to update posted status.");
     }
   };

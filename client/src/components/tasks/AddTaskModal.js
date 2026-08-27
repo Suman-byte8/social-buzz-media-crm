@@ -1,13 +1,15 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { createTask, updateTask } from "@/services/taskService";
-import { fetchClients } from "@/services/clientService";
-import { fetchTeamMembers } from "@/services/teamService";
+import { useDispatch, useSelector } from "react-redux";
+import { createTask, updateTask } from "@/redux/slices/tasksSlice";
+import { fetchClients } from "@/redux/slices/clientsSlice";
+import { fetchTeamMembers } from "@/redux/slices/teamSlice";
 
-export default function AddTaskModal({ isOpen, onClose, onSuccess, clients: preFetchedClients, teamMembers: preFetchedMembers, editTask = null }) {
-  const [clients, setClients] = useState(preFetchedClients || []);
-  const [teamMembers, setTeamMembers] = useState(preFetchedMembers || []);
+export default function AddTaskModal({ isOpen, onClose, onSuccess, editTask = null }) {
+  const dispatch = useDispatch();
+  const { clients } = useSelector((state) => state.clients);
+  const { teamMembers } = useSelector((state) => state.team);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [priority, setPriority] = useState("medium");
@@ -23,32 +25,13 @@ export default function AddTaskModal({ isOpen, onClose, onSuccess, clients: preF
   useEffect(() => {
     if (isOpen) {
       if (!clients || clients.length === 0) {
-        loadClients();
+        dispatch(fetchClients({ limit: 100 }));
       }
       if (!teamMembers || teamMembers.length === 0) {
-        loadTeamMembers();
+        dispatch(fetchTeamMembers());
       }
     }
-  }, [isOpen, clients.length, teamMembers.length]);
-
-  const loadClients = async () => {
-    try {
-      const response = await fetchClients({ limit: 100 });
-      const clientList = response.data || response || [];
-      setClients(clientList);
-    } catch (error) {
-      console.error("Error fetching clients:", error);
-    }
-  };
-
-  const loadTeamMembers = async () => {
-    try {
-      const members = await fetchTeamMembers();
-      setTeamMembers(members || []);
-    } catch (error) {
-      console.error("Error fetching team members:", error);
-    }
-  };
+  }, [isOpen, clients.length, teamMembers.length, dispatch]);
 
   useEffect(() => {
     if (isEditMode && editTask) {
@@ -92,9 +75,9 @@ export default function AddTaskModal({ isOpen, onClose, onSuccess, clients: preF
       };
 
       if (isEditMode && editTask) {
-        await updateTask(editTask.id, taskData);
+        await dispatch(updateTask({ id: editTask.id, taskData })).unwrap();
       } else {
-        await createTask(taskData);
+        await dispatch(createTask(taskData)).unwrap();
       }
 
       setSuccess("Task saved successfully!");
@@ -103,7 +86,7 @@ export default function AddTaskModal({ isOpen, onClose, onSuccess, clients: preF
         onSuccess();
       }
     } catch (error) {
-      setError(error.message || "Failed to save task.");
+      setError((typeof error === "string" ? error : error?.message) || "Failed to save task.");
     } finally {
       setIsSubmitting(false);
     }
