@@ -35,6 +35,23 @@ export const deleteDocument = async (id) => {
   return response;
 };
 
+// ── Proposals ────────────────────────────────────────────────────────────
+
+export const fetchProposals = async (clientId) => {
+  const params = new URLSearchParams({ documentType: "proposal" });
+  if (clientId) params.append("clientId", clientId);
+  const response = await apiClient(`/documents?${params.toString()}`);
+  return response;
+};
+
+export const uploadProposal = async (formData) => {
+  const response = await apiClient("/documents/upload", {
+    method: "POST",
+    body: formData,
+  });
+  return response;
+};
+
 // ── Agreements ───────────────────────────────────────────────────────────
 
 export const fetchAgreements = async (clientId) => {

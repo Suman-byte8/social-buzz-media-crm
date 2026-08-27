@@ -1,4 +1,59 @@
-import React from "react";
+"use client";
+
+import React, { useState } from "react";
+
+function CredentialField({ label, value, isPassword }) {
+  const [visible, setVisible] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(value || "");
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      // clipboard access denied; nothing to fall back to
+    }
+  };
+
+  return (
+    <div>
+      <label className="block font-label-sm text-label-sm text-on-surface-variant mb-2">{label}</label>
+      <div className="flex items-center gap-2 rounded-2xl border border-outline-variant bg-surface-container-lowest p-3">
+        <input
+          className="w-full bg-transparent border-none text-body-md text-on-surface focus:outline-none"
+          readOnly
+          type={isPassword && !visible ? "password" : "text"}
+          value={value || "N/A"}
+        />
+        <div className="flex items-center gap-1 shrink-0">
+          {isPassword && (
+            <button
+              type="button"
+              onClick={() => setVisible((v) => !v)}
+              className="rounded-full p-2 text-secondary hover:text-primary transition-colors"
+              title={visible ? "Hide" : "Show"}
+            >
+              <span className="material-symbols-outlined text-[18px]">
+                {visible ? "visibility_off" : "visibility"}
+              </span>
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={handleCopy}
+            className="rounded-full p-2 text-secondary hover:text-primary transition-colors"
+            title="Copy"
+          >
+            <span className="material-symbols-outlined text-[18px]">
+              {copied ? "check" : "content_copy"}
+            </span>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function Credentials({ client }) {
   const clientName = client?.name || "Client";
@@ -55,30 +110,9 @@ export default function Credentials({ client }) {
                   </span>
                 </div>
                 <div className="space-y-5">
-                  <div>
-                    <label className="block font-label-sm text-label-sm text-on-surface-variant mb-2">Username / Email</label>
-                    <div className="flex items-center gap-2 rounded-2xl border border-outline-variant bg-surface-container-lowest p-3">
-                      <input className="w-full bg-transparent border-none text-body-md text-on-surface focus:outline-none" readOnly type="text" defaultValue={googleAdsCred.username || googleAdsCred.email || "N/A"} />
-                      <button className="rounded-full p-2 text-secondary hover:text-primary transition-colors">
-                        <span className="material-symbols-outlined text-[18px]">content_copy</span>
-                      </button>
-                    </div>
-                  </div>
+                  <CredentialField label="Username / Email" value={googleAdsCred.username || googleAdsCred.email} />
                   {googleAdsCred.password && (
-                    <div>
-                      <label className="block font-label-sm text-label-sm text-on-surface-variant mb-2">Password</label>
-                      <div className="flex items-center gap-2 rounded-2xl border border-outline-variant bg-surface-container-lowest p-3">
-                        <input className="w-full bg-transparent border-none text-body-md text-on-surface focus:outline-none" readOnly type="password" defaultValue={googleAdsCred.password} />
-                        <div className="flex items-center gap-2">
-                          <button className="rounded-full p-2 text-secondary hover:text-primary transition-colors">
-                            <span className="material-symbols-outlined text-[18px]">visibility</span>
-                          </button>
-                          <button className="rounded-full p-2 text-secondary hover:text-primary transition-colors">
-                            <span className="material-symbols-outlined text-[18px]">content_copy</span>
-                          </button>
-                        </div>
-                      </div>
-                    </div>
+                    <CredentialField label="Password" value={googleAdsCred.password} isPassword />
                   )}
                 </div>
               </article>
@@ -105,30 +139,9 @@ export default function Credentials({ client }) {
                   </span>
                 </div>
                 <div className="space-y-5">
-                  <div>
-                    <label className="block font-label-sm text-label-sm text-on-surface-variant mb-2">Username / Email</label>
-                    <div className="flex items-center gap-2 rounded-2xl border border-outline-variant bg-surface-container-lowest p-3">
-                      <input className="w-full bg-transparent border-none text-body-md text-on-surface focus:outline-none" readOnly type="text" defaultValue={metaBusinessCred.username || metaBusinessCred.email || "N/A"} />
-                      <button className="rounded-full p-2 text-secondary hover:text-primary transition-colors">
-                        <span className="material-symbols-outlined text-[18px]">content_copy</span>
-                      </button>
-                    </div>
-                  </div>
+                  <CredentialField label="Username / Email" value={metaBusinessCred.username || metaBusinessCred.email} />
                   {metaBusinessCred.password && (
-                    <div>
-                      <label className="block font-label-sm text-label-sm text-on-surface-variant mb-2">Password</label>
-                      <div className="flex items-center gap-2 rounded-2xl border border-outline-variant bg-surface-container-lowest p-3">
-                        <input className="w-full bg-transparent border-none text-body-md text-on-surface focus:outline-none" readOnly type="password" defaultValue={metaBusinessCred.password} />
-                        <div className="flex items-center gap-2">
-                          <button className="rounded-full p-2 text-secondary hover:text-primary transition-colors">
-                            <span className="material-symbols-outlined text-[18px]">visibility</span>
-                          </button>
-                          <button className="rounded-full p-2 text-secondary hover:text-primary transition-colors">
-                            <span className="material-symbols-outlined text-[18px]">content_copy</span>
-                          </button>
-                        </div>
-                      </div>
-                    </div>
+                    <CredentialField label="Password" value={metaBusinessCred.password} isPassword />
                   )}
                 </div>
               </article>

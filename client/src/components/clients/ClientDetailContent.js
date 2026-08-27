@@ -147,7 +147,7 @@ export default function ClientDetailContent({ activeTab, setActiveTab, client = 
 
       {/* Dynamic Tab Content */}
       {activeTab === "proposal" ? (
-        <ProposalTab client={client} />
+        <ProposalTab client={client} clientId={clientId} />
       ) : activeTab === "credentials" ? (
         <Credentials client={client} credentials={credentials} />
       ) : activeTab === "google_ads" ? (

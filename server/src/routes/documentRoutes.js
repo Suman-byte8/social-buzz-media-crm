@@ -144,6 +144,7 @@ router.post("/documents/upload", upload.single("file"), async (req, res) => {
         const subfolderName = documentType === "invoice" ? "Invoices" :
                               documentType === "report" ? "Reports" :
                               documentType === "content_calendar" ? "Content Calendar" :
+                              documentType === "proposal" ? "Proposals" :
                               "Other";
         const subfolder = await getOrCreateClientSubfolder(clientFolder.folderId, subfolderName);
         folderId = subfolder.folderId;
@@ -189,11 +190,14 @@ router.post("/documents/upload", upload.single("file"), async (req, res) => {
 router.get("/documents", async (req, res) => {
   try {
     const { Document } = req.app.locals.models;
-    const { clientId } = req.query;
+    const { clientId, documentType } = req.query;
 
     const where = {};
     if (clientId) {
       where.clientId = parseInt(clientId);
+    }
+    if (documentType) {
+      where.documentType = documentType;
     }
 
     const documents = await Document.findAll({

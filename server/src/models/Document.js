@@ -18,7 +18,7 @@ const documentModel = (sequelize) => {
       description: { type: DataTypes.TEXT, allowNull: true },
       // Agreement-specific fields
       documentType: {
-        type: DataTypes.ENUM("agreement", "invoice", "report", "content_calendar", "other"),
+        type: DataTypes.ENUM("agreement", "proposal", "invoice", "report", "content_calendar", "other"),
         allowNull: true,
         defaultValue: "other",
       },

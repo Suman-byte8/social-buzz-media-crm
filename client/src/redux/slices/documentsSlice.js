@@ -3,6 +3,8 @@ import {
   fetchDocumentsByClient as fetchDocumentsByClientApi,
   uploadDocument as uploadDocumentApi,
   deleteDocument as deleteDocumentApi,
+  fetchProposals as fetchProposalsApi,
+  uploadProposal as uploadProposalApi,
   fetchAgreements as fetchAgreementsApi,
   uploadAgreement as uploadAgreementApi,
   updateAgreement as updateAgreementApi,
@@ -41,6 +43,42 @@ export const deleteDocument = createAsyncThunk(
       return id;
     } catch (error) {
       return rejectWithValue(error.message || "Failed to delete document");
+    }
+  }
+);
+
+// ── Proposals ────────────────────────────────────────────────────────────
+
+export const fetchProposals = createAsyncThunk(
+  "documents/fetchProposals",
+  async (clientId, { rejectWithValue }) => {
+    try {
+      return await fetchProposalsApi(clientId);
+    } catch (error) {
+      return rejectWithValue(error.message || "Failed to fetch proposals");
+    }
+  }
+);
+
+export const uploadProposal = createAsyncThunk(
+  "documents/uploadProposal",
+  async (formData, { rejectWithValue }) => {
+    try {
+      return await uploadProposalApi(formData);
+    } catch (error) {
+      return rejectWithValue(error.message || "Failed to upload proposal");
+    }
+  }
+);
+
+export const deleteProposal = createAsyncThunk(
+  "documents/deleteProposal",
+  async (id, { rejectWithValue }) => {
+    try {
+      await deleteDocumentApi(id);
+      return id;
+    } catch (error) {
+      return rejectWithValue(error.message || "Failed to delete proposal");
     }
   }
 );
@@ -94,8 +132,10 @@ export const deleteAgreement = createAsyncThunk(
 
 const initialState = {
   documents: [],
+  proposals: [],
   agreements: [],
   loading: false,
+  loadingProposals: false,
   loadingAgreements: false,
   error: null,
   successMessage: null,
@@ -138,6 +178,33 @@ const documentsSlice = createSlice({
       })
       .addCase(deleteDocument.rejected, (state, action) => {
         state.error = action.payload || "Failed to delete document";
+      })
+      .addCase(fetchProposals.pending, (state) => {
+        state.loadingProposals = true;
+        state.error = null;
+      })
+      .addCase(fetchProposals.fulfilled, (state, action) => {
+        state.loadingProposals = false;
+        state.proposals = action.payload.data || [];
+      })
+      .addCase(fetchProposals.rejected, (state, action) => {
+        state.loadingProposals = false;
+        state.error = action.payload || "Failed to fetch proposals";
+      })
+      .addCase(uploadProposal.fulfilled, (state, action) => {
+        const doc = action.payload?.data || action.payload;
+        if (doc) state.proposals.push(doc);
+        state.successMessage = "Proposal uploaded successfully";
+      })
+      .addCase(uploadProposal.rejected, (state, action) => {
+        state.error = action.payload || "Failed to upload proposal";
+      })
+      .addCase(deleteProposal.fulfilled, (state, action) => {
+        state.proposals = state.proposals.filter((p) => p.id !== action.payload);
+        state.successMessage = "Proposal deleted successfully";
+      })
+      .addCase(deleteProposal.rejected, (state, action) => {
+        state.error = action.payload || "Failed to delete proposal";
       })
       .addCase(fetchAgreements.pending, (state) => {
         state.loadingAgreements = true;
