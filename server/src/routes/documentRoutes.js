@@ -376,7 +376,7 @@ router.get("/documents/:id/stream", async (req, res) => {
 });
 
 // Agreement-specific routes
-router.get("/agreements", async (req, res) => {
+router.get("/agreements", requireAdminForAgreements, async (req, res) => {
   try {
     const { Document } = req.app.locals.models;
     const { clientId, status } = req.query;
@@ -400,7 +400,7 @@ router.get("/agreements", async (req, res) => {
   }
 });
 
-router.get("/agreements/:id", async (req, res) => {
+router.get("/agreements/:id", requireAdminForAgreements, async (req, res) => {
   try {
     const { Document } = req.app.locals.models;
     const agreement = await Document.findOne({
@@ -421,7 +421,7 @@ router.get("/agreements/:id", async (req, res) => {
   }
 });
 
-router.put("/agreements/:id", async (req, res) => {
+router.put("/agreements/:id", requireAdminForAgreements, async (req, res) => {
   try {
     const { Document } = req.app.locals.models;
     const { issuedDate, expiryDate, status, description } = req.body;
@@ -452,7 +452,7 @@ router.put("/agreements/:id", async (req, res) => {
   }
 });
 
-router.delete("/agreements/:id", async (req, res) => {
+router.delete("/agreements/:id", requireAdminForAgreements, async (req, res) => {
   try {
     const { Document } = req.app.locals.models;
     const agreement = await Document.findOne({
