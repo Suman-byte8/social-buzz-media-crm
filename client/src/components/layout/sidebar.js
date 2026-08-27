@@ -14,6 +14,7 @@ const navItems = [
   { label: "Invoices", href: "/invoices", icon: "receipt_long" },
   { label: "Agreements", href: "/agreements", icon: "description" },
   { label: "Meeting Notes", href: "/notes", icon: "event_note" },
+  { label: "Miscellaneous", href: "/miscellaneous", icon: "widgets" },
   { label: "Reports", href: "/reports", icon: "bar_chart" },
   { label: "Settings", href: "/settings", icon: "settings", mtAuto: true },
 ];

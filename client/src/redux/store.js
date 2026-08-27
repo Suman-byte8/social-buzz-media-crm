@@ -6,6 +6,7 @@ import teamReducer from './slices/teamSlice';
 import documentsReducer from './slices/documentsSlice';
 import contentCalendarReducer from './slices/contentCalendarSlice';
 import meetingNotesReducer from './slices/meetingNotesSlice';
+import miscTasksReducer from './slices/miscTasksSlice';
 
 export const store = configureStore({
   reducer: {
@@ -16,6 +17,7 @@ export const store = configureStore({
     documents: documentsReducer,
     contentCalendar: contentCalendarReducer,
     meetingNotes: meetingNotesReducer,
+    miscTasks: miscTasksReducer,
   },
   devTools: process.env.NODE_ENV !== 'production',
 });

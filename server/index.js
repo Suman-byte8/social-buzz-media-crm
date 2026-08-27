@@ -110,6 +110,7 @@ import documentRoutes from "./src/routes/documentRoutes.js";
 import taskRoutes from "./src/routes/taskRoutes.js";
 import meetingNoteRoutes from "./src/routes/meetingNoteRoutes.js";
 import contentCalendarRoutes from "./src/routes/contentCalendarRoutes.js";
+import miscTaskRoutes from "./src/routes/miscTaskRoutes.js";
 import authRoutes from "./src/routes/authRoutes.js";
 app.use("/api", clientRoutes);
 app.use("/api", teamRoutes);
@@ -118,6 +119,7 @@ app.use("/api", documentRoutes);
 app.use("/api", taskRoutes);
 app.use("/api", meetingNoteRoutes);
 app.use("/api", contentCalendarRoutes);
+app.use("/api", miscTaskRoutes);
 // Auth routes define /login + /logout, so mount under /api/auth to match the
 // client's call to `/api/auth/login`.
 app.use("/api/auth", authRoutes);
