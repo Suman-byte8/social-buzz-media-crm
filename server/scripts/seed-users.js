@@ -48,8 +48,8 @@ async function main() {
 
   await ensureUser("admin", {
     name: process.env.SEED_ADMIN_NAME || "Admin",
-    email: process.env.SEED_ADMIN_EMAIL || "admin@socialbuzzmedia.com",
-    password: process.env.SEED_ADMIN_PASSWORD || "ChangeMe123!",
+    email: process.env.SEED_ADMIN_EMAIL || "hellosocialbuzzmedia@gmail.com",
+    password: process.env.SEED_ADMIN_PASSWORD || "XrXkgyR|9?mwN,6+",
   });
 
   await ensureUser("team_member", {

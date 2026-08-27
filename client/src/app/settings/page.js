@@ -3,13 +3,12 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { fetchSettings, saveSettings, uploadLogo, clearMessages } from '@/redux/slices/settingsSlice';
-import { useAuth } from '@/app/login/context/AuthContext';
 import LoginAccessCard from '@/components/settings/LoginAccessCard';
+import RequireAdmin from '@/components/auth/RequireAdmin';
 
 export default function SettingsPage() {
   const dispatch = useDispatch();
   const fileInputRef = useRef(null);
-  const { isAdmin } = useAuth();
 
   const { data: settingsData, loading, uploadingLogo, error, successMessage } = useSelector(
     (state) => state.settings
@@ -113,6 +112,7 @@ export default function SettingsPage() {
   const logoSrc = getFormattedImageUrl(formData.logo);
 
   return (
+    <RequireAdmin>
     <main className="flex-1 overflow-y-auto p-4 md:p-8">
       <div className="max-w-4xl mx-auto space-y-8 pb-12">
         {/* Toast Banners */}
@@ -349,8 +349,9 @@ export default function SettingsPage() {
           </form>
         </section>
 
-        {isAdmin && <LoginAccessCard />}
+        <LoginAccessCard />
       </div>
     </main>
+    </RequireAdmin>
   );
 }

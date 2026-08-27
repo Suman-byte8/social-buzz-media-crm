@@ -2,6 +2,8 @@ import express from "express";
 import multer from "multer";
 import { uploadFileToDrive, getFileStreamFromDrive } from "../utils/googleDrive.js";
 import { encryptPassword, decryptPassword, comparePassword } from "../utils/password.js";
+import { encryptText } from "../utils/encryption.js";
+import { requireAdmin } from "../middleware/auth.js";
 
 const router = express.Router();
 
@@ -41,10 +43,11 @@ const handleGetSettings = async (req, res) => {
   try {
     const { AgencySetting } = req.app.locals.models;
     const settings = await getOrCreateSettings(AgencySetting);
-    
+
     const settingsJson = settings.toJSON();
-    // Decrypt stored password so frontend receives plain text password
-    settingsJson.password = decryptPassword(settings.password);
+    // The email/password fields double as the admin's login credentials
+    // (see handleUpdateSettings), so only the admin gets to see the password.
+    settingsJson.password = req.user?.role === "admin" ? decryptPassword(settings.password) : "";
 
     res.json({ success: true, data: settingsJson });
   } catch (error) {
@@ -57,14 +60,15 @@ const handleGetSettings = async (req, res) => {
   }
 };
 
-router.get("/settings", handleGetSettings);
-router.get("/settings/general", handleGetSettings);
+router.get("/settings", requireAdmin, handleGetSettings);
+router.get("/settings/general", requireAdmin, handleGetSettings);
 
 // POST or PUT /api/settings or /api/settings/general - Save/Update agency settings with ENCRYPTED password
 const handleUpdateSettings = async (req, res) => {
   try {
-    const { AgencySetting } = req.app.locals.models;
+    const { AgencySetting, User } = req.app.locals.models;
     const settings = await getOrCreateSettings(AgencySetting);
+    const isAdmin = req.user?.role === "admin";
 
     const {
       logo,
@@ -77,15 +81,18 @@ const handleUpdateSettings = async (req, res) => {
       password,
     } = req.body;
 
+    // Email/password here double as the admin's login credentials, so only
+    // the admin may change them — anyone else editing Settings must not be
+    // able to hijack or lock out the admin account through this form.
     let updatedPassword = settings.password;
-    if (password !== undefined && password !== null) {
+    if (isAdmin && password !== undefined && password !== null) {
       updatedPassword = encryptPassword(password);
     }
 
     const updateData = {
       logo: logo !== undefined ? logo : settings.logo,
       name: name !== undefined ? name : settings.name,
-      email: email !== undefined ? email : settings.email,
+      email: isAdmin && email !== undefined ? email : settings.email,
       website: website !== undefined ? website : settings.website,
       address: address !== undefined ? address : settings.address,
       gstNumber: (gstNumber || gst_number) !== undefined ? (gstNumber || gst_number) : settings.gstNumber,
@@ -94,8 +101,20 @@ const handleUpdateSettings = async (req, res) => {
 
     await settings.update(updateData);
 
+    if (isAdmin && (email !== undefined || password !== undefined)) {
+      const adminUser = await User.findOne({ where: { role: "admin" } });
+      if (adminUser) {
+        const adminUpdate = {};
+        if (email !== undefined && email) adminUpdate.email = String(email).trim().toLowerCase();
+        if (password !== undefined && password) adminUpdate.password = encryptText(password);
+        if (Object.keys(adminUpdate).length > 0) {
+          await adminUser.update(adminUpdate);
+        }
+      }
+    }
+
     const responseJson = settings.toJSON();
-    responseJson.password = decryptPassword(settings.password);
+    responseJson.password = isAdmin ? decryptPassword(settings.password) : "";
 
     res.json({
       success: true,
@@ -112,13 +131,13 @@ const handleUpdateSettings = async (req, res) => {
   }
 };
 
-router.post("/settings", handleUpdateSettings);
-router.post("/settings/general", handleUpdateSettings);
-router.put("/settings", handleUpdateSettings);
-router.put("/settings/general", handleUpdateSettings);
+router.post("/settings", requireAdmin, handleUpdateSettings);
+router.post("/settings/general", requireAdmin, handleUpdateSettings);
+router.put("/settings", requireAdmin, handleUpdateSettings);
+router.put("/settings/general", requireAdmin, handleUpdateSettings);
 
 // POST /api/settings/verify-password - Verify password matching
-router.post("/settings/verify-password", async (req, res) => {
+router.post("/settings/verify-password", requireAdmin, async (req, res) => {
   try {
     const { AgencySetting } = req.app.locals.models;
     const settings = await getOrCreateSettings(AgencySetting);
@@ -194,31 +213,7 @@ const handleLogoUpload = async (req, res) => {
   }
 };
 
-router.post("/settings/upload-logo", upload.single("logo"), handleLogoUpload);
-router.post("/settings/upload-logo/file", upload.single("file"), handleLogoUpload);
-
-// Debug endpoint - check raw DB password vs decrypted
-router.get("/settings/debug-password", async (req, res) => {
-  try {
-    const { AgencySetting } = req.app.locals.models;
-    const settings = await AgencySetting.findOne();
-    if (!settings) {
-      return res.json({ success: true, message: "No settings found" });
-    }
-    
-    const rawPassword = settings.password;
-    const { decryptPassword } = await import("../utils/password.js");
-    const decrypted = decryptPassword(rawPassword);
-    
-    res.json({
-      success: true,
-      rawPassword: rawPassword,
-      decryptedPassword: decrypted,
-      isEncrypted: rawPassword && rawPassword.startsWith("enc:")
-    });
-  } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
+router.post("/settings/upload-logo", requireAdmin, upload.single("logo"), handleLogoUpload);
+router.post("/settings/upload-logo/file", requireAdmin, upload.single("file"), handleLogoUpload);
 
 export default router;

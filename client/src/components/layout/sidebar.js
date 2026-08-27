@@ -16,7 +16,7 @@ const navItems = [
   { label: "Meeting Notes", href: "/notes", icon: "event_note" },
   { label: "Miscellaneous", href: "/miscellaneous", icon: "widgets" },
   { label: "Reports", href: "/reports", icon: "bar_chart" },
-  { label: "Settings", href: "/settings", icon: "settings", mtAuto: true },
+  { label: "Settings", href: "/settings", icon: "settings", mtAuto: true, adminOnly: true },
 ];
 
 export default function Sidebar() {
