@@ -1,22 +1,22 @@
 import React from "react";
-import StatusBadge from "@/components/ui/StatusBadge";
 import Card from "@/components/ui/Card";
 
 export default function Overview({ client }) {
   const clientName = client?.name || "Client Details";
-  const clientIndustry = client?.industry || "Industry";
   const clientHealth = client?.clientHealth || 0;
   const healthLabel = clientHealth >= 80 ? "Excellent" : clientHealth >= 50 ? "Fair" : "At Risk";
-  const healthColor = clientHealth >= 80 ? "green" : clientHealth >= 50 ? "amber" : "red";
-  const services = Array.isArray(client?.servicesSelected) ? client.servicesSelected : 
+  const services = Array.isArray(client?.servicesSelected) ? client.servicesSelected :
     (client?.servicesSelected ? client.servicesSelected.split(",") : []);
-  const mrr = client?.monthlyRetainer ? `$${client.monthlyRetainer.toLocaleString()}` : "N/A";
+
+  const daysUntilRenewal = client?.renewal
+    ? Math.ceil((new Date(client.renewal) - new Date()) / (1000 * 60 * 60 * 24))
+    : null;
 
   const metrics = [
-    { id: 1, title: "Monthly Retainer", value: mrr, change: "Based on current contract" },
-    { id: 2, title: "Active Services", value: services.length, change: services.length > 0 ? `${services.length} service${services.length > 1 ? 's' : ''} active` : "No active services" },
-    { id: 3, title: "Client Health", value: `${clientHealth}%`, change: `${healthLabel} health score` },
-    { id: 4, title: "Client Since", value: client?.createdAt ? new Date(client.createdAt).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : "N/A", change: "" },
+    { id: 1, title: "Active Services", value: services.length, change: services.length > 0 ? `${services.length} service${services.length > 1 ? 's' : ''} active` : "No active services" },
+    { id: 2, title: "Client Health", value: `${clientHealth}%`, change: `${healthLabel} health score` },
+    { id: 3, title: "Client Since", value: client?.createdAt ? new Date(client.createdAt).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : "N/A", change: "" },
+    { id: 4, title: "Next Renewal", value: client?.renewal ? new Date(client.renewal).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : "Not set", change: daysUntilRenewal !== null ? (daysUntilRenewal >= 0 ? `${daysUntilRenewal} days away` : "Overdue") : "" },
   ];
 
   const recentActivities = client?.notes ? [
@@ -26,9 +26,10 @@ export default function Overview({ client }) {
   ];
 
   const keyContacts = [
-    { role: "Primary Contact", name: client?.contactPerson || clientName },
+    { role: "Client Name", name: clientName },
     { role: "Email", name: client?.email || "N/A" },
     { role: "Phone", name: client?.phoneNumber || "N/A" },
+    { role: "WhatsApp", name: client?.whatsappNumber || "N/A" },
   ];
 
   return (
@@ -38,18 +39,8 @@ export default function Overview({ client }) {
           <div>
             <h1 className="font-display-lg text-display-lg text-on-surface">Client Overview</h1>
             <p className="font-body-md text-body-md text-on-surface-variant mt-2">
-              High-level client summary, account health, recent activity, and campaign status.
+              High-level client summary, account health, and recent activity.
             </p>
-          </div>
-          <div className="flex flex-wrap gap-3">
-            <button className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-on-primary font-label-md text-label-md shadow-sm hover:bg-primary/90 transition-colors">
-              <span className="material-symbols-outlined text-[18px]">insights</span>
-              View Insights
-            </button>
-            <button className="inline-flex items-center gap-2 rounded-xl border border-outline-variant bg-surface px-4 py-2 text-on-surface font-label-md text-label-md hover:border-primary hover:text-primary transition-colors">
-              <span className="material-symbols-outlined text-[18px]">share</span>
-              Share Report
-            </button>
           </div>
         </section>
 
@@ -73,7 +64,6 @@ export default function Overview({ client }) {
           <Card className="lg:col-span-2 rounded-3xl border border-outline-variant bg-white p-6 shadow-sm">
             <div className="flex items-center justify-between mb-6">
               <h2 className="font-title-lg text-title-lg text-on-surface">Recent Activity</h2>
-              <button className="text-primary font-label-sm hover:underline">View All</button>
             </div>
             <div className="space-y-4">
               {recentActivities.map((activity) => (
