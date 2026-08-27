@@ -9,7 +9,7 @@ import {
   deleteContentCalendarEntry,
   uploadCreatives,
   deleteCreative,
-  setEntryPostedLocal,
+  setEntryStatusLocal,
 } from "@/redux/slices/contentCalendarSlice";
 import ContentCalendarTable from "@/components/content-calendar/ContentCalendarTable";
 import ContentCalendarPrintView from "@/components/content-calendar/ContentCalendarPrintView";
@@ -28,7 +28,7 @@ const blankDraft = (clientId) => ({
   caption: "",
   hashtags: "",
   platforms: [],
-  posted: false,
+  status: "pending",
   stagedFiles: [],
 });
 
@@ -118,7 +118,7 @@ export default function ContentCalendarTab({ clientId, client }) {
       caption: draft.caption.trim(),
       hashtags: draft.hashtags.trim(),
       platforms: draft.platforms,
-      posted: draft.posted,
+      status: draft.status,
     };
 
     const response = await dispatch(createContentCalendarEntry(payload)).unwrap();
@@ -174,7 +174,7 @@ export default function ContentCalendarTab({ clientId, client }) {
       caption: entry.caption || "",
       hashtags: entry.hashtags || "",
       platforms: entry.platforms || [],
-      posted: !!entry.posted,
+      status: entry.status || "pending",
     });
     setEditExistingCreatives(entry.creatives || []);
     setEditStagedFiles([]);
@@ -237,7 +237,7 @@ export default function ContentCalendarTab({ clientId, client }) {
             caption: editValues.caption.trim(),
             hashtags: editValues.hashtags.trim(),
             platforms: editValues.platforms,
-            posted: editValues.posted,
+            status: editValues.status,
           },
         })
       ).unwrap();
@@ -266,15 +266,15 @@ export default function ContentCalendarTab({ clientId, client }) {
     }
   };
 
-  const handleTogglePosted = async (entry) => {
-    const nextPosted = !entry.posted;
-    dispatch(setEntryPostedLocal({ id: entry.id, posted: nextPosted }));
+  const handleStatusChange = async (entry, nextStatus) => {
+    const previousStatus = entry.status;
+    dispatch(setEntryStatusLocal({ id: entry.id, status: nextStatus }));
     try {
-      await dispatch(updateContentCalendarEntry({ id: entry.id, data: { posted: nextPosted } })).unwrap();
+      await dispatch(updateContentCalendarEntry({ id: entry.id, data: { status: nextStatus } })).unwrap();
     } catch (error) {
-      console.error("Error updating posted status:", error);
-      dispatch(setEntryPostedLocal({ id: entry.id, posted: entry.posted }));
-      alert("Failed to update posted status.");
+      console.error("Error updating status:", error);
+      dispatch(setEntryStatusLocal({ id: entry.id, status: previousStatus }));
+      alert("Failed to update status.");
     }
   };
 
@@ -378,7 +378,7 @@ export default function ContentCalendarTab({ clientId, client }) {
           showClientColumn={false}
           onEdit={handleStartEdit}
           onDelete={handleDelete}
-          onTogglePosted={handleTogglePosted}
+          onStatusChange={handleStatusChange}
           onShare={handleShare}
           draftRows={draftRows}
           draftClientName={clientName}

@@ -24,6 +24,7 @@ const upload = multer({
 });
 
 const CREATIVES_SUBFOLDER = "Content Calendar Creatives";
+const STATUS_VALUES = ["pending", "scheduled", "posted"];
 
 const parseJsonArray = (val) => {
   if (!val) return [];
@@ -46,11 +47,11 @@ const formatEntry = (data) => ({
 router.get("/content-calendar", async (req, res) => {
   try {
     const { ContentCalendarEntry, Client } = req.app.locals.models;
-    const { clientId, from, to, posted, platform } = req.query;
+    const { clientId, from, to, status, platform } = req.query;
 
     const where = {};
     if (clientId && clientId !== "all") where.clientId = parseInt(clientId);
-    if (posted === "true" || posted === "false") where.posted = posted === "true";
+    if (status && STATUS_VALUES.includes(status)) where.status = status;
     if (from || to) {
       where.date = {};
       if (from) where.date[Op.gte] = from;
@@ -102,11 +103,13 @@ router.get("/content-calendar/:id", async (req, res) => {
 router.post("/content-calendar", async (req, res) => {
   try {
     const { ContentCalendarEntry } = req.app.locals.models;
-    const { clientId, date, holiday, postTitle, content, caption, hashtags, platforms, posted } = req.body;
+    const { clientId, date, holiday, postTitle, content, caption, hashtags, platforms, status } = req.body;
 
     if (!clientId || !date) {
       return res.status(400).json({ success: false, message: "clientId and date are required" });
     }
+
+    const resolvedStatus = STATUS_VALUES.includes(status) ? status : "pending";
 
     const entry = await ContentCalendarEntry.create({
       clientId: parseInt(clientId),
@@ -117,8 +120,8 @@ router.post("/content-calendar", async (req, res) => {
       caption: caption || null,
       hashtags: hashtags || null,
       platforms: Array.isArray(platforms) && platforms.length > 0 ? JSON.stringify(platforms) : null,
-      posted: !!posted,
-      postedAt: posted ? new Date() : null,
+      status: resolvedStatus,
+      postedAt: resolvedStatus === "posted" ? new Date() : null,
     });
 
     res.status(201).json({ success: true, message: "Content calendar entry created", data: formatEntry(entry.toJSON()) });
@@ -137,7 +140,7 @@ router.put("/content-calendar/:id", async (req, res) => {
       return res.status(404).json({ success: false, message: "Content calendar entry not found" });
     }
 
-    const { clientId, date, holiday, postTitle, content, caption, hashtags, platforms, posted } = req.body;
+    const { clientId, date, holiday, postTitle, content, caption, hashtags, platforms, status } = req.body;
 
     const updateData = {
       clientId: clientId !== undefined ? parseInt(clientId) : entry.clientId,
@@ -152,10 +155,10 @@ router.put("/content-calendar/:id", async (req, res) => {
         : entry.platforms,
     };
 
-    if (posted !== undefined) {
-      updateData.posted = !!posted;
-      if (posted && !entry.posted) updateData.postedAt = new Date();
-      if (!posted) updateData.postedAt = null;
+    if (status !== undefined && STATUS_VALUES.includes(status)) {
+      updateData.status = status;
+      if (status === "posted" && entry.status !== "posted") updateData.postedAt = new Date();
+      if (status !== "posted") updateData.postedAt = null;
     }
 
     await entry.update(updateData);

@@ -69,7 +69,7 @@ export default function DashboardShell() {
       const d = new Date(e.date);
       return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
     });
-    const postedThisMonth = thisMonthEntries.filter((e) => e.posted).length;
+    const postedThisMonth = thisMonthEntries.filter((e) => e.status === "posted").length;
     const pendingThisMonth = thisMonthEntries.length - postedThisMonth;
 
     const in30Days = new Date(now);

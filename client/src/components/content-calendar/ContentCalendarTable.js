@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { getPlatformMeta, formatDateDisplay, getWeekDay } from "./constants";
+import { getPlatformMeta, getStatusMeta, STATUS_OPTIONS, formatDateDisplay, getWeekDay } from "./constants";
 import ContentCalendarRowEditor from "./ContentCalendarRowEditor";
 
 export default function ContentCalendarTable({
@@ -11,7 +11,7 @@ export default function ContentCalendarTable({
   clients = [],
   onEdit,
   onDelete,
-  onTogglePosted,
+  onStatusChange,
   onShare,
 
   // Draft (new, unsaved) rows rendered inline at the top of the table.
@@ -105,7 +105,7 @@ export default function ContentCalendarTable({
               Creatives
             </th>
             <th className="py-1.5 px-2 font-label-sm text-[10px] text-gray-700 uppercase tracking-wider whitespace-nowrap">
-              Posted
+              Status
             </th>
             <th className="py-1.5 px-2 font-label-sm text-[10px] text-gray-700 uppercase tracking-wider text-right whitespace-nowrap">
               Actions
@@ -303,20 +303,16 @@ export default function ContentCalendarTable({
                     : "—"}
                 </td>
                 <td className="py-4 px-2 whitespace-nowrap align-top">
-                  <button
-                    onClick={() => onTogglePosted(entry)}
-                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-medium border transition-colors ${
-                      entry.posted
-                        ? "bg-green-50 text-green-700 border-green-200 hover:bg-green-100"
-                        : "bg-gray-100 text-gray-600 border-gray-200 hover:bg-gray-200"
-                    }`}
-                    title="Click to toggle posted status"
+                  <select
+                    value={entry.status || "pending"}
+                    onChange={(e) => onStatusChange(entry, e.target.value)}
+                    className={`px-2 py-0.5 rounded-full font-medium border transition-colors outline-none cursor-pointer ${getStatusMeta(entry.status).className}`}
+                    title="Change status"
                   >
-                    <span className="material-symbols-outlined text-[12px]">
-                      {entry.posted ? "check_circle" : "schedule"}
-                    </span>
-                    {entry.posted ? "Posted" : "Pending"}
-                  </button>
+                    {STATUS_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
                 </td>
                 <td className="py-4 px-2 text-right whitespace-nowrap align-top">
                   <div className="flex items-center justify-end gap-0.5">

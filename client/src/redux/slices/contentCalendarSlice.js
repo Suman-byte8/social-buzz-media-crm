@@ -91,10 +91,10 @@ const contentCalendarSlice = createSlice({
       state.error = null;
       state.successMessage = null;
     },
-    setEntryPostedLocal: (state, action) => {
-      const { id, posted } = action.payload;
+    setEntryStatusLocal: (state, action) => {
+      const { id, status } = action.payload;
       const entry = state.entries.find((e) => e.id === id);
-      if (entry) entry.posted = posted;
+      if (entry) entry.status = status;
     },
   },
   extraReducers: (builder) => {
@@ -151,5 +151,5 @@ const contentCalendarSlice = createSlice({
   },
 });
 
-export const { clearMessages, setEntryPostedLocal } = contentCalendarSlice.actions;
+export const { clearMessages, setEntryStatusLocal } = contentCalendarSlice.actions;
 export default contentCalendarSlice.reducer;

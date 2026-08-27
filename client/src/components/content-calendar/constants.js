@@ -36,6 +36,15 @@ export const PLATFORM_OPTIONS = [
   },
 ];
 
+export const STATUS_OPTIONS = [
+  { value: "pending", label: "Pending", className: "bg-amber-50 text-amber-700 border-amber-200", dotColor: "bg-amber-500" },
+  { value: "scheduled", label: "Scheduled", className: "bg-blue-50 text-blue-700 border-blue-200", dotColor: "bg-blue-500" },
+  { value: "posted", label: "Posted", className: "bg-green-50 text-green-700 border-green-200", dotColor: "bg-green-500" },
+];
+
+export const getStatusMeta = (value) =>
+  STATUS_OPTIONS.find((s) => s.value === value) || STATUS_OPTIONS[0];
+
 export const getPlatformMeta = (value) =>
   PLATFORM_OPTIONS.find((p) => p.value === value) || { value, label: value, icon: "public", logo: null, className: "text-gray-700 bg-gray-100 border-gray-200" };
 
