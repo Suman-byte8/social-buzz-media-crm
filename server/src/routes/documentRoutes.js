@@ -31,7 +31,9 @@ const mediaUpload = multer({
   },
 });
 
-// Agreements are admin-only (hidden from team members).
+// Agreements and Proposals are admin-only (hidden from team members).
+const ADMIN_ONLY_DOCUMENT_TYPES = ["agreement", "proposal"];
+
 const requireAdminForAgreements = (req, res, next) => {
   if (req.user?.role !== "admin") {
     return res.status(403).json({ success: false, message: "Admin access required" });
@@ -150,7 +152,7 @@ router.post("/documents/upload", upload.single("file"), async (req, res) => {
   try {
     const { clientId, description, documentType } = req.body;
 
-    if (documentType === "agreement" && req.user?.role !== "admin") {
+    if (ADMIN_ONLY_DOCUMENT_TYPES.includes(documentType) && req.user?.role !== "admin") {
       return res.status(403).json({ success: false, message: "Admin access required" });
     }
 
@@ -291,7 +293,9 @@ router.get("/documents", async (req, res) => {
     });
 
     const visibleDocuments =
-      req.user?.role === "admin" ? documents : documents.filter((d) => d.documentType !== "agreement");
+      req.user?.role === "admin"
+        ? documents
+        : documents.filter((d) => !ADMIN_ONLY_DOCUMENT_TYPES.includes(d.documentType));
 
     res.json({ success: true, data: visibleDocuments });
   } catch (error) {
@@ -311,7 +315,7 @@ router.get("/documents/:id", async (req, res) => {
     if (!document) {
       return res.status(404).json({ success: false, message: "Document not found" });
     }
-    if (document.documentType === "agreement" && req.user?.role !== "admin") {
+    if (ADMIN_ONLY_DOCUMENT_TYPES.includes(document.documentType) && req.user?.role !== "admin") {
       return res.status(403).json({ success: false, message: "Admin access required" });
     }
 
@@ -333,7 +337,7 @@ router.delete("/documents/:id", async (req, res) => {
     if (!document) {
       return res.status(404).json({ success: false, message: "Document not found" });
     }
-    if (document.documentType === "agreement" && req.user?.role !== "admin") {
+    if (ADMIN_ONLY_DOCUMENT_TYPES.includes(document.documentType) && req.user?.role !== "admin") {
       return res.status(403).json({ success: false, message: "Admin access required" });
     }
 

@@ -22,7 +22,7 @@ import { useAuth } from "@/app/login/context/AuthContext";
 
 const tabs = [
   { id: "overview", label: "Overview", icon: "grid_view" },
-  { id: "proposal", label: "Proposal", icon: "description" },
+  { id: "proposal", label: "Proposal", icon: "description", adminOnly: true },
   { id: "credentials", label: "Credentials", icon: "key" },
   { id: "brand_kit", label: "Brand Kit", icon: "palette" },
   { id: "google_ads", label: "Google Ads", icon: "ads_click" },
@@ -159,7 +159,7 @@ export default function ClientDetailContent({ activeTab, setActiveTab, client = 
       </div>
 
       {/* Dynamic Tab Content */}
-      {activeTab === "proposal" ? (
+      {activeTab === "proposal" && isAdmin ? (
         <ProposalTab client={client} clientId={clientId} />
       ) : activeTab === "credentials" ? (
         <Credentials client={client} clientId={clientId} />
