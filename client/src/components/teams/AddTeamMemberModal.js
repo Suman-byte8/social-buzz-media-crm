@@ -1,8 +1,9 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { useDispatch } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 import { createTeamMember } from "@/redux/slices/teamSlice";
+import { fetchClients } from "@/redux/slices/clientsSlice";
 
 const DEPARTMENTS = [
   "Social Media",
@@ -17,6 +18,7 @@ const STATUSES = ["active", "inactive", "null"];
 
 export default function AddTeamMemberModal({ isOpen, onClose, onSuccess }) {
   const dispatch = useDispatch();
+  const allClients = useSelector((state) => state.clients.clients);
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -45,7 +47,7 @@ export default function AddTeamMemberModal({ isOpen, onClose, onSuccess }) {
   });
 
   const [newWorkInput, setNewWorkInput] = useState("");
-  const [newClientInput, setNewClientInput] = useState("");
+  const [clientsOpen, setClientsOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
   const [avatarError, setAvatarError] = useState("");
@@ -53,11 +55,12 @@ export default function AddTeamMemberModal({ isOpen, onClose, onSuccess }) {
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = "hidden";
+      dispatch(fetchClients({ limit: 100 }));
     }
     return () => {
       document.body.style.overflow = "";
     };
-  }, [isOpen]);
+  }, [isOpen, dispatch]);
 
   if (!isOpen) return null;
 
@@ -138,24 +141,13 @@ export default function AddTeamMemberModal({ isOpen, onClose, onSuccess }) {
     }));
   };
 
-  // Add individual Client item
-  const handleAddClientItem = () => {
-    const trimmed = newClientInput.trim();
-    if (!trimmed) return;
-    if (!formData.clientHandling.includes(trimmed)) {
-      setFormData((prev) => ({
-        ...prev,
-        clientHandling: [...prev.clientHandling, trimmed],
-      }));
-    }
-    setNewClientInput("");
-  };
-
-  // Remove individual Client item
-  const handleRemoveClientItem = (indexToRemove) => {
+  // Toggle a client (by name) in/out of Clients Handling
+  const toggleClientItem = (clientName) => {
     setFormData((prev) => ({
       ...prev,
-      clientHandling: prev.clientHandling.filter((_, idx) => idx !== indexToRemove),
+      clientHandling: prev.clientHandling.includes(clientName)
+        ? prev.clientHandling.filter((name) => name !== clientName)
+        : [...prev.clientHandling, clientName],
     }));
   };
 
@@ -648,7 +640,7 @@ export default function AddTeamMemberModal({ isOpen, onClose, onSuccess }) {
             </div>
 
             {/* Individual Clients Handling */}
-            <div>
+            <div className="relative">
               <label className="block font-label-sm text-label-sm text-secondary mb-1">
                 Clients Handling
               </label>
@@ -662,7 +654,7 @@ export default function AddTeamMemberModal({ isOpen, onClose, onSuccess }) {
                       <span>{client}</span>
                       <button
                         type="button"
-                        onClick={() => handleRemoveClientItem(idx)}
+                        onClick={() => toggleClientItem(client)}
                         className="hover:bg-blue-200 p-0.5 rounded-full text-blue-700 transition-colors"
                         title="Remove client"
                       >
@@ -678,28 +670,50 @@ export default function AddTeamMemberModal({ isOpen, onClose, onSuccess }) {
                   </span>
                 )}
               </div>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={newClientInput}
-                  onChange={(e) => setNewClientInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      handleAddClientItem();
-                    }
-                  }}
-                  className="flex-1 px-4 py-2 border border-[#E5E5E7] rounded-lg focus:ring-1 focus:ring-primary focus:border-primary bg-white text-sm"
-                  placeholder="Type client name and press Add"
-                />
-                <button
-                  type="button"
-                  onClick={handleAddClientItem}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg font-label-md text-label-md hover:bg-blue-700 transition-colors shrink-0"
-                >
-                  Add Client
-                </button>
-              </div>
+
+              <button
+                type="button"
+                onClick={() => setClientsOpen((prev) => !prev)}
+                className="w-full px-4 py-2 border border-[#E5E5E7] rounded-lg bg-white text-left text-sm flex items-center justify-between gap-2 focus:ring-1 focus:ring-primary focus:border-primary"
+              >
+                <span className="text-secondary">Select clients to add…</span>
+                <span className="material-symbols-outlined text-[20px] text-secondary shrink-0">
+                  {clientsOpen ? "expand_less" : "expand_more"}
+                </span>
+              </button>
+
+              {clientsOpen && (
+                <>
+                  <div className="fixed inset-0 z-10" onClick={() => setClientsOpen(false)} />
+                  <div className="absolute z-20 mt-1 w-full bg-white border border-[#E5E5E7] rounded-lg shadow-lg max-h-56 overflow-y-auto">
+                    {allClients.length === 0 ? (
+                      <p className="px-4 py-3 text-xs text-gray-400 italic">No clients found</p>
+                    ) : (
+                      allClients.map((c) => {
+                        const isSelected = formData.clientHandling.includes(c.name);
+                        return (
+                          <div
+                            key={c.id}
+                            onClick={() => toggleClientItem(c.name)}
+                            className={`flex items-center gap-2 px-4 py-2 cursor-pointer transition-colors ${
+                              isSelected ? "bg-blue-50" : "hover:bg-gray-50"
+                            }`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={() => toggleClientItem(c.name)}
+                              onClick={(e) => e.stopPropagation()}
+                              className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                            />
+                            <span className="text-sm text-on-surface">{c.name}</span>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </>
+              )}
             </div>
           </div>
 
