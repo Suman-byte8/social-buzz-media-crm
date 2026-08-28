@@ -315,10 +315,34 @@ router.put('/clients/:id', async (req, res) => {
 // DELETE /api/clients/:id - Delete client
 router.delete('/clients/:id', async (req, res) => {
   try {
-    const { Client } = req.app.locals.models;
+    const { Client, TeamMember } = req.app.locals.models;
     const client = await Client.findByPk(req.params.id);
     if (!client) {
       return res.status(404).json({ success: false, message: 'Client not found' });
+    }
+
+    // `clientHandling` on TeamMember is a free-typed list of client *names*
+    // with no FK to Client — the team profile page falls back to displaying
+    // it verbatim when a member has no clients formally assigned via
+    // clientManagedBy, so a deleted client's name would otherwise keep
+    // showing there forever. Strip it from every member's list here, the
+    // same way task titles get cleaned out of assignedWorks when a task is
+    // removed.
+    const membersWithHandling = await TeamMember.findAll({
+      where: { clientHandling: { [Op.ne]: null } },
+    });
+    for (const member of membersWithHandling) {
+      let names = [];
+      try {
+        names = JSON.parse(member.clientHandling);
+      } catch {
+        names = [];
+      }
+      if (!Array.isArray(names)) continue;
+      const filtered = names.filter((name) => String(name).toLowerCase() !== client.name.toLowerCase());
+      if (filtered.length !== names.length) {
+        await member.update({ clientHandling: filtered.length > 0 ? JSON.stringify(filtered) : null });
+      }
     }
 
     await client.destroy();
