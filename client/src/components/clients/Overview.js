@@ -15,7 +15,7 @@ export default function Overview({ client }) {
   const metrics = [
     { id: 1, title: "Active Services", value: services.length, change: services.length > 0 ? `${services.length} service${services.length > 1 ? 's' : ''} active` : "No active services" },
     { id: 2, title: "Client Health", value: `${clientHealth}%`, change: `${healthLabel} health score` },
-    { id: 3, title: "Client Since", value: client?.createdAt ? new Date(client.createdAt).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : "N/A", change: "" },
+    { id: 3, title: "Client Since", value: (client?.clientSince || client?.createdAt) ? new Date(client.clientSince || client.createdAt).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : "N/A", change: "" },
     { id: 4, title: "Next Renewal", value: client?.renewal ? new Date(client.renewal).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : "Not set", change: daysUntilRenewal !== null ? (daysUntilRenewal >= 0 ? `${daysUntilRenewal} days away` : "Overdue") : "" },
   ];
 
@@ -30,6 +30,7 @@ export default function Overview({ client }) {
     { role: "Email", name: client?.email || "N/A" },
     { role: "Phone", name: client?.phoneNumber || "N/A" },
     { role: "WhatsApp", name: client?.whatsappNumber || "N/A" },
+    { role: "Website", name: client?.website || "N/A" },
   ];
 
   return (

@@ -13,6 +13,7 @@
     "db:sync": "node scripts/sync-db.js",
     "db:add-indexes": "node scripts/add-indexes.js",
     "migrate:task-assignees": "node scripts/migrate-task-assignees.js",
+    "migrate:client-columns": "node scripts/add-client-columns.js",
     "seed:users": "node scripts/seed-users.js"
   },
   "dependencies": {

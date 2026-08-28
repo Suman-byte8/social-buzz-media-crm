@@ -86,6 +86,7 @@ const prepareClientData = (body) => ({
   whatsappNumber: body.whatsappNumber,
   address: body.address,
   email: body.email,
+  website: body.website,
   servicesSelected: toArrayString(body.servicesSelected),
   clientManagedBy: body.clientManagedBy,
   clientHealth: body.clientHealth,
@@ -100,6 +101,7 @@ const prepareClientData = (body) => ({
   notes: body.notes,
   renewal: body.renewal ? new Date(body.renewal) : null,
   contentCalendar: toArrayString(body.contentCalendar),
+  clientSince: body.clientSince || null,
 });
 
 // POST /api/clients - Create a new client
