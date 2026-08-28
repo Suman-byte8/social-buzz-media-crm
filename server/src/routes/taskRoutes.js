@@ -177,14 +177,18 @@ router.get("/tasks", async (req, res) => {
 
     const { count, rows } = await Task.findAndCountAll({
       where,
+      include: [{ model: Client, as: "client", attributes: ["id", "name"] }],
       order: [["createdAt", "DESC"]],
       limit: parseInt(limit),
       offset: parseInt(offset),
     });
 
     const taskList = rows.map((t) => t.toJSON());
-    const taskIds = taskList.map((t) => t.id);
 
+    // `assignees` has no real foreign key (it's a JSON-serialized array of
+    // ids in a TEXT column — see the LIKE-based filter above), so this side
+    // still needs a manual lookup; only the client relation is a real
+    // association and can go through `include`.
     const teamMembers = await TeamMember.findAll({
       where: { id: { [Op.in]: taskList.flatMap((t) => {
         const assignees = t.assignees ? JSON.parse(t.assignees) : [];
@@ -192,24 +196,19 @@ router.get("/tasks", async (req, res) => {
       }).filter(Boolean) } },
       attributes: ["id", "name"],
     });
-
-    const clientIds = taskList.map((t) => t.clientId).filter(Boolean);
-    const clients = await Client.findAll({
-      where: { id: { [Op.in]: clientIds } },
-      attributes: ["id", "name"],
-    });
+    const teamMemberById = new Map(teamMembers.map((m) => [m.id, m]));
 
     const enrichedTasks = taskList.map((t) => {
+      const { client, ...taskFields } = t;
       const parsedAssignees = t.assignees ? JSON.parse(t.assignees) : [];
-      const taskAssignees = teamMembers.filter((m) =>
-        parsedAssignees.map(Number).includes(m.id)
-      );
-      const taskClient = clients.find((c) => c.id === t.clientId);
+      const taskAssignees = parsedAssignees
+        .map((id) => teamMemberById.get(Number(id)))
+        .filter(Boolean);
       return {
-        ...t,
+        ...taskFields,
         assignees: parsedAssignees,
         assigneeDetails: taskAssignees,
-        clientName: taskClient ? taskClient.name : null,
+        clientName: client ? client.name : null,
       };
     });
 

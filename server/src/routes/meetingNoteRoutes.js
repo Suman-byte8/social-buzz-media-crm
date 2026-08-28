@@ -71,7 +71,11 @@ router.get("/meeting-notes", async (req, res) => {
       ];
     }
 
-    const queryOptions = { where, order: [["meetingDate", "DESC"]] };
+    const queryOptions = {
+      where,
+      include: [{ model: Client, as: "client", attributes: ["id", "name"] }],
+      order: [["meetingDate", "DESC"]],
+    };
 
     let meetingNotes;
     let pagination;
@@ -93,16 +97,10 @@ router.get("/meeting-notes", async (req, res) => {
       meetingNotes = await MeetingNote.findAll(queryOptions);
     }
 
-    const clientIds = meetingNotes.map((n) => n.clientId).filter(Boolean);
-    const clients = await Client.findAll({
-      where: { id: { [Op.in]: clientIds } },
-      attributes: ["id", "name"],
-    });
-
     const enrichedNotes = meetingNotes.map((note) => {
-      const client = clients.find((c) => c.id === note.clientId);
+      const { client, ...noteFields } = note.toJSON();
       return {
-        ...note.toJSON(),
+        ...noteFields,
         clientName: client ? client.name : null,
       };
     });
@@ -121,26 +119,17 @@ router.get("/meeting-notes", async (req, res) => {
 router.get("/meeting-notes/:id", async (req, res) => {
   try {
     const { MeetingNote, Client } = req.app.locals.models;
-    const meetingNote = await MeetingNote.findByPk(req.params.id);
+    const meetingNote = await MeetingNote.findByPk(req.params.id, {
+      include: [{ model: Client, as: "client", attributes: ["id", "name"] }],
+    });
 
     if (!meetingNote) {
       return res.status(404).json({ success: false, message: "Meeting note not found" });
     }
 
-    const noteData = meetingNote.toJSON();
-    let client = null;
-    if (noteData.clientId) {
-      client = await Client.findByPk(noteData.clientId, {
-        attributes: ["id", "name"],
-      });
-    }
-
     res.json({
       success: true,
-      data: {
-        ...noteData,
-        client,
-      },
+      data: meetingNote.toJSON(),
     });
   } catch (error) {
     console.error("Error fetching meeting note:", error);

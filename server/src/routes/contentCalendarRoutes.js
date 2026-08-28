@@ -63,7 +63,11 @@ router.get("/content-calendar", async (req, res) => {
       if (to) where.date[Op.lte] = to;
     }
 
-    const queryOptions = { where, order: [["date", "ASC"]] };
+    const queryOptions = {
+      where,
+      include: [{ model: Client, as: "client", attributes: ["id", "name"] }],
+      order: [["date", "ASC"]],
+    };
 
     let entries;
     let pagination;
@@ -86,15 +90,8 @@ router.get("/content-calendar", async (req, res) => {
       entries = await ContentCalendarEntry.findAll(queryOptions);
     }
 
-    const clientIds = [...new Set(entries.map((e) => e.clientId).filter(Boolean))];
-    const clients = await Client.findAll({
-      where: { id: { [Op.in]: clientIds } },
-      attributes: ["id", "name"],
-    });
-
     let list = entries.map((e) => {
-      const data = formatEntry(e.toJSON());
-      const client = clients.find((c) => c.id === data.clientId);
+      const { client, ...data } = formatEntry(e.toJSON());
       return { ...data, clientName: client ? client.name : null };
     });
 
