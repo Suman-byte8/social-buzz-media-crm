@@ -148,7 +148,7 @@ router.post("/settings/verify-password", requireAdmin, async (req, res) => {
       return res.status(400).json({ success: false, message: "Password is required" });
     }
 
-    const isMatch = comparePassword(password, settings.password);
+    const isMatch = await comparePassword(password, settings.password);
     if (!isMatch) {
       return res.status(401).json({ success: false, isMatch: false, message: "Password does not match" });
     }

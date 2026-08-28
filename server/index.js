@@ -45,7 +45,11 @@ if (process.env.DATABASE_URL) {
     dialect: "postgres",
     logging: isDev ? console.log : false,
     dialectOptions: sslOptions,
-    pool: { max: 10, min: 0, acquire: 30000, idle: 10000 },
+    // min: 1 keeps one connection warm so the first request after an idle
+    // period doesn't pay for establishing a fresh connection (relevant on
+    // managed Postgres with TLS handshake overhead); negligible idle cost
+    // for a single connection.
+    pool: { max: 10, min: 1, acquire: 30000, idle: 10000 },
   });
   console.log(
     `[DB] Using DATABASE_URL (connection string) ssl=${!!sslOptions}`,
@@ -61,7 +65,11 @@ if (process.env.DATABASE_URL) {
       dialect: "postgres",
       logging: isDev ? console.log : false,
       dialectOptions: sslOptions,
-      pool: { max: 10, min: 0, acquire: 30000, idle: 10000 },
+      // min: 1 keeps one connection warm so the first request after an idle
+    // period doesn't pay for establishing a fresh connection (relevant on
+    // managed Postgres with TLS handshake overhead); negligible idle cost
+    // for a single connection.
+    pool: { max: 10, min: 1, acquire: 30000, idle: 10000 },
     },
   );
   console.log(`[DB] Using DB_* env vars (host=${process.env.DB_HOST})`);
