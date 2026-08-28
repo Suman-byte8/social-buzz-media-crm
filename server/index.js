@@ -2,12 +2,14 @@ import express from "express";
 import dotenv from "dotenv";
 import cors from "cors";
 import helmet from "helmet";
+import compression from "compression";
 
 dotenv.config();
 
 const app = express();
 
 app.use(cors());
+app.use(compression());
 // Frontend and API are served from different origins (separate ports in dev,
 // separate domains in prod), so images/files streamed by this API (logo
 // proxy, document downloads) must be embeddable cross-origin. Helmet's
