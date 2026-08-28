@@ -1,6 +1,7 @@
 import express from "express";
 import multer from "multer";
-import { uploadFileToDrive, getFileStreamFromDrive } from "../utils/googleDrive.js";
+import { uploadFileToDrive, getFileBufferFromDrive } from "../utils/googleDrive.js";
+import { getCachedFile, setCachedFile } from "../utils/fileCache.js";
 import { encryptPassword, decryptPassword, comparePassword } from "../utils/password.js";
 import { encryptText } from "../utils/encryption.js";
 import { requireAdmin } from "../middleware/auth.js";
@@ -162,10 +163,17 @@ router.post("/settings/verify-password", requireAdmin, async (req, res) => {
 router.get("/settings/logo-proxy/:fileId", async (req, res) => {
   try {
     const { fileId } = req.params;
-    const fileStream = await getFileStreamFromDrive(fileId);
-    res.setHeader("Content-Type", fileStream.contentType || "image/png");
+
+    let cached = getCachedFile(fileId);
+    if (!cached) {
+      const { buffer, contentType } = await getFileBufferFromDrive(fileId);
+      setCachedFile(fileId, buffer, contentType);
+      cached = { buffer, contentType };
+    }
+
+    res.setHeader("Content-Type", cached.contentType || "image/png");
     res.setHeader("Cache-Control", "public, max-age=86400");
-    fileStream.pipe(res);
+    res.send(cached.buffer);
   } catch (error) {
     console.error("Error proxying Google Drive logo:", error.message);
     res.redirect(`https://drive.google.com/thumbnail?id=${req.params.fileId}&sz=w1000`);

@@ -1,7 +1,8 @@
 import express from "express";
 import multer from "multer";
 import { Op } from "sequelize";
-import { uploadFileToDrive, getFileStreamFromDrive, getOrCreateClientFolder, getOrCreateClientSubfolder } from "../utils/googleDrive.js";
+import { uploadFileToDrive, getFileBufferFromDrive, getOrCreateClientFolder, getOrCreateClientSubfolder } from "../utils/googleDrive.js";
+import { getCachedFile, setCachedFile } from "../utils/fileCache.js";
 
 const router = express.Router();
 
@@ -385,10 +386,16 @@ router.get("/documents/:id/stream", async (req, res) => {
       return res.status(404).json({ success: false, message: "Document not found" });
     }
 
-    const fileStream = await getFileStreamFromDrive(document.fileId);
+    let cached = getCachedFile(document.fileId);
+    if (!cached) {
+      const { buffer, contentType } = await getFileBufferFromDrive(document.fileId);
+      setCachedFile(document.fileId, buffer, contentType);
+      cached = { buffer };
+    }
+
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `inline; filename="${document.fileName}"`);
-    fileStream.pipe(res);
+    res.send(cached.buffer);
   } catch (error) {
     console.error("Error streaming document:", error);
     res.status(500).json({

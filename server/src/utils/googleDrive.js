@@ -122,6 +122,18 @@ export const getFileStreamFromDrive = async (fileId) => {
   return response.data;
 };
 
+// Same as getFileStreamFromDrive, but collects the whole file into a Buffer
+// first. Used by endpoints that cache the result (see utils/fileCache.js) —
+// caching a stream isn't possible since it can only be consumed once.
+export const getFileBufferFromDrive = async (fileId) => {
+  const fileStream = await getFileStreamFromDrive(fileId);
+  const chunks = [];
+  for await (const chunk of fileStream) {
+    chunks.push(chunk);
+  }
+  return { buffer: Buffer.concat(chunks), contentType: fileStream.contentType };
+};
+
 export const createFolderInDrive = async (folderName, parentFolderId = null) => {
   try {
     const drive = getDriveClient();
