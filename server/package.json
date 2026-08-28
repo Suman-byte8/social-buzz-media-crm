@@ -11,6 +11,7 @@
     "dev": "nodemon server.js",
     "start": "node server.js",
     "db:sync": "node scripts/sync-db.js",
+    "db:add-indexes": "node scripts/add-indexes.js",
     "seed:users": "node scripts/seed-users.js"
   },
   "dependencies": {

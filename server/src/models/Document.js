@@ -42,6 +42,11 @@ const documentModel = (sequelize) => {
     },
     {
       tableName: "documents",
+      indexes: [
+        { fields: ["clientId"] },
+        { fields: ["documentType"] },
+        { fields: ["status"] },
+      ],
     }
   );
 

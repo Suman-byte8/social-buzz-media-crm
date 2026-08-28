@@ -44,6 +44,11 @@ const taskModel = (sequelize) => {
     },
     {
       tableName: "tasks",
+      indexes: [
+        { fields: ["clientId"] },
+        { fields: ["status"] },
+        { fields: ["priority"] },
+      ],
     }
   );
 

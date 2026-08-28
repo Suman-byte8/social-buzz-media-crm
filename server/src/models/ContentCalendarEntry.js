@@ -33,6 +33,7 @@ const contentCalendarEntryModel = (sequelize) => {
     },
     {
       tableName: "content_calendar_entries",
+      indexes: [{ fields: ["clientId"] }, { fields: ["status"] }],
     }
   );
 

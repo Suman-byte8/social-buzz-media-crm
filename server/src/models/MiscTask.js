@@ -37,6 +37,11 @@ const miscTaskModel = (sequelize) => {
     },
     {
       tableName: "misc_tasks",
+      indexes: [
+        { fields: ["clientId"] },
+        { fields: ["assignedTo"] },
+        { fields: ["status"] },
+      ],
     }
   );
 

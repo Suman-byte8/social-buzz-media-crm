@@ -40,6 +40,7 @@ const teamMemberModel = (sequelize) => {
     },
     {
       tableName: "team_members",
+      indexes: [{ fields: ["email"] }],
     }
   );
 
