@@ -46,6 +46,20 @@ const INDEXES = [
   { name: "team_members_email", table: "team_members", column: "email" },
 ];
 
+// `ILIKE '%term%'` (leading wildcard) can never use a plain btree index —
+// these columns back free-text search boxes (client search, meeting notes
+// search), so they get a trigram GIN index instead, which pg_trgm can use
+// for substring matches. Requires the pg_trgm extension; most managed
+// Postgres hosts (Neon, Supabase, Render, RDS) allow creating it without
+// superuser. If the host forbids it, we log a warning and move on — the
+// app still works, just without the search speedup.
+const TRIGRAM_INDEXES = [
+  { name: "clients_name_trgm", table: "clients", column: "name" },
+  { name: "clients_email_trgm", table: "clients", column: "email" },
+  { name: "clients_industry_trgm", table: "clients", column: "industry" },
+  { name: "meeting_notes_title_trgm", table: "meeting_notes", column: "title" },
+];
+
 async function main() {
   await sequelize.authenticate();
   console.log("[add-indexes] Connected. Creating missing indexes...");
@@ -56,6 +70,22 @@ async function main() {
       `CREATE INDEX IF NOT EXISTS "${indexName}" ON "${table}" ("${column}");`
     );
     console.log(`[add-indexes] Ensured ${indexName} on ${table}(${column})`);
+  }
+
+  try {
+    await sequelize.query(`CREATE EXTENSION IF NOT EXISTS pg_trgm;`);
+    for (const { name, table, column } of TRIGRAM_INDEXES) {
+      const indexName = `idx_${name}`;
+      await sequelize.query(
+        `CREATE INDEX IF NOT EXISTS "${indexName}" ON "${table}" USING gin ("${column}" gin_trgm_ops);`
+      );
+      console.log(`[add-indexes] Ensured trigram index ${indexName} on ${table}(${column})`);
+    }
+  } catch (err) {
+    console.warn(
+      "[add-indexes] Could not create pg_trgm extension/indexes (may need elevated DB privileges on this host). Free-text search will still work, just without this speedup. Error:",
+      err.message
+    );
   }
 
   console.log("[add-indexes] Done.");
