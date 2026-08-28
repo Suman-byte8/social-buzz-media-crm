@@ -3,20 +3,6 @@ import { Op } from "sequelize";
 
 const router = express.Router();
 
-const formatTask = (data) => ({
-  ...data,
-  assignees: data.assignees ? JSON.parse(data.assignees) : [],
-});
-
-const parseAssignees = (val) => {
-  if (!val) return [];
-  try {
-    return JSON.parse(val);
-  } catch {
-    return Array.isArray(val) ? val : [];
-  }
-};
-
 const syncTeamMemberWorks = async (TeamMember, teamMemberId, taskTitle) => {
   const member = await TeamMember.findByPk(teamMemberId);
   if (!member) return;
@@ -61,7 +47,7 @@ const removeTaskFromTeamMember = async (TeamMember, teamMemberId, taskTitle) => 
 
 router.post("/tasks", async (req, res) => {
   try {
-    const { Task, Client, TeamMember } = req.app.locals.models;
+    const { Task, TeamMember, TaskAssignee } = req.app.locals.models;
     const {
       title,
       description,
@@ -76,12 +62,13 @@ router.post("/tasks", async (req, res) => {
       return res.status(400).json({ success: false, message: "Task title is required" });
     }
 
-    if (assignees && Array.isArray(assignees)) {
+    let validIds = [];
+    if (assignees && Array.isArray(assignees) && assignees.length > 0) {
       const validAssignees = await TeamMember.findAll({
         where: { id: { [Op.in]: assignees } },
         attributes: ["id"],
       });
-      const validIds = validAssignees.map((a) => a.id);
+      validIds = validAssignees.map((a) => a.id);
       if (validIds.length !== assignees.length) {
         return res.status(400).json({ success: false, message: "One or more assignee IDs are invalid" });
       }
@@ -93,14 +80,12 @@ router.post("/tasks", async (req, res) => {
       status: status || "todo",
       priority: priority || "medium",
       clientId: clientId ? parseInt(clientId) : null,
-      assignees: assignees && Array.isArray(assignees) && assignees.length > 0
-        ? JSON.stringify(assignees)
-        : null,
       dueDate: dueDate ? new Date(dueDate) : null,
     });
 
-    if (assignees && Array.isArray(assignees) && assignees.length > 0) {
-      for (const assigneeId of assignees) {
+    if (validIds.length > 0) {
+      await TaskAssignee.bulkCreate(validIds.map((teamMemberId) => ({ taskId: task.id, teamMemberId })));
+      for (const assigneeId of validIds) {
         await syncTeamMemberWorks(TeamMember, assigneeId, title);
       }
     }
@@ -108,7 +93,7 @@ router.post("/tasks", async (req, res) => {
     res.status(201).json({
       success: true,
       message: "Task created successfully",
-      data: formatTask(task.toJSON()),
+      data: { ...task.toJSON(), assignees: validIds },
     });
   } catch (error) {
     console.error("Error creating task:", error);
@@ -122,7 +107,7 @@ router.post("/tasks", async (req, res) => {
 
 router.get("/tasks", async (req, res) => {
   try {
-    const { Task, Client, TeamMember } = req.app.locals.models;
+    const { Task, Client, TeamMember, TaskAssignee } = req.app.locals.models;
     const {
       page = 1,
       limit = 50,
@@ -157,15 +142,13 @@ router.get("/tasks", async (req, res) => {
     }
 
     if (assigneeId && assigneeId !== "all") {
-      const idStr = String(parseInt(assigneeId));
-      where[Op.or] = [
-        { assignees: { [Op.like]: `[${idStr}]` } },
-        { assignees: { [Op.like]: `[${idStr},%` } },
-        { assignees: { [Op.like]: `%,${idStr},%` } },
-        { assignees: { [Op.like]: `%,${idStr}]` } },
-        { assignees: { [Op.like]: `%, ${idStr},%` } },
-        { assignees: { [Op.like]: `%, ${idStr}]` } },
-      ];
+      const links = await TaskAssignee.findAll({
+        where: { teamMemberId: parseInt(assigneeId) },
+        attributes: ["taskId"],
+      });
+      const matchingTaskIds = links.map((l) => l.taskId);
+      // No matches -> a filter no id can satisfy, so the main query returns nothing.
+      where.id = { [Op.in]: matchingTaskIds.length > 0 ? matchingTaskIds : [-1] };
     }
 
     if (month && /^\d{4}-\d{2}$/.test(month)) {
@@ -184,29 +167,31 @@ router.get("/tasks", async (req, res) => {
     });
 
     const taskList = rows.map((t) => t.toJSON());
+    const taskIds = taskList.map((t) => t.id);
 
-    // `assignees` has no real foreign key (it's a JSON-serialized array of
-    // ids in a TEXT column — see the LIKE-based filter above), so this side
-    // still needs a manual lookup; only the client relation is a real
-    // association and can go through `include`.
+    const assigneeLinks = await TaskAssignee.findAll({
+      where: { taskId: { [Op.in]: taskIds.length > 0 ? taskIds : [-1] } },
+    });
+    const memberIds = [...new Set(assigneeLinks.map((l) => l.teamMemberId))];
     const teamMembers = await TeamMember.findAll({
-      where: { id: { [Op.in]: taskList.flatMap((t) => {
-        const assignees = t.assignees ? JSON.parse(t.assignees) : [];
-        return assignees.map((a) => parseInt(a));
-      }).filter(Boolean) } },
+      where: { id: { [Op.in]: memberIds.length > 0 ? memberIds : [-1] } },
       attributes: ["id", "name"],
     });
     const teamMemberById = new Map(teamMembers.map((m) => [m.id, m]));
 
+    const assigneeIdsByTask = new Map();
+    for (const link of assigneeLinks) {
+      if (!assigneeIdsByTask.has(link.taskId)) assigneeIdsByTask.set(link.taskId, []);
+      assigneeIdsByTask.get(link.taskId).push(link.teamMemberId);
+    }
+
     const enrichedTasks = taskList.map((t) => {
       const { client, ...taskFields } = t;
-      const parsedAssignees = t.assignees ? JSON.parse(t.assignees) : [];
-      const taskAssignees = parsedAssignees
-        .map((id) => teamMemberById.get(Number(id)))
-        .filter(Boolean);
+      const assigneeIds = assigneeIdsByTask.get(t.id) || [];
+      const taskAssignees = assigneeIds.map((id) => teamMemberById.get(id)).filter(Boolean);
       return {
         ...taskFields,
-        assignees: parsedAssignees,
+        assignees: assigneeIds,
         assigneeDetails: taskAssignees,
         clientName: client ? client.name : null,
       };
@@ -234,38 +219,34 @@ router.get("/tasks", async (req, res) => {
 
 router.get("/tasks/:id", async (req, res) => {
   try {
-    const { Task, Client, TeamMember } = req.app.locals.models;
-    const task = await Task.findByPk(req.params.id);
+    const { Task, Client, TeamMember, TaskAssignee } = req.app.locals.models;
+    const task = await Task.findByPk(req.params.id, {
+      include: [{ model: Client, as: "client", attributes: ["id", "name", "industry"] }],
+    });
 
     if (!task) {
       return res.status(404).json({ success: false, message: "Task not found" });
     }
 
-    const taskData = task.toJSON();
-    const parsedAssignees = taskData.assignees ? JSON.parse(taskData.assignees) : [];
+    const { client, ...taskFields } = task.toJSON();
 
-    let assigneeDetails = [];
-    if (parsedAssignees.length > 0) {
-      assigneeDetails = await TeamMember.findAll({
-        where: { id: { [Op.in]: parsedAssignees } },
-        attributes: ["id", "name", "designation", "department"],
-      });
-    }
+    const links = await TaskAssignee.findAll({ where: { taskId: task.id }, attributes: ["teamMemberId"] });
+    const memberIds = links.map((l) => l.teamMemberId);
 
-    let client = null;
-    if (taskData.clientId) {
-      client = await Client.findByPk(taskData.clientId, {
-        attributes: ["id", "name", "industry"],
-      });
-    }
+    const assigneeDetails = memberIds.length > 0
+      ? await TeamMember.findAll({
+          where: { id: { [Op.in]: memberIds } },
+          attributes: ["id", "name", "designation", "department"],
+        })
+      : [];
 
     res.json({
       success: true,
       data: {
-        ...taskData,
-        assignees: parsedAssignees,
-        assigneeDetails: assigneeDetails,
-        client: client,
+        ...taskFields,
+        assignees: memberIds,
+        assigneeDetails,
+        client: client || null,
       },
     });
   } catch (error) {
@@ -279,7 +260,7 @@ router.get("/tasks/:id", async (req, res) => {
 
 router.put("/tasks/:id", async (req, res) => {
   try {
-    const { Task, TeamMember } = req.app.locals.models;
+    const { Task, TeamMember, TaskAssignee } = req.app.locals.models;
     const task = await Task.findByPk(req.params.id);
 
     if (!task) {
@@ -288,7 +269,8 @@ router.put("/tasks/:id", async (req, res) => {
 
     const { title, description, status, priority, clientId, assignees, dueDate, completedAt } = req.body;
 
-    const oldAssignees = parseAssignees(task.assignees);
+    const oldLinks = await TaskAssignee.findAll({ where: { taskId: task.id }, attributes: ["teamMemberId"] });
+    const oldAssigneeIds = oldLinks.map((l) => l.teamMemberId);
 
     const updateData = {
       title: title ?? task.title,
@@ -296,9 +278,6 @@ router.put("/tasks/:id", async (req, res) => {
       status: status ?? task.status,
       priority: priority ?? task.priority,
       clientId: clientId !== undefined ? parseInt(clientId) : task.clientId,
-      assignees: assignees !== undefined && Array.isArray(assignees)
-        ? JSON.stringify(assignees)
-        : task.assignees,
       dueDate: dueDate !== undefined ? new Date(dueDate) : task.dueDate,
       completedAt: completedAt !== undefined
         ? new Date(completedAt)
@@ -311,15 +290,23 @@ router.put("/tasks/:id", async (req, res) => {
 
     await task.update(updateData);
 
-    const newAssigneeIds = assignees !== undefined && Array.isArray(assignees) ? assignees : oldAssignees;
+    const assigneesProvided = assignees !== undefined && Array.isArray(assignees);
+    const newAssigneeIds = assigneesProvided ? assignees.map((id) => parseInt(id)) : oldAssigneeIds;
+
+    if (assigneesProvided) {
+      await TaskAssignee.destroy({ where: { taskId: task.id } });
+      if (newAssigneeIds.length > 0) {
+        await TaskAssignee.bulkCreate(newAssigneeIds.map((teamMemberId) => ({ taskId: task.id, teamMemberId })));
+      }
+    }
 
     for (const assigneeId of newAssigneeIds) {
-      if (!oldAssignees.includes(assigneeId)) {
+      if (!oldAssigneeIds.includes(assigneeId)) {
         await syncTeamMemberWorks(TeamMember, assigneeId, task.title);
       }
     }
 
-    for (const oldId of oldAssignees) {
+    for (const oldId of oldAssigneeIds) {
       if (!newAssigneeIds.includes(oldId)) {
         await removeTaskFromTeamMember(TeamMember, oldId, task.title);
       }
@@ -328,7 +315,7 @@ router.put("/tasks/:id", async (req, res) => {
     res.json({
       success: true,
       message: "Task updated successfully",
-      data: formatTask(task.toJSON()),
+      data: { ...task.toJSON(), assignees: newAssigneeIds },
     });
   } catch (error) {
     res.status(500).json({
@@ -341,18 +328,20 @@ router.put("/tasks/:id", async (req, res) => {
 
 router.delete("/tasks/:id", async (req, res) => {
   try {
-    const { Task, TeamMember } = req.app.locals.models;
+    const { Task, TeamMember, TaskAssignee } = req.app.locals.models;
     const task = await Task.findByPk(req.params.id);
 
     if (!task) {
       return res.status(404).json({ success: false, message: "Task not found" });
     }
 
-    const taskAssignees = parseAssignees(task.assignees);
-    for (const assigneeId of taskAssignees) {
-      await removeTaskFromTeamMember(TeamMember, assigneeId, task.title);
+    const links = await TaskAssignee.findAll({ where: { taskId: task.id }, attributes: ["teamMemberId"] });
+    for (const link of links) {
+      await removeTaskFromTeamMember(TeamMember, link.teamMemberId, task.title);
     }
 
+    // task_assignees rows for this task cascade-delete automatically
+    // (ON DELETE CASCADE — see scripts/migrate-task-assignees.js).
     await task.destroy();
     res.json({ success: true, message: "Task deleted successfully" });
   } catch (error) {

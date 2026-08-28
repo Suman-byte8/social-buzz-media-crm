@@ -30,6 +30,10 @@ const taskModel = (sequelize) => {
         },
       },
       clientId: { type: DataTypes.INTEGER, allowNull: true },
+      // Deprecated: superseded by the TaskAssignee join table (see
+      // models/TaskAssignee.js and scripts/migrate-task-assignees.js). No
+      // longer read or written by the app — kept only as a rollback
+      // reference to pre-migration data. Do not use in new code.
       assignees: { type: DataTypes.TEXT, allowNull: true, defaultValue: null },
       dueDate: { type: DataTypes.DATE, allowNull: true },
       completedAt: { type: DataTypes.DATE, allowNull: true },
