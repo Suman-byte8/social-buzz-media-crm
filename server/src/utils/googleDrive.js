@@ -199,8 +199,22 @@ export const findFolderInDrive = async (folderName, parentFolderId = null) => {
   }
 };
 
+// A client's Drive folder (and its subfolders) essentially never change once
+// created, but every upload was re-resolving them via a live `files.list`
+// search — on top of the per-call OAuth token exchange this used to also
+// pay for (see getDriveClient above), a single file upload could involve
+// several sequential Drive round-trips before the actual upload even
+// started. Caching the resolved folder in memory removes that for every
+// upload after the first, for the lifetime of the process. If a folder is
+// deleted out-of-band in Drive, the cache would need a restart to notice —
+// an acceptable tradeoff since that's not something this app does itself.
+const folderCache = new Map();
+const folderCacheKey = (name, parentFolderId) => `${parentFolderId || "root"}::${name}`;
+
 export const getOrCreateClientFolder = async (clientName, clientId) => {
   const folderName = `${clientName} - Documents`;
+  const key = folderCacheKey(folderName, null);
+  if (folderCache.has(key)) return folderCache.get(key);
 
   let folder = await findFolderInDrive(folderName);
 
@@ -208,15 +222,20 @@ export const getOrCreateClientFolder = async (clientName, clientId) => {
     folder = await createFolderInDrive(folderName);
   }
 
+  folderCache.set(key, folder);
   return folder;
 };
 
 export const getOrCreateClientSubfolder = async (parentFolderId, subfolderName) => {
+  const key = folderCacheKey(subfolderName, parentFolderId);
+  if (folderCache.has(key)) return folderCache.get(key);
+
   let folder = await findFolderInDrive(subfolderName, parentFolderId);
 
   if (!folder) {
     folder = await createFolderInDrive(subfolderName, parentFolderId);
   }
 
+  folderCache.set(key, folder);
   return folder;
 };
