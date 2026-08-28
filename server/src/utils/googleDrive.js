@@ -1,7 +1,18 @@
 import { google } from "googleapis";
 import stream from "stream";
 
+// Built once and reused across every call. googleapis' OAuth2Client caches
+// the minted access token (and its expiry) on the client instance itself —
+// rebuilding a fresh OAuth2Client per request (the previous behavior) threw
+// that cache away every time, so *every* Drive operation paid for an extra
+// token-exchange round-trip to Google's OAuth endpoint before doing any
+// actual work. A single long-lived client lets googleapis reuse the token
+// until it's close to expiry, refreshing only when it actually needs to.
+let driveClient = null;
+
 const getDriveClient = () => {
+  if (driveClient) return driveClient;
+
   const clientId = process.env.GOOGLE_DRIVE_CLIENT_ID;
   const clientSecret = process.env.GOOGLE_DRIVE_CLIENT_SECRET;
   const refreshToken = process.env.GOOGLE_DRIVE_REFRESH_TOKEN;
@@ -20,7 +31,8 @@ const getDriveClient = () => {
     refresh_token: refreshToken,
   });
 
-  return google.drive({ version: "v3", auth: oauth2Client });
+  driveClient = google.drive({ version: "v3", auth: oauth2Client });
+  return driveClient;
 };
 
 export const uploadFileToDrive = async (fileBuffer, fileName, mimeType, folderId = null) => {
