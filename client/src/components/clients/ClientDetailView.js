@@ -19,7 +19,16 @@ export default function ClientDetailView({ clientId }) {
     dispatch(fetchClientById(clientId));
   }, [dispatch, clientId]);
 
-  if (loading) {
+  // Only show the full-page spinner for an actual navigation to a new/not-
+  // yet-loaded client. A save inside a tab (edit modal, credentials, brand
+  // kit, etc.) re-dispatches fetchClientById to refresh `client`, which also
+  // flips `loading` briefly — showing the spinner for that would unmount
+  // ClientDetailShell and reset its activeTab state back to "overview" on
+  // every save. Keeping the same client's content mounted during that
+  // background refresh preserves whichever tab the user is on.
+  const isShowingRequestedClient = client && String(client.id) === String(clientId);
+
+  if (loading && !isShowingRequestedClient) {
     return (
       <main className="flex-1 p-container-margin flex items-center justify-center min-h-[60vh]">
         <div className="flex flex-col items-center gap-3">
