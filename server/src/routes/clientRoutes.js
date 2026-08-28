@@ -78,31 +78,61 @@ const toJsonString = (value) => {
   return JSON.stringify(value);
 };
 
-// Helper to prepare data for DB
-const prepareClientData = (body) => ({
-  name: body.name,
-  industry: body.industry,
-  phoneNumber: body.phoneNumber,
-  whatsappNumber: body.whatsappNumber,
-  address: body.address,
-  email: body.email,
-  website: body.website,
-  servicesSelected: toArrayString(body.servicesSelected),
-  clientManagedBy: body.clientManagedBy,
-  clientHealth: body.clientHealth,
-  proposals: toArrayString(body.proposals),
-  credentials: Array.isArray(body.credentials)
-    ? JSON.stringify(encryptCredentials(body.credentials))
-    : toJsonString(body.credentials),
-  campaigns: toArrayString(body.campaigns),
-  socialMediaAccounts: toArrayString(body.socialMediaAccounts),
-  reports: toArrayString(body.reports),
-  invoices: toArrayString(body.invoices),
-  notes: body.notes,
-  renewal: body.renewal ? new Date(body.renewal) : null,
-  contentCalendar: toArrayString(body.contentCalendar),
-  clientSince: body.clientSince || null,
-});
+// Each client field's raw-body-value -> DB-value transform, shared by both
+// create (every field gets a value, defaulting to null when absent — see
+// prepareClientData) and update (only fields the caller actually sent get
+// touched — see prepareClientUpdateData). Keeping one transform table for
+// both avoids the two ever drifting out of sync.
+const CLIENT_FIELD_TRANSFORMS = {
+  name: (v) => v,
+  industry: (v) => v,
+  phoneNumber: (v) => v,
+  whatsappNumber: (v) => v,
+  address: (v) => v,
+  email: (v) => v,
+  website: (v) => v,
+  servicesSelected: (v) => toArrayString(v),
+  clientManagedBy: (v) => v,
+  clientHealth: (v) => v,
+  proposals: (v) => toArrayString(v),
+  credentials: (v) => (Array.isArray(v) ? JSON.stringify(encryptCredentials(v)) : toJsonString(v)),
+  campaigns: (v) => toArrayString(v),
+  socialMediaAccounts: (v) => toArrayString(v),
+  reports: (v) => toArrayString(v),
+  invoices: (v) => toArrayString(v),
+  notes: (v) => v,
+  renewal: (v) => (v ? new Date(v) : null),
+  contentCalendar: (v) => toArrayString(v),
+  clientSince: (v) => v || null,
+};
+
+// Helper to prepare data for a new client — every field gets a value
+// (absent ones become null), which is correct for a brand-new row.
+const prepareClientData = (body) => {
+  const data = {};
+  for (const [field, transform] of Object.entries(CLIENT_FIELD_TRANSFORMS)) {
+    data[field] = transform(body[field]);
+  }
+  return data;
+};
+
+// Helper to prepare an UPDATE payload — only includes fields the caller
+// actually sent (`!== undefined`), leaving every other column untouched.
+// Several tabs (Credentials, Proposal, Social, Reports, Invoices, Content
+// Calendar) each save just their own field via a partial PUT; building the
+// full field set from prepareClientData for an update would silently null
+// out every field the caller didn't include, since Sequelize's `.update()`
+// treats an explicit `undefined` value as "set this column to NULL" rather
+// than "leave it alone".
+const prepareClientUpdateData = (body) => {
+  const data = {};
+  for (const [field, transform] of Object.entries(CLIENT_FIELD_TRANSFORMS)) {
+    if (body[field] !== undefined) {
+      data[field] = transform(body[field]);
+    }
+  }
+  return data;
+};
 
 // POST /api/clients - Create a new client
 router.post('/clients', async (req, res) => {
@@ -302,7 +332,7 @@ router.put('/clients/:id', async (req, res) => {
       return res.status(404).json({ success: false, message: 'Client not found' });
     }
 
-    const updateData = prepareClientData(req.body);
+    const updateData = prepareClientUpdateData(req.body);
     if (req.user?.role !== 'admin') delete updateData.invoices;
     await client.update(updateData);
 
