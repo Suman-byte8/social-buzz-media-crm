@@ -32,12 +32,16 @@ const encryptCredentials = (value) => {
   return value.map((entry) => ({ ...entry, password: entry.password ? encryptText(entry.password) : entry.password }));
 };
 
-// Helper to format array fields
-const formatArrayFields = (data) => ({
+// Helper to format array fields. `includeCredentials` defaults to true for
+// the single-client detail view (where they're actually shown); the list
+// view (which never renders credentials) passes false to skip the AES
+// decrypt work entirely for every row instead of doing it and discarding
+// the result.
+const formatArrayFields = (data, { includeCredentials = true } = {}) => ({
   ...data,
   servicesSelected: data.servicesSelected ? data.servicesSelected.split(',').filter(Boolean) : [],
   proposals: data.proposals ? data.proposals.split(',').filter(Boolean) : [],
-  credentials: decryptCredentials(data.credentials),
+  credentials: includeCredentials ? decryptCredentials(data.credentials) : [],
   campaigns: data.campaigns ? data.campaigns.split(',').filter(Boolean) : [],
   socialMediaAccounts: data.socialMediaAccounts ? data.socialMediaAccounts.split(',').filter(Boolean) : [],
   reports: data.reports ? data.reports.split(',').filter(Boolean) : [],
@@ -159,7 +163,9 @@ router.get('/clients', async (req, res) => {
       offset: parseInt(offset),
     });
 
-    const formattedRows = rows.map((c) => redactForRole(formatArrayFields(c.toJSON()), req.user?.role));
+    const formattedRows = rows.map((c) =>
+      redactForRole(formatArrayFields(c.toJSON(), { includeCredentials: false }), req.user?.role)
+    );
 
     res.json({
       success: true,
