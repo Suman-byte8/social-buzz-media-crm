@@ -131,6 +131,7 @@ router.get("/tasks", async (req, res) => {
       priority,
       clientId,
       assigneeId,
+      month,
     } = req.query;
 
     const offset = (page - 1) * limit;
@@ -165,6 +166,13 @@ router.get("/tasks", async (req, res) => {
         { assignees: { [Op.like]: `%, ${idStr},%` } },
         { assignees: { [Op.like]: `%, ${idStr}]` } },
       ];
+    }
+
+    if (month && /^\d{4}-\d{2}$/.test(month)) {
+      const [year, monthNum] = month.split("-").map(Number);
+      const rangeStart = new Date(Date.UTC(year, monthNum - 1, 1));
+      const rangeEnd = new Date(Date.UTC(year, monthNum, 1));
+      where.dueDate = { [Op.gte]: rangeStart, [Op.lt]: rangeEnd };
     }
 
     const { count, rows } = await Task.findAndCountAll({

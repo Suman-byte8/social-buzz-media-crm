@@ -13,6 +13,8 @@ export default function TasksFilters({
   onClientChange,
   assigneeFilter,
   onAssigneeChange,
+  monthFilter,
+  onMonthChange,
   clients,
   teamMembers,
 }) {
@@ -86,6 +88,25 @@ export default function TasksFilters({
         <span className="material-symbols-outlined absolute right-2 top-1/2 -translate-y-1/2 text-[16px] text-gray-400 pointer-events-none">
           expand_more
         </span>
+      </div>
+
+      <div className="relative flex items-center">
+        <input
+          type="month"
+          value={monthFilter}
+          onChange={(e) => onMonthChange(e.target.value)}
+          className="bg-gray-50 border border-outline-variant text-on-surface rounded-lg pl-3 pr-8 py-2 text-sm focus:ring-1 focus:ring-primary focus:border-primary outline-none"
+        />
+        {monthFilter && (
+          <button
+            type="button"
+            onClick={() => onMonthChange("")}
+            title="Clear month filter"
+            className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 cursor-pointer"
+          >
+            <span className="material-symbols-outlined text-[16px]">close</span>
+          </button>
+        )}
       </div>
     </div>
   );

@@ -25,6 +25,7 @@ export default function TasksPageShell() {
   const [priorityFilter, setPriorityFilter] = useState("all");
   const [clientFilter, setClientFilter] = useState("all");
   const [assigneeFilter, setAssigneeFilter] = useState("all");
+  const [monthFilter, setMonthFilter] = useState("");
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingTask, setEditingTask] = useState(null);
 
@@ -63,8 +64,9 @@ export default function TasksPageShell() {
       priority: priorityFilter !== "all" ? priorityFilter : undefined,
       clientId: clientFilter !== "all" ? clientFilter : undefined,
       assigneeId: assigneeFilter !== "all" ? assigneeFilter : undefined,
+      month: monthFilter || undefined,
     }),
-    [searchTerm, statusFilter, priorityFilter, clientFilter, assigneeFilter]
+    [searchTerm, statusFilter, priorityFilter, clientFilter, assigneeFilter, monthFilter]
   );
 
   // Re-fetch tasks on mount and whenever a filter changes.
@@ -135,6 +137,8 @@ export default function TasksPageShell() {
         onClientChange={setClientFilter}
         assigneeFilter={assigneeFilter}
         onAssigneeChange={setAssigneeFilter}
+        monthFilter={monthFilter}
+        onMonthChange={setMonthFilter}
         clients={clients}
         teamMembers={teamMembers}
       />
