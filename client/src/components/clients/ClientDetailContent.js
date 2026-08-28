@@ -54,6 +54,14 @@ export default function ClientDetailContent({ activeTab, setActiveTab, client = 
   const healthLabel = clientHealth >= 80 ? "Excellent" : clientHealth >= 50 ? "Fair" : "At Risk";
   const healthColor = clientHealth >= 80 ? "green" : clientHealth >= 50 ? "amber" : "red";
 
+  const clientSinceDate = client.clientSince || client.createdAt;
+  const daysAsClient = clientSinceDate
+    ? Math.max(0, Math.floor((new Date() - new Date(clientSinceDate)) / (1000 * 60 * 60 * 24)))
+    : null;
+  const clientSinceLabel = clientSinceDate
+    ? new Date(clientSinceDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+    : null;
+
   const handleEditSuccess = () => {
     setEditModalOpen(false);
     dispatch(fetchClientById(clientId));
@@ -94,6 +102,15 @@ export default function ClientDetailContent({ activeTab, setActiveTab, client = 
                 }`}></span>
                 {healthLabel} Client
               </span>
+              {daysAsClient !== null && (
+                <span
+                  title={`Client since ${clientSinceLabel}`}
+                  className="px-3 py-1 rounded-full font-label-sm text-label-sm flex items-center gap-1.5 bg-blue-50 text-blue-700 border border-blue-200"
+                >
+                  <span className="material-symbols-outlined text-[16px]">event_available</span>
+                  Client since {daysAsClient.toLocaleString()} days
+                </span>
+              )}
             </div>
             <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1">
               <p className="font-body-sm text-body-sm text-secondary flex items-center gap-1.5 m-0">
