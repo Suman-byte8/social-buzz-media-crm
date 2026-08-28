@@ -22,10 +22,12 @@ const upload = multer({
 });
 
 // GET /api/misc-tasks - list, optionally filtered
+// `page`/`limit` are optional — omitting them preserves the historical
+// "return everything" behavior existing callers rely on.
 router.get("/misc-tasks", async (req, res) => {
   try {
     const { MiscTask } = req.app.locals.models;
-    const { clientId, status, assignedTo, typeOfWork } = req.query;
+    const { clientId, status, assignedTo, typeOfWork, page, limit } = req.query;
 
     const where = {};
     if (clientId) where.clientId = parseInt(clientId);
@@ -33,11 +35,28 @@ router.get("/misc-tasks", async (req, res) => {
     if (assignedTo) where.assignedTo = parseInt(assignedTo);
     if (typeOfWork) where.typeOfWork = typeOfWork;
 
-    const miscTasks = await MiscTask.findAll({
-      where,
-      order: [["createdAt", "DESC"]],
-    });
+    const queryOptions = { where, order: [["createdAt", "DESC"]] };
 
+    if (limit) {
+      const parsedLimit = parseInt(limit);
+      const parsedPage = parseInt(page) || 1;
+      queryOptions.limit = parsedLimit;
+      queryOptions.offset = (parsedPage - 1) * parsedLimit;
+
+      const { count, rows } = await MiscTask.findAndCountAll(queryOptions);
+      return res.json({
+        success: true,
+        data: rows,
+        pagination: {
+          total: count,
+          page: parsedPage,
+          limit: parsedLimit,
+          totalPages: Math.ceil(count / parsedLimit),
+        },
+      });
+    }
+
+    const miscTasks = await MiscTask.findAll(queryOptions);
     res.json({ success: true, data: miscTasks });
   } catch (error) {
     res.status(500).json({ success: false, message: "Error fetching miscellaneous tasks", error: error.message });

@@ -1,5 +1,6 @@
 import express from "express";
 import multer from "multer";
+import { Op } from "sequelize";
 import { uploadFileToDrive, getFileStreamFromDrive, getOrCreateClientFolder, getOrCreateClientSubfolder } from "../utils/googleDrive.js";
 
 const router = express.Router();
@@ -274,10 +275,12 @@ router.post("/documents/upload-media", mediaUpload.single("file"), async (req, r
   }
 });
 
+// `page`/`limit` are optional — omitting them preserves the historical
+// "return everything" behavior existing callers rely on.
 router.get("/documents", async (req, res) => {
   try {
     const { Document } = req.app.locals.models;
-    const { clientId, documentType } = req.query;
+    const { clientId, documentType, page, limit } = req.query;
 
     const where = {};
     if (clientId) {
@@ -286,18 +289,39 @@ router.get("/documents", async (req, res) => {
     if (documentType) {
       where.documentType = documentType;
     }
+    // Push the admin-only-type exclusion into the query itself for
+    // non-admins, instead of fetching every row and filtering in JS.
+    if (req.user?.role !== "admin") {
+      where.documentType = documentType
+        ? ADMIN_ONLY_DOCUMENT_TYPES.includes(documentType)
+          ? { [Op.in]: [] } // explicitly requested an admin-only type — matches nothing
+          : documentType
+        : { [Op.or]: [{ [Op.notIn]: ADMIN_ONLY_DOCUMENT_TYPES }, { [Op.is]: null }] };
+    }
 
-    const documents = await Document.findAll({
-      where,
-      order: [["createdAt", "DESC"]],
-    });
+    const queryOptions = { where, order: [["createdAt", "DESC"]] };
 
-    const visibleDocuments =
-      req.user?.role === "admin"
-        ? documents
-        : documents.filter((d) => !ADMIN_ONLY_DOCUMENT_TYPES.includes(d.documentType));
+    if (limit) {
+      const parsedLimit = parseInt(limit);
+      const parsedPage = parseInt(page) || 1;
+      queryOptions.limit = parsedLimit;
+      queryOptions.offset = (parsedPage - 1) * parsedLimit;
 
-    res.json({ success: true, data: visibleDocuments });
+      const { count, rows } = await Document.findAndCountAll(queryOptions);
+      return res.json({
+        success: true,
+        data: rows,
+        pagination: {
+          total: count,
+          page: parsedPage,
+          limit: parsedLimit,
+          totalPages: Math.ceil(count / parsedLimit),
+        },
+      });
+    }
+
+    const documents = await Document.findAll(queryOptions);
+    res.json({ success: true, data: documents });
   } catch (error) {
     res.status(500).json({
       success: false,

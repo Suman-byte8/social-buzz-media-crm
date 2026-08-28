@@ -47,10 +47,12 @@ router.post("/meeting-notes", async (req, res) => {
   }
 });
 
+// `page`/`limit` are optional — omitting them preserves the historical
+// "return everything" behavior existing callers rely on.
 router.get("/meeting-notes", async (req, res) => {
   try {
     const { MeetingNote, Client } = req.app.locals.models;
-    const { clientId, search = "", meetingType } = req.query;
+    const { clientId, search = "", meetingType, page, limit } = req.query;
 
     const where = {};
 
@@ -69,10 +71,27 @@ router.get("/meeting-notes", async (req, res) => {
       ];
     }
 
-    const meetingNotes = await MeetingNote.findAll({
-      where,
-      order: [["meetingDate", "DESC"]],
-    });
+    const queryOptions = { where, order: [["meetingDate", "DESC"]] };
+
+    let meetingNotes;
+    let pagination;
+    if (limit) {
+      const parsedLimit = parseInt(limit);
+      const parsedPage = parseInt(page) || 1;
+      queryOptions.limit = parsedLimit;
+      queryOptions.offset = (parsedPage - 1) * parsedLimit;
+
+      const { count, rows } = await MeetingNote.findAndCountAll(queryOptions);
+      meetingNotes = rows;
+      pagination = {
+        total: count,
+        page: parsedPage,
+        limit: parsedLimit,
+        totalPages: Math.ceil(count / parsedLimit),
+      };
+    } else {
+      meetingNotes = await MeetingNote.findAll(queryOptions);
+    }
 
     const clientIds = meetingNotes.map((n) => n.clientId).filter(Boolean);
     const clients = await Client.findAll({
@@ -88,7 +107,7 @@ router.get("/meeting-notes", async (req, res) => {
       };
     });
 
-    res.json({ success: true, data: enrichedNotes });
+    res.json({ success: true, data: enrichedNotes, ...(pagination ? { pagination } : {}) });
   } catch (error) {
     console.error("Error fetching meeting notes:", error);
     res.status(500).json({

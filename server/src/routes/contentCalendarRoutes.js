@@ -44,10 +44,15 @@ const formatEntry = (data) => ({
 });
 
 // ── List entries ─────────────────────────────────────────────────────────
+// `page`/`limit` are optional — omitting them preserves the historical
+// "return everything" behavior existing callers rely on. Pagination is
+// skipped when `platform` is set, since that filter is applied in JS
+// (platforms are stored as a JSON-serialized array) after the SQL query
+// runs, and paginating before that filter would make `total`/pages wrong.
 router.get("/content-calendar", async (req, res) => {
   try {
     const { ContentCalendarEntry, Client } = req.app.locals.models;
-    const { clientId, from, to, status, platform } = req.query;
+    const { clientId, from, to, status, platform, page, limit } = req.query;
 
     const where = {};
     if (clientId && clientId !== "all") where.clientId = parseInt(clientId);
@@ -58,10 +63,28 @@ router.get("/content-calendar", async (req, res) => {
       if (to) where.date[Op.lte] = to;
     }
 
-    const entries = await ContentCalendarEntry.findAll({
-      where,
-      order: [["date", "ASC"]],
-    });
+    const queryOptions = { where, order: [["date", "ASC"]] };
+
+    let entries;
+    let pagination;
+    const canPaginate = limit && !(platform && platform !== "all");
+    if (canPaginate) {
+      const parsedLimit = parseInt(limit);
+      const parsedPage = parseInt(page) || 1;
+      queryOptions.limit = parsedLimit;
+      queryOptions.offset = (parsedPage - 1) * parsedLimit;
+
+      const { count, rows } = await ContentCalendarEntry.findAndCountAll(queryOptions);
+      entries = rows;
+      pagination = {
+        total: count,
+        page: parsedPage,
+        limit: parsedLimit,
+        totalPages: Math.ceil(count / parsedLimit),
+      };
+    } else {
+      entries = await ContentCalendarEntry.findAll(queryOptions);
+    }
 
     const clientIds = [...new Set(entries.map((e) => e.clientId).filter(Boolean))];
     const clients = await Client.findAll({
@@ -79,7 +102,7 @@ router.get("/content-calendar", async (req, res) => {
       list = list.filter((e) => e.platforms.includes(platform));
     }
 
-    res.json({ success: true, data: list });
+    res.json({ success: true, data: list, ...(pagination ? { pagination } : {}) });
   } catch (error) {
     console.error("Error fetching content calendar entries:", error);
     res.status(500).json({ success: false, message: "Error fetching content calendar entries", error: error.message });
