@@ -40,23 +40,13 @@ export default function DashboardPage() {
       </header>
 
       <main className="flex-1 p-gutter md:p-container-margin w-full max-w-[1440px] mx-auto">
-        <div className="mb-stack-lg flex justify-between items-end">
-          <div>
-            <h1 className="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-surface">
-              CEO Dashboard
-            </h1>
-            <p className="font-body-sm text-body-sm text-on-surface-variant mt-1">
-              Overview of agency performance and operations.
-            </p>
-          </div>
-          <div className="hidden sm:flex space-x-2">
-            <button className="px-4 py-2 bg-white border border-[#1A1A1A] text-[#1A1A1A] rounded-lg font-label-md text-label-md hover:bg-gray-50 transition-colors">
-              Generate Report
-            </button>
-            <button className="px-4 py-2 bg-[#E8262A] text-white rounded-lg font-label-md text-label-md hover:bg-[#c91d21] shadow-sm transition-colors">
-              New Client
-            </button>
-          </div>
+        <div className="mb-stack-lg">
+          <h1 className="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-surface">
+            CEO Dashboard
+          </h1>
+          <p className="font-body-sm text-body-sm text-on-surface-variant mt-1">
+            Overview of agency performance and operations.
+          </p>
         </div>
 
         <DashboardShell />

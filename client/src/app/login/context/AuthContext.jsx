@@ -9,11 +9,21 @@ const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
   const router = useRouter();
-  const [user, setUser] = useState(() => getFromStorage('auth_user'));
-  const [isAuthenticated, setIsAuthenticated] = useState(() => {
-    const token = getFromStorage('auth_token');
-    return token !== null;
-  });
+  // Start in the logged-out shape unconditionally so the very first client
+  // render matches the server-rendered HTML (the server has no localStorage
+  // to read). The real cached values are loaded right after in an effect,
+  // which only runs post-hydration — reading localStorage in a useState
+  // initializer instead causes a hydration mismatch, since that initializer
+  // also runs during the client's first (pre-hydration-check) render.
+  const [user, setUser] = useState(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [hydrated, setHydrated] = useState(false);
+
+  useEffect(() => {
+    setUser(getFromStorage('auth_user'));
+    setIsAuthenticated(getFromStorage('auth_token') !== null);
+    setHydrated(true);
+  }, []);
 
   const login = async (email, password) => {
     try {
@@ -51,6 +61,8 @@ export const AuthProvider = ({ children }) => {
   };
 
   useEffect(() => {
+    if (!hydrated) return;
+
     if (isAuthenticated) {
       // Re-validate the token and refresh role/name in case they changed
       // (or the token has since expired) since it was last cached.
@@ -68,7 +80,7 @@ export const AuthProvider = ({ children }) => {
       router.push('/login');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAuthenticated]);
+  }, [hydrated, isAuthenticated]);
 
   const role = user?.role || null;
 
