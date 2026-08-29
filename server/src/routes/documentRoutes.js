@@ -423,6 +423,9 @@ router.post("/documents/:id/email", async (req, res) => {
     if (!document) {
       return res.status(404).json({ success: false, message: "Document not found" });
     }
+    if (ADMIN_ONLY_DOCUMENT_TYPES.includes(document.documentType) && req.user?.role !== "admin") {
+      return res.status(403).json({ success: false, message: "Admin access required" });
+    }
 
     let cached = getCachedFile(document.fileId);
     if (!cached) {

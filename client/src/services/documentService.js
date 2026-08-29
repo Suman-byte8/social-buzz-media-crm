@@ -35,6 +35,13 @@ export const deleteDocument = async (id) => {
   return response;
 };
 
+// Fetches the raw PDF bytes for an already-uploaded document (agreement,
+// invoice, etc.) — used to hand the actual file to the Web Share API
+// instead of sharing a link.
+export const fetchDocumentBlob = async (id) => {
+  return apiClient(`/documents/${id}/stream`, { responseType: "blob" });
+};
+
 // ── Proposals ────────────────────────────────────────────────────────────
 
 export const fetchProposals = async (clientId) => {
