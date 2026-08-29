@@ -97,9 +97,15 @@ export default function Notes({ client, clientId }) {
                   </div>
                 </div>
                 {note.description && (
-                  <p className="font-body-sm text-body-sm text-on-surface-variant whitespace-pre-wrap">
-                    {note.description}
-                  </p>
+                  <div className="bg-surface-container-low rounded-lg p-4 mt-2">
+                    <h3 className="font-label-md text-label-md text-on-surface mb-2 flex items-center gap-1.5">
+                      <span className="material-symbols-outlined text-primary text-[16px]">subject</span>
+                      Meeting Brief
+                    </h3>
+                    <p className="font-body-md text-body-md text-on-surface leading-relaxed whitespace-pre-wrap">
+                      {note.description}
+                    </p>
+                  </div>
                 )}
               </article>
             ))}

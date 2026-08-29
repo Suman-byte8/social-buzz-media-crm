@@ -125,6 +125,24 @@ export default function MeetingNotesPage() {
       .slice(0, 2);
   };
 
+  const renderDescription = (description) => {
+    if (!description || !description.trim()) return null;
+
+    return (
+      <div className="bg-surface-container-low rounded-lg p-4 mb-4">
+        <h4 className="font-label-md text-label-md text-on-surface mb-2 flex items-center gap-1">
+          <span className="material-symbols-outlined text-primary text-[16px]">
+            subject
+          </span>{" "}
+          Meeting Brief
+        </h4>
+        <p className="font-body-md text-body-md text-on-surface leading-relaxed whitespace-pre-wrap">
+          {description}
+        </p>
+      </div>
+    );
+  };
+
   const renderActionItems = (actionItems) => {
     if (!actionItems || !actionItems.trim()) return null;
     const items = actionItems
@@ -360,11 +378,7 @@ export default function MeetingNotesPage() {
 
                     {renderAttendees(note.attendees)}
 
-                    {note.description && (
-                      <p className="font-body-sm text-body-sm text-on-surface-variant mb-4">
-                        {note.description}
-                      </p>
-                    )}
+                    {renderDescription(note.description)}
 
                     {renderActionItems(note.actionItems)}
 
