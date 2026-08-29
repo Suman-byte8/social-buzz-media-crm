@@ -191,7 +191,7 @@ export default function ClientDetailContent({ activeTab, setActiveTab, client = 
       ) : activeTab === "reports" ? (
         <Reports client={client} />
       ) : activeTab === "invoices" && isAdmin ? (
-        <Invoices client={client} />
+        <Invoices client={client} clientId={clientId} />
       ) : activeTab === "notes" ? (
         <Notes client={client} clientId={clientId} />
       ) : activeTab === "renewal" ? (

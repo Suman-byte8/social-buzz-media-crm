@@ -5,6 +5,7 @@ import {
   deleteDocument as deleteDocumentApi,
   fetchProposals as fetchProposalsApi,
   uploadProposal as uploadProposalApi,
+  fetchInvoiceDocuments as fetchInvoiceDocumentsApi,
   fetchBrandKitFiles as fetchBrandKitFilesApi,
   uploadBrandKitFile as uploadBrandKitFileApi,
   fetchAgreements as fetchAgreementsApi,
@@ -81,6 +82,31 @@ export const deleteProposal = createAsyncThunk(
       return id;
     } catch (error) {
       return rejectWithValue(error.message || "Failed to delete proposal");
+    }
+  }
+);
+
+// ── Invoice Documents ────────────────────────────────────────────────────
+
+export const fetchInvoiceDocuments = createAsyncThunk(
+  "documents/fetchInvoiceDocuments",
+  async (clientId, { rejectWithValue }) => {
+    try {
+      return await fetchInvoiceDocumentsApi(clientId);
+    } catch (error) {
+      return rejectWithValue(error.message || "Failed to fetch invoices");
+    }
+  }
+);
+
+export const deleteInvoiceDocument = createAsyncThunk(
+  "documents/deleteInvoiceDocument",
+  async (id, { rejectWithValue }) => {
+    try {
+      await deleteDocumentApi(id);
+      return id;
+    } catch (error) {
+      return rejectWithValue(error.message || "Failed to delete invoice");
     }
   }
 );
@@ -171,10 +197,12 @@ export const deleteAgreement = createAsyncThunk(
 const initialState = {
   documents: [],
   proposals: [],
+  invoiceDocuments: [],
   brandKit: [],
   agreements: [],
   loading: false,
   loadingProposals: false,
+  loadingInvoiceDocuments: false,
   loadingBrandKit: false,
   loadingAgreements: false,
   error: null,
@@ -245,6 +273,25 @@ const documentsSlice = createSlice({
       })
       .addCase(deleteProposal.rejected, (state, action) => {
         state.error = action.payload || "Failed to delete proposal";
+      })
+      .addCase(fetchInvoiceDocuments.pending, (state) => {
+        state.loadingInvoiceDocuments = true;
+        state.error = null;
+      })
+      .addCase(fetchInvoiceDocuments.fulfilled, (state, action) => {
+        state.loadingInvoiceDocuments = false;
+        state.invoiceDocuments = action.payload.data || [];
+      })
+      .addCase(fetchInvoiceDocuments.rejected, (state, action) => {
+        state.loadingInvoiceDocuments = false;
+        state.error = action.payload || "Failed to fetch invoices";
+      })
+      .addCase(deleteInvoiceDocument.fulfilled, (state, action) => {
+        state.invoiceDocuments = state.invoiceDocuments.filter((d) => d.id !== action.payload);
+        state.successMessage = "Invoice deleted successfully";
+      })
+      .addCase(deleteInvoiceDocument.rejected, (state, action) => {
+        state.error = action.payload || "Failed to delete invoice";
       })
       .addCase(fetchBrandKit.pending, (state) => {
         state.loadingBrandKit = true;

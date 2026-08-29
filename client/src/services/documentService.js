@@ -59,6 +59,18 @@ export const uploadProposal = async (formData) => {
   return response;
 };
 
+// ── Invoice Documents ────────────────────────────────────────────────────
+// The PDFs saved to Drive via the Invoice Builder's "Save to Drive" action
+// (documentType: "invoice") — distinct from the legacy free-text
+// `client.invoices` field.
+
+export const fetchInvoiceDocuments = async (clientId) => {
+  const params = new URLSearchParams({ documentType: "invoice" });
+  if (clientId) params.append("clientId", clientId);
+  const response = await apiClient(`/documents?${params.toString()}`);
+  return response;
+};
+
 // ── Brand Kit ────────────────────────────────────────────────────────────
 
 export const fetchBrandKitFiles = async (clientId) => {
