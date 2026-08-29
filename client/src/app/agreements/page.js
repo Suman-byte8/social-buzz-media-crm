@@ -106,6 +106,7 @@ export default function AgreementsPage() {
       <AgreementsTable
         agreements={filteredAgreements}
         loading={loadingClients || loadingAgreements}
+        clients={clients}
         getClientName={getClientName}
         onView={handleView}
         onEdit={handleEdit}
@@ -139,6 +140,7 @@ export default function AgreementsPage() {
           setViewingAgreement(null);
         }}
         agreement={viewingAgreement}
+        clients={clients}
       />
     </main>
     </RequireAdmin>

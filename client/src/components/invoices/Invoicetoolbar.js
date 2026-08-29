@@ -1,6 +1,6 @@
 "use client";
 import React from "react";
-import ShareMenu from "./Sharemenu";
+import ShareMenu from "@/components/ui/ShareMenu";
 
 // This is the actual Google Drive triangle logo. The previous version used
 // a generic globe/language icon path, which is why "Save to Drive" never

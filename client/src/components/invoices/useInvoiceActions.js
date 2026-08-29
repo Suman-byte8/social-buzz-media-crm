@@ -4,6 +4,7 @@ import { useState, useCallback } from "react";
 import { uploadInvoiceToDrive, sendDocumentEmail } from "@/services/clientService";
 import { exportInvoiceToPdf, getInvoicePdfBlob } from "@/lib/Pdfexport";
 import { API_BASE_URL } from "@/services/apiClient";
+import { shareFileNatively, buildWhatsAppUrl } from "@/lib/documentShare";
 
 export function useInvoiceActions({ invoiceSheetRef, invoiceNumber, dueDate, grandTotal, selectedClientId, selectedClient }) {
   const [isSavingPdf, setIsSavingPdf] = useState(false);
@@ -92,29 +93,29 @@ export function useInvoiceActions({ invoiceSheetRef, invoiceNumber, dueDate, gra
         const pdfBlob = await getInvoicePdfBlob(invoiceSheetRef.current);
 
         // Preferred path: hand the actual PDF file to the OS/browser share
-        // sheet (Web Share API, level 2) so the user picks WhatsApp and the
-        // real file gets attached — not a link. Supported on mobile Chrome/
-        // Safari and modern desktop Chrome/Edge; the trade-off is that the
-        // target chat can't be pre-selected the way wa.me does, since the
-        // share sheet doesn't accept a phone number.
-        if (typeof navigator !== "undefined" && navigator.canShare) {
-          const file = new File([pdfBlob], fileName, { type: "application/pdf" });
-          if (navigator.canShare({ files: [file] })) {
-            try {
-              await navigator.share({
-                files: [file],
-                title: `Invoice ${invoiceNumber}`,
-                text: buildShareMessage({ attached: true }),
-              });
-              return;
-            } catch (shareErr) {
-              if (shareErr?.name === "AbortError") return; // user closed the share sheet
-              console.warn("Web Share failed, falling back to wa.me link:", shareErr);
-            }
-          }
+        // sheet so the user picks WhatsApp and the real file gets attached —
+        // not a link. The trade-off is that the target chat can't be
+        // pre-selected the way wa.me does, since the share sheet doesn't
+        // accept a phone number. Any failure here falls through to the
+        // upload+link flow below instead of aborting the whole share.
+        try {
+          const shareResult = await shareFileNatively({
+            blob: pdfBlob,
+            fileName,
+            mimeType: "application/pdf",
+            title: `Invoice ${invoiceNumber}`,
+            text: buildShareMessage({ attached: true }),
+          });
+          if (shareResult === "shared" || shareResult === "cancelled") return;
+        } catch {
+          // Expected on browsers/devices without file-sharing support — the
+          // upload+link flow below handles it. Deliberately not logged as a
+          // warning/error: this is a normal, already-handled fallback path,
+          // not a problem to surface.
         }
 
-        // Fallback for browsers without file-sharing support: open a
+        // Fallback for browsers without file-sharing support (or where the
+        // native attempt above failed): open a
         // placeholder tab synchronously (browsers block window.open() calls
         // that happen after async work like the upload below, since they're
         // no longer tied to the user's click), then navigate it to wa.me
@@ -129,10 +130,7 @@ export function useInvoiceActions({ invoiceSheetRef, invoiceNumber, dueDate, gra
             downloadedLocally = true;
           }
           const message = buildShareMessage({ pdfLink, downloadedLocally });
-          // wa.me expects digits only, with country code, no "+" — same format
-          // used for the WhatsApp click-to-chat button elsewhere on your sites.
-          const digitsOnly = String(targetNumber).replace(/\D/g, "");
-          const waUrl = `https://wa.me/${digitsOnly}?text=${encodeURIComponent(message)}`;
+          const waUrl = buildWhatsAppUrl(targetNumber, message);
           if (waWindow && !waWindow.closed) {
             waWindow.location.href = waUrl;
           } else {
@@ -165,8 +163,9 @@ export function useInvoiceActions({ invoiceSheetRef, invoiceNumber, dueDate, gra
       let documentRecord = null;
       try {
         documentRecord = await uploadInvoiceDocument(pdfBlob);
-      } catch (uploadErr) {
-        console.error("Could not upload invoice before emailing:", uploadErr);
+      } catch {
+        // Handled below: documentRecord stays null, so both the SMTP send
+        // and the link fallback are skipped in favor of a local download.
       }
 
       // Preferred path: have the backend actually send the email with the
@@ -181,8 +180,10 @@ export function useInvoiceActions({ invoiceSheetRef, invoiceNumber, dueDate, gra
           });
           alert(`Invoice emailed to ${selectedClient.email}.`);
           return;
-        } catch (sendErr) {
-          console.warn("Backend email send failed, falling back to mail app:", sendErr);
+        } catch {
+          // Expected when SMTP isn't configured yet or a send fails — the
+          // mailto: fallback below handles it. Deliberately not logged as a
+          // warning/error: this is a normal, already-handled fallback path.
         }
       }
 
