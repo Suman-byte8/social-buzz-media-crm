@@ -391,10 +391,19 @@ router.get("/documents/:id/stream", async (req, res) => {
     if (!cached) {
       const { buffer, contentType } = await getFileBufferFromDrive(document.fileId);
       setCachedFile(document.fileId, buffer, contentType);
-      cached = { buffer };
+      cached = { buffer, contentType };
     }
 
-    res.setHeader("Content-Type", "application/pdf");
+    // Prefer the content type recorded at upload time (from the browser's
+    // File.type — e.g. "image/png" for a brand kit logo) over whatever
+    // Drive's API reports, falling back to that only if it's missing. This
+    // used to be hardcoded to "application/pdf" for every document, which
+    // silently broke any non-PDF file (brand kit images): helmet sets
+    // X-Content-Type-Options: nosniff globally, so the browser refuses to
+    // render an <img> whose declared Content-Type doesn't match an image
+    // type, regardless of what the actual bytes are.
+    const contentType = document.fileType || cached.contentType || "application/octet-stream";
+    res.setHeader("Content-Type", contentType);
     res.setHeader("Content-Disposition", `inline; filename="${document.fileName}"`);
     res.send(cached.buffer);
   } catch (error) {

@@ -3,6 +3,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchBrandKit, uploadBrandKit, deleteBrandKit } from "@/redux/slices/documentsSlice";
+import { getAssetUrl } from "@/services/apiClient";
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 
@@ -148,17 +149,24 @@ export default function BrandKit({ client, clientId }) {
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
             {brandKit.map((file) => {
               const isImage = file.fileType?.startsWith("image/");
+              // Proxied through our own backend (which fetches the bytes via
+              // an authenticated Drive API call) rather than linking straight
+              // to Drive's googleUserContentLink — that direct-hotlink URL
+              // only works while Drive's "anyone with the link" permission
+              // happens to be set, which isn't guaranteed (see the same fix
+              // already applied to agency logos via logo-proxy).
+              const fileUrl = getAssetUrl(`/api/documents/${file.id}/stream`);
               return (
                 <div key={file.id} className="bg-white rounded-xl border border-outline-variant shadow-sm overflow-hidden group">
                   <a
-                    href={file.webViewLink || file.googleUserContentLink}
+                    href={fileUrl}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="block aspect-square bg-surface-container-lowest flex items-center justify-center overflow-hidden"
                   >
                     {isImage ? (
                       <img
-                        src={file.googleUserContentLink}
+                        src={fileUrl}
                         alt={file.fileName}
                         className="w-full h-full object-cover"
                       />

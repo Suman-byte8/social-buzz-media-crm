@@ -3,6 +3,7 @@
 import React from "react";
 import StatusBadge from "@/components/ui/StatusBadge";
 import AgreementEmailButton from "./AgreementEmailButton";
+import { getAssetUrl } from "@/services/apiClient";
 
 const STATUS_META = {
   active: { label: "Active", color: "green" },
@@ -69,8 +70,14 @@ export default function AgreementsTable({
                     <div className="flex items-center gap-3">
                       <span className="material-symbols-outlined text-primary text-[24px] shrink-0">description</span>
                       <div className="min-w-0">
+                        {/* Proxied through our own backend rather than
+                            linking straight to Drive's googleUserContentLink
+                            — that direct-hotlink URL only works while Drive's
+                            "anyone with the link" permission happens to be
+                            set, which isn't guaranteed (see logo-proxy, which
+                            already fixed this same issue for agency logos). */}
                         <a
-                          href={agreement.driveLink}
+                          href={getAssetUrl(`/api/documents/${agreement.id}/stream`)}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="font-title-md text-title-md text-on-surface hover:text-primary transition-colors truncate block max-w-[240px]"
