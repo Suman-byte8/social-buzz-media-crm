@@ -11,28 +11,38 @@ const A4_HEIGHT_MM = 297;
  * Renders a DOM node to a PDF sized to true A4 dimensions, always fit onto
  * a single page.
  *
- * Two html2canvas quirks are worked around here, both handled inside
- * `onclone` (which runs against the offscreen clone html2canvas builds
- * right before rasterizing it):
+ * Every field (input/textarea) is swapped for a plain <span>/<div> carrying
+ * the same text and CSS classes before anything else touches the clone,
+ * handled inside `onclone` (which runs against the offscreen clone
+ * html2canvas builds right before rasterizing it). This works around two
+ * separate html2canvas quirks at once:
  *
- * 1. `data-html2canvas-ignore` is NOT a feature html2canvas reads
- *    automatically in every version/fork — so elements meant to be
- *    PDF-only-hidden (edit controls, the client picker dropdown, the
- *    decorative blur shape) were still showing up in exports. We remove
- *    them from the clone ourselves instead of relying on the library to
- *    honor the attribute.
- * 2. `cloneNode()` (which html2canvas uses to snapshot the page) does not
- *    copy form field values that were set via a JS property — which is
- *    how React sets the value of a controlled input. Only values set as a
- *    literal HTML `value` attribute survive cloning. Without re-syncing
- *    values here, input/textarea contents can render blank in the
- *    captured canvas even though they look correct on screen.
+ * 1. `cloneNode()` (which html2canvas uses to snapshot the page) does not
+ *    copy form field values that were set via a JS property — which is how
+ *    React sets the value of a controlled input. Reading `.value` off the
+ *    *live* `node` here (not the clone) sidesteps that entirely.
+ * 2. html2canvas's own text renderer for <input>/<textarea> elements can
+ *    clip content that a real browser renders with room to spare — observed
+ *    on the header's right-aligned date fields, whose text only needs
+ *    ~60% of the input's width yet still came out cut off. Ordinary text
+ *    nodes don't go through that code path, so replacing the field with one
+ *    avoids the bug rather than fighting it.
+ *
+ * This substitution has to happen *before* `[data-html2canvas-ignore]`
+ * elements are removed from the clone (edit controls, the client picker
+ * dropdown, the decorative blur shape — none of that belongs in the PDF).
+ * The removed client-picker <select> sits earlier in the page than the line
+ * items table; deleting it first and *then* pairing up original/cloned
+ * fields by list position (the previous approach) shifted every field after
+ * it by one slot, so each line item silently rendered the *previous*
+ * field's value. Pairing fields while both trees are still structurally
+ * identical avoids that class of bug entirely, not just today's instance.
  */
 async function generateInvoicePdfBlob(node) {
   if (!node) throw new Error("Invoice element not found");
 
   const canvas = await html2canvas(node, {
-    scale: 2,
+    scale: 3,
     useCORS: true,
     backgroundColor: "#ffffff",
     onclone: (clonedDoc) => {
@@ -41,25 +51,23 @@ async function generateInvoicePdfBlob(node) {
         : clonedDoc.body;
       if (!clonedRoot) return;
 
-      clonedRoot
-        .querySelectorAll("[data-html2canvas-ignore]")
-        .forEach((el) => el.remove());
-
-      const originalFields = node.querySelectorAll("input, textarea, select");
-      const clonedFields = clonedRoot.querySelectorAll(
-        "input, textarea, select",
-      );
+      const originalFields = node.querySelectorAll("input, textarea");
+      const clonedFields = clonedRoot.querySelectorAll("input, textarea");
       originalFields.forEach((original, i) => {
         const cloned = clonedFields[i];
         if (!cloned) return;
-        if (cloned.tagName === "TEXTAREA") {
-          cloned.textContent = original.value;
-          cloned.value = original.value;
-        } else {
-          cloned.setAttribute("value", original.value);
-          cloned.value = original.value;
-        }
+        const isMultiline = cloned.tagName === "TEXTAREA";
+        const replacement = clonedDoc.createElement(isMultiline ? "div" : "span");
+        replacement.className = cloned.className;
+        replacement.style.display = isMultiline ? "block" : "inline-block";
+        replacement.style.whiteSpace = isMultiline ? "pre-wrap" : "pre";
+        replacement.textContent = original.value;
+        cloned.replaceWith(replacement);
       });
+
+      clonedRoot
+        .querySelectorAll("[data-html2canvas-ignore]")
+        .forEach((el) => el.remove());
     },
   });
 

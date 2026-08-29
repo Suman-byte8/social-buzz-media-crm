@@ -3,6 +3,7 @@ import multer from "multer";
 import { Op } from "sequelize";
 import { uploadFileToDrive, getFileBufferFromDrive, getOrCreateClientFolder, getOrCreateClientSubfolder } from "../utils/googleDrive.js";
 import { getCachedFile, setCachedFile } from "../utils/fileCache.js";
+import { sendMail } from "../utils/mailer.js";
 
 const router = express.Router();
 
@@ -401,6 +402,54 @@ router.get("/documents/:id/stream", async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Error streaming document",
+      error: error.message,
+    });
+  }
+});
+
+// Emails a document to a given address with the actual file attached
+// (rather than a link) — used by the invoice "Send Email" action. Requires
+// SMTP_HOST/SMTP_USER/SMTP_PASS to be set in .env; see utils/mailer.js.
+router.post("/documents/:id/email", async (req, res) => {
+  try {
+    const { Document } = req.app.locals.models;
+    const { to, subject, text } = req.body;
+
+    if (!to) {
+      return res.status(400).json({ success: false, message: "Recipient email (to) is required" });
+    }
+
+    const document = await Document.findByPk(req.params.id);
+    if (!document) {
+      return res.status(404).json({ success: false, message: "Document not found" });
+    }
+
+    let cached = getCachedFile(document.fileId);
+    if (!cached) {
+      const { buffer, contentType } = await getFileBufferFromDrive(document.fileId);
+      setCachedFile(document.fileId, buffer, contentType);
+      cached = { buffer };
+    }
+
+    await sendMail({
+      to,
+      subject: subject || `Document: ${document.fileName}`,
+      text: text || "Please find the attached document.",
+      attachments: [
+        {
+          filename: document.fileName,
+          content: cached.buffer,
+          contentType: "application/pdf",
+        },
+      ],
+    });
+
+    res.json({ success: true, message: "Email sent successfully" });
+  } catch (error) {
+    console.error("Error sending document email:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message || "Failed to send email",
       error: error.message,
     });
   }

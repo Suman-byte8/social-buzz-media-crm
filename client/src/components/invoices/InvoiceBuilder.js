@@ -103,7 +103,7 @@ export default function InvoiceBuilder() {
         onSendEmail={handleSendEmail}
       />
 
-      <main className="mx-auto my-8 max-w-full">
+      <main className="my-8 overflow-x-auto">
         <InvoiceDocument
           ref={invoiceSheetRef}
           gstin={gstin}

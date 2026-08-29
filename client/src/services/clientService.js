@@ -83,3 +83,13 @@ export const uploadInvoiceToDrive = async (pdfBlob, clientId, invoiceNumber) => 
     body: formData,
   });
 };
+
+// Emails an already-uploaded document with the PDF actually attached
+// (server fetches the file from Drive and sends it via SMTP), instead of a
+// mailto: link that can't carry an attachment.
+export const sendDocumentEmail = async (documentId, { to, subject, text }) => {
+  return apiClient(`/documents/${documentId}/email`, {
+    method: 'POST',
+    body: { to, subject, text },
+  });
+};
