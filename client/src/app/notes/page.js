@@ -185,29 +185,23 @@ export default function MeetingNotesPage() {
     if (names.length === 0) return null;
 
     return (
-      <div className="flex items-center gap-2 mb-4">
-        <span className="font-label-sm text-label-sm text-on-surface-variant">
+      <div className="flex flex-wrap items-center gap-2 mb-4">
+        <span className="font-label-sm text-label-sm text-on-surface-variant shrink-0">
           Attendees:
         </span>
-        <div className="flex -space-x-2">
-          {names.slice(0, 2).map((name, idx) => (
-            <div
-              key={idx}
-              className="w-6 h-6 rounded-full border-2 border-white overflow-hidden bg-secondary-container flex items-center justify-center"
-            >
-              <span className="font-label-sm text-label-sm text-on-secondary-container">
-                {getInitials(name)}
-              </span>
-            </div>
-          ))}
-          {names.length > 2 && (
-            <div className="w-6 h-6 rounded-full border-2 border-white overflow-hidden bg-secondary-container flex items-center justify-center">
-              <span className="font-label-sm text-label-sm text-on-secondary-container">
-                +{names.length - 2}
-              </span>
-            </div>
-          )}
-        </div>
+        {names.map((name, idx) => (
+          <span
+            key={idx}
+            className="inline-flex items-center gap-1.5 pl-1 pr-2.5 py-1 rounded-full bg-secondary-container"
+          >
+            <span className="w-5 h-5 rounded-full bg-white/70 flex items-center justify-center text-[10px] font-label-sm text-on-secondary-container shrink-0">
+              {getInitials(name)}
+            </span>
+            <span className="font-label-sm text-label-sm text-on-secondary-container">
+              {name}
+            </span>
+          </span>
+        ))}
       </div>
     );
   };
@@ -215,7 +209,7 @@ export default function MeetingNotesPage() {
   if (loading) {
     return (
       <main className="flex-1 overflow-y-auto bg-background p-container-margin">
-        <div className="max-w-6xl mx-auto">
+        <div className="max-w-[1600px] mx-auto">
           <h2 className="font-display-lg text-display-lg text-on-background mb-4">
             Meeting Notes
           </h2>
@@ -240,7 +234,7 @@ export default function MeetingNotesPage() {
 
   return (
     <main className="flex-1 overflow-y-auto bg-background p-container-margin">
-      <div className="max-w-6xl mx-auto">
+      <div className="max-w-[1600px] mx-auto">
         {/* Page Header */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
           <div>
