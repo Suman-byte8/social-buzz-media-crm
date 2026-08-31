@@ -48,7 +48,7 @@ export default function AgreementsPage() {
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm("Are you sure you want to delete this agreement?")) return;
+    if (!window.confirm("Delete this agreement? It will be moved to the Drive trash and removed from here.")) return;
     try {
       await dispatch(deleteAgreement(id)).unwrap();
     } catch (err) {
