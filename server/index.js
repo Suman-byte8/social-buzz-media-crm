@@ -133,6 +133,7 @@ import contentCalendarRoutes from "./src/routes/contentCalendarRoutes.js";
 import miscTaskRoutes from "./src/routes/miscTaskRoutes.js";
 import leadRoutes from "./src/routes/leadRoutes.js";
 import authRoutes from "./src/routes/authRoutes.js";
+import { startKeepAlivePing } from "./src/utils/keepAlive.js";
 import { authenticate } from "./src/middleware/auth.js";
 
 // Auth routes (/login, /logout, /me, admin user management) are mounted
@@ -170,6 +171,8 @@ app.get("/", (req, res) => {
     message: "CRM API is running",
   });
 });
+
+startKeepAlivePing();
 
 // Error handling
 app.use((err, req, res, next) => {
