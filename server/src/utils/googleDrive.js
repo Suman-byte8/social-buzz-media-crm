@@ -112,6 +112,17 @@ export const deleteFileFromDrive = async (fileId) => {
   return { success: true };
 };
 
+// Moves a file to Drive's trash instead of permanently deleting it — used
+// for client-facing business documents (invoices, agreements, brand kit)
+// where a wrong click shouldn't be unrecoverable. Trashed files still count
+// against storage but are recoverable from Drive's UI for 30 days before
+// Google auto-purges them.
+export const trashFileInDrive = async (fileId) => {
+  const drive = getDriveClient();
+  await drive.files.update({ fileId, requestBody: { trashed: true } });
+  return { success: true };
+};
+
 export const getFileStreamFromDrive = async (fileId) => {
   const drive = getDriveClient();
   const response = await drive.files.get(

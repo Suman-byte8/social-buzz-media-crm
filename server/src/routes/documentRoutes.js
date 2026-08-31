@@ -1,7 +1,7 @@
 import express from "express";
 import multer from "multer";
 import { Op } from "sequelize";
-import { uploadFileToDrive, getFileBufferFromDrive, getOrCreateClientFolder, getOrCreateClientSubfolder } from "../utils/googleDrive.js";
+import { uploadFileToDrive, getFileBufferFromDrive, getOrCreateClientFolder, getOrCreateClientSubfolder, trashFileInDrive } from "../utils/googleDrive.js";
 import { getCachedFile, setCachedFile } from "../utils/fileCache.js";
 import { sendMail } from "../utils/mailer.js";
 
@@ -367,6 +367,15 @@ router.delete("/documents/:id", async (req, res) => {
       return res.status(403).json({ success: false, message: "Admin access required" });
     }
 
+    try {
+      await trashFileInDrive(document.fileId);
+    } catch (driveErr) {
+      // Best-effort: the file may already be missing/trashed in Drive, or
+      // the Drive API call could fail transiently — don't let that block
+      // removing the record itself.
+      console.warn("Could not trash document file in Drive:", driveErr.message);
+    }
+
     await document.destroy();
     res.json({ success: true, message: "Document deleted successfully" });
   } catch (error) {
@@ -553,6 +562,15 @@ router.delete("/agreements/:id", requireAdminForAgreements, async (req, res) => 
 
     if (!agreement) {
       return res.status(404).json({ success: false, message: "Agreement not found" });
+    }
+
+    try {
+      await trashFileInDrive(agreement.fileId);
+    } catch (driveErr) {
+      // Best-effort: the file may already be missing/trashed in Drive, or
+      // the Drive API call could fail transiently — don't let that block
+      // removing the record itself.
+      console.warn("Could not trash agreement file in Drive:", driveErr.message);
     }
 
     await agreement.destroy();

@@ -28,7 +28,7 @@ const Invoices = ({ client, clientId }) => {
   }, [dispatch, clientId]);
 
   const handleDelete = (id) => {
-    if (!window.confirm("Delete this invoice? This will not remove it from Google Drive.")) return;
+    if (!window.confirm("Delete this invoice? It will be moved to the Drive trash and removed from here.")) return;
     dispatch(deleteInvoiceDocument(id));
   };
 

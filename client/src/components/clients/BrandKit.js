@@ -77,7 +77,7 @@ export default function BrandKit({ client, clientId }) {
   };
 
   const handleDelete = (id) => {
-    if (!window.confirm("Delete this file? This will not remove it from Google Drive.")) return;
+    if (!window.confirm("Delete this file? It will be moved to the Drive trash and removed from here.")) return;
     dispatch(deleteBrandKit(id));
   };
 
