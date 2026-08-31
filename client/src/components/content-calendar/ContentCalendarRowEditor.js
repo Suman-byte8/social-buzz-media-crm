@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useRef } from "react";
-import { PLATFORM_OPTIONS, getWeekDay } from "./constants";
+import { PLATFORM_OPTIONS, STATUS_OPTIONS, getStatusMeta, getWeekDay } from "./constants";
 
 export default function ContentCalendarRowEditor({
   showClientColumn,
@@ -195,19 +195,16 @@ export default function ContentCalendarRowEditor({
         </div>
       </td>
       <td className="py-2 px-2 align-top">
-        <button
-          type="button"
-          onClick={() => onChange("posted", !values.posted)}
+        <select
+          value={values.status || "pending"}
+          onChange={(e) => onChange("status", e.target.value)}
           disabled={saving}
-          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-medium border transition-colors text-xs ${
-            values.posted
-              ? "bg-green-50 text-green-700 border-green-200"
-              : "bg-gray-100 text-gray-600 border-gray-200"
-          }`}
+          className={`px-2 py-0.5 rounded-full font-medium border transition-colors text-xs outline-none cursor-pointer ${getStatusMeta(values.status).className}`}
         >
-          <span className="material-symbols-outlined text-[12px]">{values.posted ? "check_circle" : "schedule"}</span>
-          {values.posted ? "Posted" : "Pending"}
-        </button>
+          {STATUS_OPTIONS.map((opt) => (
+            <option key={opt.value} value={opt.value}>{opt.label}</option>
+          ))}
+        </select>
       </td>
       <td className="py-2 px-2 align-top text-right">
         <div className="flex flex-col items-end gap-1">

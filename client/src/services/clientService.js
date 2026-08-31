@@ -27,6 +27,16 @@ export const updateClient = async (id, clientData) => {
   return response;
 };
 
+export const uploadClientLogo = async (id, file) => {
+  const formData = new FormData();
+  formData.append('logo', file);
+  const response = await apiClient(`/clients/${id}/upload-logo`, {
+    method: 'POST',
+    body: formData,
+  });
+  return response;
+};
+
 export const deleteClient = async (id) => {
   const response = await apiClient(`/clients/${id}`, {
     method: 'DELETE',
@@ -71,5 +81,15 @@ export const uploadInvoiceToDrive = async (pdfBlob, clientId, invoiceNumber) => 
   return apiClient('/documents/upload', {
     method: 'POST',
     body: formData,
+  });
+};
+
+// Emails an already-uploaded document with the PDF actually attached
+// (server fetches the file from Drive and sends it via SMTP), instead of a
+// mailto: link that can't carry an attachment.
+export const sendDocumentEmail = async (documentId, { to, subject, text }) => {
+  return apiClient(`/documents/${documentId}/email`, {
+    method: 'POST',
+    body: { to, subject, text },
   });
 };

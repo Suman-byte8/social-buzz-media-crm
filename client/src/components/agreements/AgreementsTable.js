@@ -2,6 +2,8 @@
 
 import React from "react";
 import StatusBadge from "@/components/ui/StatusBadge";
+import AgreementEmailButton from "./AgreementEmailButton";
+import { getAssetUrl } from "@/services/apiClient";
 
 const STATUS_META = {
   active: { label: "Active", color: "green" },
@@ -20,7 +22,15 @@ const isExpiringSoon = (agreement) => {
   return daysLeft >= 0 && daysLeft <= 30;
 };
 
-export default function AgreementsTable({ agreements, loading, getClientName, onView, onEdit, onDelete }) {
+export default function AgreementsTable({
+  agreements,
+  loading,
+  clients = [],
+  getClientName,
+  onView,
+  onEdit,
+  onDelete,
+}) {
   return (
     <div className="bg-white rounded-b-xl border border-outline-variant shadow-card overflow-hidden overflow-x-auto">
       <table className="w-full min-w-[860px] text-left border-collapse">
@@ -53,14 +63,21 @@ export default function AgreementsTable({ agreements, loading, getClientName, on
             agreements.map((agreement) => {
               const meta = STATUS_META[agreement.status] || { label: agreement.status || "Unknown", color: "gray" };
               const expiringSoon = isExpiringSoon(agreement);
+              const client = clients.find((c) => c.id === agreement.clientId) || null;
               return (
                 <tr key={agreement.id} className="border-b border-[#F0F0F0] hover:bg-[#F9F9F9] transition-colors group">
                   <td className="py-4 px-4">
                     <div className="flex items-center gap-3">
                       <span className="material-symbols-outlined text-primary text-[24px] shrink-0">description</span>
                       <div className="min-w-0">
+                        {/* Proxied through our own backend rather than
+                            linking straight to Drive's googleUserContentLink
+                            — that direct-hotlink URL only works while Drive's
+                            "anyone with the link" permission happens to be
+                            set, which isn't guaranteed (see logo-proxy, which
+                            already fixed this same issue for agency logos). */}
                         <a
-                          href={agreement.driveLink}
+                          href={getAssetUrl(`/api/documents/${agreement.id}/stream`)}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="font-title-md text-title-md text-on-surface hover:text-primary transition-colors truncate block max-w-[240px]"
@@ -99,6 +116,7 @@ export default function AgreementsTable({ agreements, loading, getClientName, on
                       >
                         <span className="material-symbols-outlined text-[20px]">visibility</span>
                       </button>
+                      <AgreementEmailButton agreement={agreement} client={client} />
                       <button
                         onClick={() => onEdit(agreement)}
                         className="p-1.5 text-secondary hover:text-primary hover:bg-gray-100 rounded transition-colors"

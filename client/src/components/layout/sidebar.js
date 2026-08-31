@@ -6,21 +6,24 @@ import { usePathname } from "next/navigation";
 import { useAuth } from "@/app/login/context/AuthContext";
 
 const navItems = [
-  { label: "Dashboard", href: "/dashboard", icon: "dashboard" },
+  { label: "Dashboard", href: "/dashboard", icon: "dashboard", adminOnly: true },
   { label: "Clients", href: "/clients", icon: "group" },
   { label: "Content Calendar", href: "/calendar", icon: "calendar_month" },
   { label: "Tasks", href: "/tasks", icon: "assignment" },
   { label: "Team", href: "/team", icon: "people" },
-  { label: "Invoices", href: "/invoices", icon: "receipt_long" },
-  { label: "Agreements", href: "/agreements", icon: "description" },
+  { label: "Invoices", href: "/invoices", icon: "receipt_long", adminOnly: true },
+  { label: "Agreements", href: "/agreements", icon: "description", adminOnly: true },
   { label: "Meeting Notes", href: "/notes", icon: "event_note" },
+  { label: "Miscellaneous", href: "/miscellaneous", icon: "widgets" },
   { label: "Reports", href: "/reports", icon: "bar_chart" },
-  { label: "Settings", href: "/settings", icon: "settings", mtAuto: true },
+  { label: "Settings", href: "/settings", icon: "settings", mtAuto: true, adminOnly: true },
 ];
 
 export default function Sidebar() {
   const pathname = usePathname();
-  const { logout } = useAuth();
+  const { logout, isAdmin } = useAuth();
+
+  const visibleNavItems = navItems.filter((item) => !item.adminOnly || isAdmin);
 
   const handleLogout = () => {
     logout();
@@ -37,7 +40,7 @@ export default function Sidebar() {
 
       {/* Navigation Links */}
       <nav className="flex-1 overflow-y-auto w-full px-0 py-2 space-y-1 scrollbar-none [&::-webkit-scrollbar]:hidden">
-        {navItems.map((item) => {
+        {visibleNavItems.map((item) => {
           const isActive =
             pathname === item.href ||
             (item.href !== "/" && pathname.startsWith(item.href));

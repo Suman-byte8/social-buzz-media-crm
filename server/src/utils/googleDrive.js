@@ -1,7 +1,18 @@
 import { google } from "googleapis";
 import stream from "stream";
 
+// Built once and reused across every call. googleapis' OAuth2Client caches
+// the minted access token (and its expiry) on the client instance itself —
+// rebuilding a fresh OAuth2Client per request (the previous behavior) threw
+// that cache away every time, so *every* Drive operation paid for an extra
+// token-exchange round-trip to Google's OAuth endpoint before doing any
+// actual work. A single long-lived client lets googleapis reuse the token
+// until it's close to expiry, refreshing only when it actually needs to.
+let driveClient = null;
+
 const getDriveClient = () => {
+  if (driveClient) return driveClient;
+
   const clientId = process.env.GOOGLE_DRIVE_CLIENT_ID;
   const clientSecret = process.env.GOOGLE_DRIVE_CLIENT_SECRET;
   const refreshToken = process.env.GOOGLE_DRIVE_REFRESH_TOKEN;
@@ -20,7 +31,8 @@ const getDriveClient = () => {
     refresh_token: refreshToken,
   });
 
-  return google.drive({ version: "v3", auth: oauth2Client });
+  driveClient = google.drive({ version: "v3", auth: oauth2Client });
+  return driveClient;
 };
 
 export const uploadFileToDrive = async (fileBuffer, fileName, mimeType, folderId = null) => {
@@ -100,13 +112,37 @@ export const deleteFileFromDrive = async (fileId) => {
   return { success: true };
 };
 
+// Moves a file to Drive's trash instead of permanently deleting it — used
+// for client-facing business documents (invoices, agreements, brand kit)
+// where a wrong click shouldn't be unrecoverable. Trashed files still count
+// against storage but are recoverable from Drive's UI for 30 days before
+// Google auto-purges them.
+export const trashFileInDrive = async (fileId) => {
+  const drive = getDriveClient();
+  await drive.files.update({ fileId, requestBody: { trashed: true } });
+  return { success: true };
+};
+
 export const getFileStreamFromDrive = async (fileId) => {
   const drive = getDriveClient();
   const response = await drive.files.get(
     { fileId: fileId, alt: "media" },
     { responseType: "stream" }
   );
+  response.data.contentType = response.headers?.get?.("content-type");
   return response.data;
+};
+
+// Same as getFileStreamFromDrive, but collects the whole file into a Buffer
+// first. Used by endpoints that cache the result (see utils/fileCache.js) —
+// caching a stream isn't possible since it can only be consumed once.
+export const getFileBufferFromDrive = async (fileId) => {
+  const fileStream = await getFileStreamFromDrive(fileId);
+  const chunks = [];
+  for await (const chunk of fileStream) {
+    chunks.push(chunk);
+  }
+  return { buffer: Buffer.concat(chunks), contentType: fileStream.contentType };
 };
 
 export const createFolderInDrive = async (folderName, parentFolderId = null) => {
@@ -186,8 +222,22 @@ export const findFolderInDrive = async (folderName, parentFolderId = null) => {
   }
 };
 
+// A client's Drive folder (and its subfolders) essentially never change once
+// created, but every upload was re-resolving them via a live `files.list`
+// search — on top of the per-call OAuth token exchange this used to also
+// pay for (see getDriveClient above), a single file upload could involve
+// several sequential Drive round-trips before the actual upload even
+// started. Caching the resolved folder in memory removes that for every
+// upload after the first, for the lifetime of the process. If a folder is
+// deleted out-of-band in Drive, the cache would need a restart to notice —
+// an acceptable tradeoff since that's not something this app does itself.
+const folderCache = new Map();
+const folderCacheKey = (name, parentFolderId) => `${parentFolderId || "root"}::${name}`;
+
 export const getOrCreateClientFolder = async (clientName, clientId) => {
   const folderName = `${clientName} - Documents`;
+  const key = folderCacheKey(folderName, null);
+  if (folderCache.has(key)) return folderCache.get(key);
 
   let folder = await findFolderInDrive(folderName);
 
@@ -195,15 +245,20 @@ export const getOrCreateClientFolder = async (clientName, clientId) => {
     folder = await createFolderInDrive(folderName);
   }
 
+  folderCache.set(key, folder);
   return folder;
 };
 
 export const getOrCreateClientSubfolder = async (parentFolderId, subfolderName) => {
+  const key = folderCacheKey(subfolderName, parentFolderId);
+  if (folderCache.has(key)) return folderCache.get(key);
+
   let folder = await findFolderInDrive(subfolderName, parentFolderId);
 
   if (!folder) {
     folder = await createFolderInDrive(subfolderName, parentFolderId);
   }
 
+  folderCache.set(key, folder);
   return folder;
 };

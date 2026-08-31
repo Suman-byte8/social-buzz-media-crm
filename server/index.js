@@ -2,13 +2,20 @@ import express from "express";
 import dotenv from "dotenv";
 import cors from "cors";
 import helmet from "helmet";
+import compression from "compression";
 
 dotenv.config();
 
 const app = express();
 
 app.use(cors());
-app.use(helmet());
+app.use(compression());
+// Frontend and API are served from different origins (separate ports in dev,
+// separate domains in prod), so images/files streamed by this API (logo
+// proxy, document downloads) must be embeddable cross-origin. Helmet's
+// default same-origin CORP silently blocks the browser from rendering them
+// in an <img> tag even though the request itself succeeds with a 200.
+app.use(helmet({ crossOriginResourcePolicy: { policy: "cross-origin" } }));
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ limit: "10mb", extended: true }));
 
@@ -38,7 +45,11 @@ if (process.env.DATABASE_URL) {
     dialect: "postgres",
     logging: isDev ? console.log : false,
     dialectOptions: sslOptions,
-    pool: { max: 10, min: 0, acquire: 30000, idle: 10000 },
+    // min: 1 keeps one connection warm so the first request after an idle
+    // period doesn't pay for establishing a fresh connection (relevant on
+    // managed Postgres with TLS handshake overhead); negligible idle cost
+    // for a single connection.
+    pool: { max: 10, min: 1, acquire: 30000, idle: 10000 },
   });
   console.log(
     `[DB] Using DATABASE_URL (connection string) ssl=${!!sslOptions}`,
@@ -54,7 +65,11 @@ if (process.env.DATABASE_URL) {
       dialect: "postgres",
       logging: isDev ? console.log : false,
       dialectOptions: sslOptions,
-      pool: { max: 10, min: 0, acquire: 30000, idle: 10000 },
+      // min: 1 keeps one connection warm so the first request after an idle
+    // period doesn't pay for establishing a fresh connection (relevant on
+    // managed Postgres with TLS handshake overhead); negligible idle cost
+    // for a single connection.
+    pool: { max: 10, min: 1, acquire: 30000, idle: 10000 },
     },
   );
   console.log(`[DB] Using DB_* env vars (host=${process.env.DB_HOST})`);
@@ -80,7 +95,12 @@ const connectWithRetry = async (retries = 5, delayMs = 3000) => {
     try {
       await sequelize.authenticate();
       console.log(`[DB] Connection established (attempt ${attempt})`);
-      await sequelize.sync({ alter: isDev });
+      // Non-destructive: creates tables that don't exist yet, but never alters
+      // existing columns. Every nodemon restart during dev re-runs this, and
+      // `alter: true` here was silently dropping/rewriting live columns and
+      // data on every file save. Run `npm run db:sync` explicitly (still with
+      // `alter: true`) when you intend an actual schema change.
+      await sequelize.sync();
       console.log("Database synchronized");
       return;
     } catch (err) {
@@ -110,7 +130,29 @@ import documentRoutes from "./src/routes/documentRoutes.js";
 import taskRoutes from "./src/routes/taskRoutes.js";
 import meetingNoteRoutes from "./src/routes/meetingNoteRoutes.js";
 import contentCalendarRoutes from "./src/routes/contentCalendarRoutes.js";
+import miscTaskRoutes from "./src/routes/miscTaskRoutes.js";
 import authRoutes from "./src/routes/authRoutes.js";
+import { authenticate } from "./src/middleware/auth.js";
+
+// Auth routes (/login, /logout, /me, admin user management) are mounted
+// first so login itself never requires a token. Every other /api route
+// requires a valid JWT — except image/file streams embedded via plain
+// <img>/<a> tags, which can't send an Authorization header; those stay
+// public (the Drive file IDs they key off are long and unguessable).
+app.use("/api/auth", authRoutes);
+
+const PUBLIC_ASSET_PATHS = [
+  /^\/api\/settings\/logo-proxy\//,
+  /^\/api\/documents\/\d+\/stream$/,
+];
+
+app.use("/api", (req, res, next) => {
+  if (PUBLIC_ASSET_PATHS.some((pattern) => pattern.test(req.originalUrl))) {
+    return next();
+  }
+  return authenticate(req, res, next);
+});
+
 app.use("/api", clientRoutes);
 app.use("/api", teamRoutes);
 app.use("/api", settingRoutes);
@@ -118,9 +160,7 @@ app.use("/api", documentRoutes);
 app.use("/api", taskRoutes);
 app.use("/api", meetingNoteRoutes);
 app.use("/api", contentCalendarRoutes);
-// Auth routes define /login + /logout, so mount under /api/auth to match the
-// client's call to `/api/auth/login`.
-app.use("/api/auth", authRoutes);
+app.use("/api", miscTaskRoutes);
 
 app.get("/", (req, res) => {
   res.json({

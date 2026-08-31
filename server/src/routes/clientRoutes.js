@@ -1,20 +1,62 @@
 import express from 'express';
+import multer from 'multer';
 import { Op } from 'sequelize';
+import { encryptText, decryptText } from '../utils/encryption.js';
+import { uploadFileToDrive, getOrCreateClientFolder } from '../utils/googleDrive.js';
 
 const router = express.Router();
 
-// Helper to format array fields
-const formatArrayFields = (data) => ({
+const logoUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype.startsWith('image/')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only image files are allowed'), false);
+    }
+  },
+});
+
+// Credentials are stored as an array of { id, platform, username, password, notes }.
+// Passwords are encrypted at rest; decrypt here so the client only ever sees plaintext.
+const decryptCredentials = (value) => {
+  if (!value) return [];
+  const parsed = typeof value === 'string' ? JSON.parse(value) : value;
+  if (!Array.isArray(parsed)) return [];
+  return parsed.map((entry) => ({ ...entry, password: decryptText(entry.password) }));
+};
+
+const encryptCredentials = (value) => {
+  if (!Array.isArray(value)) return null;
+  return value.map((entry) => ({ ...entry, password: entry.password ? encryptText(entry.password) : entry.password }));
+};
+
+// Helper to format array fields. `includeCredentials` defaults to true for
+// the single-client detail view (where they're actually shown); the list
+// view (which never renders credentials) passes false to skip the AES
+// decrypt work entirely for every row instead of doing it and discarding
+// the result.
+const formatArrayFields = (data, { includeCredentials = true } = {}) => ({
   ...data,
   servicesSelected: data.servicesSelected ? data.servicesSelected.split(',').filter(Boolean) : [],
   proposals: data.proposals ? data.proposals.split(',').filter(Boolean) : [],
-  credentials: data.credentials ? JSON.parse(data.credentials) : {},
+  credentials: includeCredentials ? decryptCredentials(data.credentials) : [],
   campaigns: data.campaigns ? data.campaigns.split(',').filter(Boolean) : [],
   socialMediaAccounts: data.socialMediaAccounts ? data.socialMediaAccounts.split(',').filter(Boolean) : [],
   reports: data.reports ? data.reports.split(',').filter(Boolean) : [],
   invoices: data.invoices ? data.invoices.split(',').filter(Boolean) : [],
   contentCalendar: data.contentCalendar ? data.contentCalendar.split(',').filter(Boolean) : [],
 });
+
+// Invoices are an admin-only view (Invoices page + client profile tab are
+// hidden from team members) — strip the field for non-admins on read, and
+// ignore attempts to write it on create/update.
+const redactForRole = (data, role) => {
+  if (role === 'admin') return data;
+  const { invoices, ...rest } = data;
+  return rest;
+};
 
 // Accepts array or comma-separated string, returns CSV string or null
 const toArrayString = (value) => {
@@ -36,40 +78,75 @@ const toJsonString = (value) => {
   return JSON.stringify(value);
 };
 
-// Helper to prepare data for DB
-const prepareClientData = (body) => ({
-  name: body.name,
-  industry: body.industry,
-  phoneNumber: body.phoneNumber,
-  whatsappNumber: body.whatsappNumber,
-  address: body.address,
-  email: body.email,
-  servicesSelected: toArrayString(body.servicesSelected),
-  clientManagedBy: body.clientManagedBy,
-  clientHealth: body.clientHealth,
-  proposals: toArrayString(body.proposals),
-  credentials: toJsonString(body.credentials),
-  campaigns: toArrayString(body.campaigns),
-  socialMediaAccounts: toArrayString(body.socialMediaAccounts),
-  reports: toArrayString(body.reports),
-  invoices: toArrayString(body.invoices),
-  notes: body.notes,
-  renewal: body.renewal ? new Date(body.renewal) : null,
-  contentCalendar: toArrayString(body.contentCalendar),
-});
+// Each client field's raw-body-value -> DB-value transform, shared by both
+// create (every field gets a value, defaulting to null when absent — see
+// prepareClientData) and update (only fields the caller actually sent get
+// touched — see prepareClientUpdateData). Keeping one transform table for
+// both avoids the two ever drifting out of sync.
+const CLIENT_FIELD_TRANSFORMS = {
+  name: (v) => v,
+  industry: (v) => v,
+  phoneNumber: (v) => v,
+  whatsappNumber: (v) => v,
+  address: (v) => v,
+  email: (v) => v,
+  website: (v) => v,
+  servicesSelected: (v) => toArrayString(v),
+  clientManagedBy: (v) => v,
+  clientHealth: (v) => v,
+  proposals: (v) => toArrayString(v),
+  credentials: (v) => (Array.isArray(v) ? JSON.stringify(encryptCredentials(v)) : toJsonString(v)),
+  campaigns: (v) => toArrayString(v),
+  socialMediaAccounts: (v) => toArrayString(v),
+  reports: (v) => toArrayString(v),
+  invoices: (v) => toArrayString(v),
+  notes: (v) => v,
+  renewal: (v) => (v ? new Date(v) : null),
+  contentCalendar: (v) => toArrayString(v),
+  clientSince: (v) => v || null,
+};
+
+// Helper to prepare data for a new client — every field gets a value
+// (absent ones become null), which is correct for a brand-new row.
+const prepareClientData = (body) => {
+  const data = {};
+  for (const [field, transform] of Object.entries(CLIENT_FIELD_TRANSFORMS)) {
+    data[field] = transform(body[field]);
+  }
+  return data;
+};
+
+// Helper to prepare an UPDATE payload — only includes fields the caller
+// actually sent (`!== undefined`), leaving every other column untouched.
+// Several tabs (Credentials, Proposal, Social, Reports, Invoices, Content
+// Calendar) each save just their own field via a partial PUT; building the
+// full field set from prepareClientData for an update would silently null
+// out every field the caller didn't include, since Sequelize's `.update()`
+// treats an explicit `undefined` value as "set this column to NULL" rather
+// than "leave it alone".
+const prepareClientUpdateData = (body) => {
+  const data = {};
+  for (const [field, transform] of Object.entries(CLIENT_FIELD_TRANSFORMS)) {
+    if (body[field] !== undefined) {
+      data[field] = transform(body[field]);
+    }
+  }
+  return data;
+};
 
 // POST /api/clients - Create a new client
 router.post('/clients', async (req, res) => {
   try {
     const { Client } = req.app.locals.models;
     const clientData = prepareClientData(req.body);
+    if (req.user?.role !== 'admin') delete clientData.invoices;
 
     if (!clientData.name) {
       return res.status(400).json({ success: false, message: 'Client name is required' });
     }
 
     const client = await Client.create(clientData);
-    res.status(201).json({ success: true, message: 'Client created successfully', data: formatArrayFields(client.toJSON()) });
+    res.status(201).json({ success: true, message: 'Client created successfully', data: redactForRole(formatArrayFields(client.toJSON()), req.user?.role) });
   } catch (error) {
     console.error('Error creating client:', error);
     res.status(500).json({ success: false, message: 'Error creating client', error: error.message });
@@ -118,7 +195,9 @@ router.get('/clients', async (req, res) => {
       offset: parseInt(offset),
     });
 
-    const formattedRows = rows.map((c) => formatArrayFields(c.toJSON()));
+    const formattedRows = rows.map((c) =>
+      redactForRole(formatArrayFields(c.toJSON(), { includeCredentials: false }), req.user?.role)
+    );
 
     res.json({
       success: true,
@@ -161,10 +240,11 @@ router.get('/clients/export', async (req, res) => {
       order: [['createdAt', 'DESC']],
     });
 
+    const isAdmin = req.user?.role === 'admin';
     const headers = [
       'ID', 'Name', 'Industry', 'Phone Number', 'WhatsApp Number', 'Address', 'Email',
       'Services Selected', 'Managed By', 'Client Health', 'Proposals', 'Credentials',
-      'Campaigns', 'Social Media Accounts', 'Reports', 'Invoices', 'Notes',
+      'Campaigns', 'Social Media Accounts', 'Reports', ...(isAdmin ? ['Invoices'] : []), 'Notes',
       'Renewal Date', 'Content Calendar', 'Created At', 'Updated At'
     ];
 
@@ -186,7 +266,7 @@ router.get('/clients/export', async (req, res) => {
         d.campaigns || '',
         d.socialMediaAccounts || '',
         d.reports || '',
-        d.invoices || '',
+        ...(isAdmin ? [d.invoices || ''] : []),
         d.notes || '',
         d.renewal ? new Date(d.renewal).toISOString().split('T')[0] : '',
         d.contentCalendar || '',
@@ -213,9 +293,33 @@ router.get('/clients/:id', async (req, res) => {
     if (!client) {
       return res.status(404).json({ success: false, message: 'Client not found' });
     }
-    res.json({ success: true, data: formatArrayFields(client.toJSON()) });
+    res.json({ success: true, data: redactForRole(formatArrayFields(client.toJSON()), req.user?.role) });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Error fetching client', error: error.message });
+  }
+});
+
+// POST /api/clients/:id/upload-logo - Upload/replace a client's logo
+router.post('/clients/:id/upload-logo', logoUpload.single('logo'), async (req, res) => {
+  try {
+    const { Client } = req.app.locals.models;
+    const client = await Client.findByPk(req.params.id);
+    if (!client) {
+      return res.status(404).json({ success: false, message: 'Client not found' });
+    }
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: 'No logo file provided or file exceeds 5MB limit' });
+    }
+
+    const clientFolder = await getOrCreateClientFolder(client.name, client.id);
+    const driveResult = await uploadFileToDrive(req.file.buffer, req.file.originalname, req.file.mimetype, clientFolder.folderId);
+
+    await client.update({ logo: driveResult.proxyLink });
+
+    res.json({ success: true, message: 'Logo uploaded successfully', data: redactForRole(formatArrayFields(client.toJSON()), req.user?.role) });
+  } catch (error) {
+    console.error('Error uploading client logo:', error);
+    res.status(500).json({ success: false, message: error.message || 'Error uploading logo', error: error.message });
   }
 });
 
@@ -228,10 +332,11 @@ router.put('/clients/:id', async (req, res) => {
       return res.status(404).json({ success: false, message: 'Client not found' });
     }
 
-    const updateData = prepareClientData(req.body);
+    const updateData = prepareClientUpdateData(req.body);
+    if (req.user?.role !== 'admin') delete updateData.invoices;
     await client.update(updateData);
 
-    res.json({ success: true, message: 'Client updated successfully', data: formatArrayFields(client.toJSON()) });
+    res.json({ success: true, message: 'Client updated successfully', data: redactForRole(formatArrayFields(client.toJSON()), req.user?.role) });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Error updating client', error: error.message });
   }
@@ -240,10 +345,34 @@ router.put('/clients/:id', async (req, res) => {
 // DELETE /api/clients/:id - Delete client
 router.delete('/clients/:id', async (req, res) => {
   try {
-    const { Client } = req.app.locals.models;
+    const { Client, TeamMember } = req.app.locals.models;
     const client = await Client.findByPk(req.params.id);
     if (!client) {
       return res.status(404).json({ success: false, message: 'Client not found' });
+    }
+
+    // `clientHandling` on TeamMember is a free-typed list of client *names*
+    // with no FK to Client — the team profile page falls back to displaying
+    // it verbatim when a member has no clients formally assigned via
+    // clientManagedBy, so a deleted client's name would otherwise keep
+    // showing there forever. Strip it from every member's list here, the
+    // same way task titles get cleaned out of assignedWorks when a task is
+    // removed.
+    const membersWithHandling = await TeamMember.findAll({
+      where: { clientHandling: { [Op.ne]: null } },
+    });
+    for (const member of membersWithHandling) {
+      let names = [];
+      try {
+        names = JSON.parse(member.clientHandling);
+      } catch {
+        names = [];
+      }
+      if (!Array.isArray(names)) continue;
+      const filtered = names.filter((name) => String(name).toLowerCase() !== client.name.toLowerCase());
+      if (filtered.length !== names.length) {
+        await member.update({ clientHandling: filtered.length > 0 ? JSON.stringify(filtered) : null });
+      }
     }
 
     await client.destroy();

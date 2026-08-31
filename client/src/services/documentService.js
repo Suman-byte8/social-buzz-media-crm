@@ -35,6 +35,59 @@ export const deleteDocument = async (id) => {
   return response;
 };
 
+// Fetches the raw PDF bytes for an already-uploaded document (agreement,
+// invoice, etc.) — used to hand the actual file to the Web Share API
+// instead of sharing a link.
+export const fetchDocumentBlob = async (id) => {
+  return apiClient(`/documents/${id}/stream`, { responseType: "blob" });
+};
+
+// ── Proposals ────────────────────────────────────────────────────────────
+
+export const fetchProposals = async (clientId) => {
+  const params = new URLSearchParams({ documentType: "proposal" });
+  if (clientId) params.append("clientId", clientId);
+  const response = await apiClient(`/documents?${params.toString()}`);
+  return response;
+};
+
+export const uploadProposal = async (formData) => {
+  const response = await apiClient("/documents/upload", {
+    method: "POST",
+    body: formData,
+  });
+  return response;
+};
+
+// ── Invoice Documents ────────────────────────────────────────────────────
+// The PDFs saved to Drive via the Invoice Builder's "Save to Drive" action
+// (documentType: "invoice") — distinct from the legacy free-text
+// `client.invoices` field.
+
+export const fetchInvoiceDocuments = async (clientId) => {
+  const params = new URLSearchParams({ documentType: "invoice" });
+  if (clientId) params.append("clientId", clientId);
+  const response = await apiClient(`/documents?${params.toString()}`);
+  return response;
+};
+
+// ── Brand Kit ────────────────────────────────────────────────────────────
+
+export const fetchBrandKitFiles = async (clientId) => {
+  const params = new URLSearchParams({ documentType: "brand_kit" });
+  if (clientId) params.append("clientId", clientId);
+  const response = await apiClient(`/documents?${params.toString()}`);
+  return response;
+};
+
+export const uploadBrandKitFile = async (formData) => {
+  const response = await apiClient("/documents/upload-media", {
+    method: "POST",
+    body: formData,
+  });
+  return response;
+};
+
 // ── Agreements ───────────────────────────────────────────────────────────
 
 export const fetchAgreements = async (clientId) => {

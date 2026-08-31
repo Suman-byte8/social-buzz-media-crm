@@ -10,12 +10,12 @@ import {
   deleteContentCalendarEntry,
   uploadCreatives,
   deleteCreative,
-  setEntryPostedLocal,
+  setEntryStatusLocal,
 } from "@/redux/slices/contentCalendarSlice";
 import ContentCalendarTable from "./ContentCalendarTable";
 import ContentCalendarPrintView from "./ContentCalendarPrintView";
 import { exportContentCalendarToPdf } from "@/lib/ContentCalendarPdfExport";
-import { PLATFORM_OPTIONS } from "./constants";
+import { PLATFORM_OPTIONS, STATUS_OPTIONS } from "./constants";
 
 let draftIdCounter = 0;
 const nextDraftId = () => `draft-${Date.now()}-${draftIdCounter++}`;
@@ -30,7 +30,7 @@ const blankDraft = (clientId) => ({
   caption: "",
   hashtags: "",
   platforms: [],
-  posted: false,
+  status: "pending",
   stagedFiles: [],
 });
 
@@ -41,7 +41,7 @@ export default function ContentCalendarShell() {
 
   const [selectedClientId, setSelectedClientId] = useState("");
   const [platformFilter, setPlatformFilter] = useState("all");
-  const [postedFilter, setPostedFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
   const [month, setMonth] = useState("");
   const [search, setSearch] = useState("");
 
@@ -67,13 +67,13 @@ export default function ContentCalendarShell() {
   useEffect(() => {
     loadEntries();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedClientId, platformFilter, postedFilter, month]);
+  }, [selectedClientId, platformFilter, statusFilter, month]);
 
   const loadEntries = () => {
     const params = {
       clientId: selectedClientId || undefined,
       platform: platformFilter !== "all" ? platformFilter : undefined,
-      posted: postedFilter !== "all" ? postedFilter : undefined,
+      status: statusFilter !== "all" ? statusFilter : undefined,
     };
     if (month) {
       const [year, m] = month.split("-").map(Number);
@@ -98,8 +98,10 @@ export default function ContentCalendarShell() {
 
   const stats = useMemo(() => {
     const total = filteredEntries.length;
-    const posted = filteredEntries.filter((e) => e.posted).length;
-    return { total, posted, pending: total - posted };
+    const posted = filteredEntries.filter((e) => e.status === "posted").length;
+    const scheduled = filteredEntries.filter((e) => e.status === "scheduled").length;
+    const pending = filteredEntries.filter((e) => e.status === "pending" || !e.status).length;
+    return { total, posted, scheduled, pending };
   }, [filteredEntries]);
 
   // ── Bulk add (draft rows) ────────────────────────────────────────────
@@ -157,7 +159,7 @@ export default function ContentCalendarShell() {
       caption: draft.caption.trim(),
       hashtags: draft.hashtags.trim(),
       platforms: draft.platforms,
-      posted: draft.posted,
+      status: draft.status,
     };
 
     const response = await dispatch(createContentCalendarEntry(payload)).unwrap();
@@ -213,7 +215,7 @@ export default function ContentCalendarShell() {
       caption: entry.caption || "",
       hashtags: entry.hashtags || "",
       platforms: entry.platforms || [],
-      posted: !!entry.posted,
+      status: entry.status || "pending",
     });
     setEditExistingCreatives(entry.creatives || []);
     setEditStagedFiles([]);
@@ -276,7 +278,7 @@ export default function ContentCalendarShell() {
             caption: editValues.caption.trim(),
             hashtags: editValues.hashtags.trim(),
             platforms: editValues.platforms,
-            posted: editValues.posted,
+            status: editValues.status,
           },
         })
       ).unwrap();
@@ -305,15 +307,15 @@ export default function ContentCalendarShell() {
     }
   };
 
-  const handleTogglePosted = async (entry) => {
-    const nextPosted = !entry.posted;
-    dispatch(setEntryPostedLocal({ id: entry.id, posted: nextPosted }));
+  const handleStatusChange = async (entry, nextStatus) => {
+    const previousStatus = entry.status;
+    dispatch(setEntryStatusLocal({ id: entry.id, status: nextStatus }));
     try {
-      await dispatch(updateContentCalendarEntry({ id: entry.id, data: { posted: nextPosted } })).unwrap();
+      await dispatch(updateContentCalendarEntry({ id: entry.id, data: { status: nextStatus } })).unwrap();
     } catch (error) {
-      console.error("Error updating posted status:", error);
-      dispatch(setEntryPostedLocal({ id: entry.id, posted: entry.posted }));
-      alert("Failed to update posted status.");
+      console.error("Error updating status:", error);
+      dispatch(setEntryStatusLocal({ id: entry.id, status: previousStatus }));
+      alert("Failed to update status.");
     }
   };
 
@@ -415,6 +417,10 @@ export default function ContentCalendarShell() {
               <p className="text-base font-bold text-green-600 leading-tight">{stats.posted}</p>
             </div>
             <div className="text-center px-1.5">
+              <p className="text-[10px] text-gray-500 uppercase tracking-wider leading-none">Scheduled</p>
+              <p className="text-base font-bold text-blue-600 leading-tight">{stats.scheduled}</p>
+            </div>
+            <div className="text-center px-1.5">
               <p className="text-[10px] text-gray-500 uppercase tracking-wider leading-none">Pending</p>
               <p className="text-base font-bold text-amber-600 leading-tight">{stats.pending}</p>
             </div>
@@ -461,13 +467,14 @@ export default function ContentCalendarShell() {
 
           <div className="min-w-[100px]">
             <select
-              value={postedFilter}
-              onChange={(e) => setPostedFilter(e.target.value)}
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
               className="w-full px-2 py-1.5 border border-gray-300 rounded-lg text-xs text-on-surface focus:ring-1 focus:ring-primary focus:border-primary outline-none"
             >
               <option value="all">All Status</option>
-              <option value="true">Posted</option>
-              <option value="false">Pending</option>
+              {STATUS_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
             </select>
           </div>
 
@@ -505,7 +512,7 @@ export default function ContentCalendarShell() {
           clients={clients}
           onEdit={handleStartEdit}
           onDelete={handleDelete}
-          onTogglePosted={handleTogglePosted}
+          onStatusChange={handleStatusChange}
           onShare={handleShare}
           draftRows={draftRows}
           onDraftChange={handleDraftChange}

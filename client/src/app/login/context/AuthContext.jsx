@@ -1,19 +1,29 @@
 "use client";
 
-"use client";
-
 import { createContext, useContext, useState, useEffect } from 'react';
 import { saveToStorage, getFromStorage, removeFromStorage } from '@/utils/storage';
+import { apiClient } from '@/services/apiClient';
 import { useRouter } from 'next/navigation';
 
 const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
   const router = useRouter();
-  const [isAuthenticated, setIsAuthenticated] = useState(() => {
-    const token = getFromStorage('auth_token');
-    return token !== null;
-  });
+  // Start in the logged-out shape unconditionally so the very first client
+  // render matches the server-rendered HTML (the server has no localStorage
+  // to read). The real cached values are loaded right after in an effect,
+  // which only runs post-hydration — reading localStorage in a useState
+  // initializer instead causes a hydration mismatch, since that initializer
+  // also runs during the client's first (pre-hydration-check) render.
+  const [user, setUser] = useState(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [hydrated, setHydrated] = useState(false);
+
+  useEffect(() => {
+    setUser(getFromStorage('auth_user'));
+    setIsAuthenticated(getFromStorage('auth_token') !== null);
+    setHydrated(true);
+  }, []);
 
   const login = async (email, password) => {
     try {
@@ -28,6 +38,8 @@ export const AuthProvider = ({ children }) => {
       const data = await response.json();
       if (data.success && data.token) {
         saveToStorage('auth_token', data.token);
+        saveToStorage('auth_user', data.user);
+        setUser(data.user);
         setIsAuthenticated(true);
         router.push('/dashboard');
         return true;
@@ -42,24 +54,38 @@ export const AuthProvider = ({ children }) => {
 
   const logout = () => {
     removeFromStorage('auth_token');
+    removeFromStorage('auth_user');
+    setUser(null);
     setIsAuthenticated(false);
     router.push('/login');
   };
 
   useEffect(() => {
+    if (!hydrated) return;
+
     if (isAuthenticated) {
-      // Optionally, you can add a token validation here
-    } else {
-      // If not authenticated and not on login page, redirect to login
-      // Note: We avoid redirecting on login page to prevent infinite loop
-      if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
-        router.push('/login');
-      }
+      // Re-validate the token and refresh role/name in case they changed
+      // (or the token has since expired) since it was last cached.
+      apiClient('/auth/me')
+        .then((data) => {
+          if (data?.user) {
+            saveToStorage('auth_user', data.user);
+            setUser(data.user);
+          }
+        })
+        .catch(() => {
+          // apiClient already clears storage and redirects on 401.
+        });
+    } else if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
+      router.push('/login');
     }
-  }, [isAuthenticated, router]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hydrated, isAuthenticated]);
+
+  const role = user?.role || null;
 
   return (
-    <AuthContext.Provider value={{ isAuthenticated, login, logout }}>
+    <AuthContext.Provider value={{ isAuthenticated, user, role, isAdmin: role === 'admin', login, logout }}>
       {children}
     </AuthContext.Provider>
   );

@@ -14,7 +14,11 @@ const contentCalendarEntryModel = (sequelize) => {
       hashtags: { type: DataTypes.TEXT, allowNull: true },
       // JSON-stringified array, e.g. ["facebook","instagram"]
       platforms: { type: DataTypes.TEXT, allowNull: true },
-      posted: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false },
+      status: {
+        type: DataTypes.ENUM("pending", "scheduled", "posted"),
+        allowNull: false,
+        defaultValue: "pending",
+      },
       postedAt: { type: DataTypes.DATE, allowNull: true },
       // JSON-stringified array of { fileId, fileName, mimeType, driveLink, webViewLink, thumbnailLink, folderId, uploadedAt }
       creatives: { type: DataTypes.TEXT, allowNull: true },
@@ -29,6 +33,7 @@ const contentCalendarEntryModel = (sequelize) => {
     },
     {
       tableName: "content_calendar_entries",
+      indexes: [{ fields: ["clientId"] }, { fields: ["status"] }],
     }
   );
 

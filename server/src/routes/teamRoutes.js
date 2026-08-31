@@ -110,12 +110,36 @@ router.post("/team-members", async (req, res) => {
 });
 
 // GET /api/team-members - Get all team members
+// `page`/`limit` are optional — omitting them preserves the historical
+// "return everything" behavior existing callers rely on; passing them
+// opts into paginated results plus a `pagination` block, same shape as
+// the clients/tasks endpoints.
 router.get("/team-members", async (req, res) => {
   try {
     const { TeamMember } = req.app.locals.models;
-    const teamMembers = await TeamMember.findAll({
-      order: [["createdAt", "DESC"]],
-    });
+    const { page, limit } = req.query;
+    const queryOptions = { order: [["createdAt", "DESC"]] };
+
+    if (limit) {
+      const parsedLimit = parseInt(limit);
+      const parsedPage = parseInt(page) || 1;
+      queryOptions.limit = parsedLimit;
+      queryOptions.offset = (parsedPage - 1) * parsedLimit;
+
+      const { count, rows } = await TeamMember.findAndCountAll(queryOptions);
+      return res.json({
+        success: true,
+        data: rows,
+        pagination: {
+          total: count,
+          page: parsedPage,
+          limit: parsedLimit,
+          totalPages: Math.ceil(count / parsedLimit),
+        },
+      });
+    }
+
+    const teamMembers = await TeamMember.findAll(queryOptions);
     res.json({ success: true, data: teamMembers });
   } catch (error) {
     res.status(500).json({

@@ -52,38 +52,25 @@ export default function Overview({ client, clientId, teamMembers = [] }) {
     : null;
 
   const metrics = [
-    {
-      id: 1,
-      title: "Client Health",
-      value: `${clientHealth}%`,
-      change: `${healthLabel} health score`,
-      progress: clientHealth,
-    },
-    {
-      id: 2,
-      title: "Active Services",
-      value: serviceList.length,
-      change: serviceList.length > 0 ? `${serviceList.length} service${serviceList.length > 1 ? "s" : ""} active` : "No active services",
-    },
-    {
-      id: 3,
-      title: "Client Since",
-      value: client?.createdAt ? new Date(client.createdAt).toLocaleDateString("en-US", { month: "short", year: "numeric" }) : "N/A",
-      change: "",
-    },
-    {
-      id: 4,
-      title: "Next Renewal",
-      value: client?.renewal ? new Date(client.renewal).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "Not set",
-      change: daysUntilRenewal !== null ? (daysUntilRenewal >= 0 ? `${daysUntilRenewal} days away` : "Overdue") : "",
-    },
+    { id: 1, title: "Active Services", value: services.length, change: services.length > 0 ? `${services.length} service${services.length > 1 ? 's' : ''} active` : "No active services" },
+    { id: 2, title: "Client Health", value: `${clientHealth}%`, change: `${healthLabel} health score` },
+    { id: 3, title: "Client Since", value: (client?.clientSince || client?.createdAt) ? new Date(client.clientSince || client.createdAt).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : "N/A", change: "" },
+    { id: 4, title: "Next Renewal", value: client?.renewal ? new Date(client.renewal).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : "Not set", change: daysUntilRenewal !== null ? (daysUntilRenewal >= 0 ? `${daysUntilRenewal} days away` : "Overdue") : "" },
   ];
 
-  const recentActivities = useMemo(() => {
-    return [...meetingNotes]
-      .sort((a, b) => new Date(b.meetingDate || b.createdAt) - new Date(a.meetingDate || a.createdAt))
-      .slice(0, 5);
-  }, [meetingNotes]);
+  const recentActivities = client?.notes ? [
+    { id: 1, date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }), message: client.notes.substring(0, 100) + (client.notes.length > 100 ? '...' : ''), type: "Note" },
+  ] : [
+    { id: 1, date: "N/A", message: "No recent activity recorded", type: "Note" },
+  ];
+
+  const keyContacts = [
+    { role: "Client Name", name: clientName },
+    { role: "Email", name: client?.email || "N/A" },
+    { role: "Phone", name: client?.phoneNumber || "N/A" },
+    { role: "WhatsApp", name: client?.whatsappNumber || "N/A" },
+    { role: "Website", name: client?.website || "N/A" },
+  ];
 
   return (
     <main className="flex-1 overflow-y-auto p-container-margin">

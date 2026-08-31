@@ -46,7 +46,7 @@ const InvoiceDocument = forwardRef(function InvoiceDocument(props, ref) {
     <article
       ref={ref}
       id="invoiceSheet"
-      className="sheet relative mx-auto bg-white p-[14mm] shadow-[0_18px_50px_rgba(26,26,26,.16)]"
+      className="sheet relative mx-auto w-[210mm] min-h-[297mm] shrink-0 bg-white p-[14mm] shadow-[0_18px_50px_rgba(26,26,26,.16)]"
     >
       {/*
         data-html2canvas-ignore: html2canvas can't render CSS blur() filters

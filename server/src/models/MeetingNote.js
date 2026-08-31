@@ -28,6 +28,7 @@ const meetingNoteModel = (sequelize) => {
     },
     {
       tableName: "meeting_notes",
+      indexes: [{ fields: ["clientId"] }],
     }
   );
 

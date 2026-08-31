@@ -5,6 +5,7 @@ import { useDispatch, useSelector } from "react-redux";
 import ProposalTab from "@/components/clients/ProposalTab";
 import Overview from "@/components/clients/Overview";
 import Credentials from "@/components/clients/Credentials";
+import BrandKit from "@/components/clients/BrandKit";
 import AdsTab from "@/components/clients/AdsTab";
 import MetaAdsTab from "@/components/clients/MetaAdsTab";
 import SocialMedia from "@/components/clients/SocialMedia";
@@ -16,16 +17,19 @@ import ContentCalendarTab from "@/components/clients/ContentCalendarTab";
 import AddEditClientModal from "@/components/clients/AddEditClientModal";
 import { fetchClientById } from "@/redux/slices/clientsSlice";
 import { fetchTeamMembers } from "@/redux/slices/teamSlice";
+import { getAssetUrl } from "@/services/apiClient";
+import { useAuth } from "@/app/login/context/AuthContext";
 
 const tabs = [
   { id: "overview", label: "Overview", icon: "grid_view" },
-  { id: "proposal", label: "Proposal", icon: "description" },
+  { id: "proposal", label: "Proposal", icon: "description", adminOnly: true },
   { id: "credentials", label: "Credentials", icon: "key" },
+  { id: "brand_kit", label: "Brand Kit", icon: "palette" },
   { id: "google_ads", label: "Google Ads", icon: "ads_click" },
   { id: "meta_ads", label: "Meta Ads", icon: "campaign" },
   { id: "social", label: "Social", icon: "thumb_up" },
   { id: "reports", label: "Reports", icon: "bar_chart" },
-  { id: "invoices", label: "Invoices", icon: "receipt_long" },
+  { id: "invoices", label: "Invoices", icon: "receipt_long", adminOnly: true },
   { id: "notes", label: "Notes", icon: "event_note" },
   { id: "renewal", label: "Renewal", icon: "autorenew" },
   { id: "content_calendar", label: "Content Calendar", icon: "calendar_today" },
@@ -35,6 +39,8 @@ export default function ClientDetailContent({ activeTab, setActiveTab, client = 
   const dispatch = useDispatch();
   const teamMembers = useSelector((state) => state.team.teamMembers);
   const [editModalOpen, setEditModalOpen] = useState(false);
+  const { isAdmin } = useAuth();
+  const visibleTabs = tabs.filter((tab) => !tab.adminOnly || isAdmin);
 
   useEffect(() => {
     if (teamMembers.length === 0) {
@@ -47,7 +53,14 @@ export default function ClientDetailContent({ activeTab, setActiveTab, client = 
   const clientHealth = client.clientHealth ?? 0;
   const healthLabel = clientHealth >= 80 ? "Excellent" : clientHealth >= 50 ? "Fair" : "At Risk";
   const healthColor = clientHealth >= 80 ? "green" : clientHealth >= 50 ? "amber" : "red";
-  const credentials = client.credentials && typeof client.credentials === "object" ? client.credentials : (client.credentials ? JSON.parse(client.credentials) : {});
+
+  const clientSinceDate = client.clientSince || client.createdAt;
+  const daysAsClient = clientSinceDate
+    ? Math.max(0, Math.floor((new Date() - new Date(clientSinceDate)) / (1000 * 60 * 60 * 24)))
+    : null;
+  const clientSinceLabel = clientSinceDate
+    ? new Date(clientSinceDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+    : null;
 
   const handleEditSuccess = () => {
     setEditModalOpen(false);
@@ -59,10 +72,18 @@ export default function ClientDetailContent({ activeTab, setActiveTab, client = 
       {/* Client Header Section */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-stack-md bg-surface p-card-padding rounded-xl border border-outline-variant shadow-sm">
         <div className="flex items-center gap-stack-md">
-          <div className="w-16 h-16 rounded-xl overflow-hidden border border-surface-variant bg-primary-container flex items-center justify-center shrink-0 shadow-sm">
-            <span className="font-display-md text-display-md text-primary font-bold">
-              {clientName[0]?.toUpperCase()}
-            </span>
+          <div
+            className={`w-28 h-28 rounded-xl flex items-center justify-center shrink-0 ${
+              client.logo ? "" : "border border-surface-variant bg-primary-container shadow-sm"
+            }`}
+          >
+            {client.logo ? (
+              <img src={getAssetUrl(client.logo)} alt={clientName} className="w-full h-full object-contain" />
+            ) : (
+              <span className="font-display-md text-display-md text-primary font-bold">
+                {clientName[0]?.toUpperCase()}
+              </span>
+            )}
           </div>
           <div className="flex flex-col">
             <div className="flex items-center gap-3 flex-wrap">
@@ -81,6 +102,15 @@ export default function ClientDetailContent({ activeTab, setActiveTab, client = 
                 }`}></span>
                 {healthLabel} Client
               </span>
+              {daysAsClient !== null && (
+                <span
+                  title={`Client since ${clientSinceLabel}`}
+                  className="px-3 py-1 rounded-full font-label-sm text-label-sm flex items-center gap-1.5 bg-blue-50 text-blue-700 border border-blue-200"
+                >
+                  <span className="material-symbols-outlined text-[16px]">event_available</span>
+                  Client since {daysAsClient.toLocaleString()} days
+                </span>
+              )}
             </div>
             <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1">
               <p className="font-body-sm text-body-sm text-secondary flex items-center gap-1.5 m-0">
@@ -126,7 +156,7 @@ export default function ClientDetailContent({ activeTab, setActiveTab, client = 
           aria-label="Tabs"
           className="flex flex-wrap items-center gap-1 text-xs"
         >
-          {tabs.map((tab) => (
+          {visibleTabs.map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab?.(tab.id)}
@@ -146,10 +176,12 @@ export default function ClientDetailContent({ activeTab, setActiveTab, client = 
       </div>
 
       {/* Dynamic Tab Content */}
-      {activeTab === "proposal" ? (
-        <ProposalTab client={client} />
+      {activeTab === "proposal" && isAdmin ? (
+        <ProposalTab client={client} clientId={clientId} />
       ) : activeTab === "credentials" ? (
-        <Credentials client={client} credentials={credentials} />
+        <Credentials client={client} clientId={clientId} />
+      ) : activeTab === "brand_kit" ? (
+        <BrandKit client={client} clientId={clientId} />
       ) : activeTab === "google_ads" ? (
         <AdsTab client={client} />
       ) : activeTab === "meta_ads" ? (
@@ -158,7 +190,7 @@ export default function ClientDetailContent({ activeTab, setActiveTab, client = 
         <SocialMedia client={client} />
       ) : activeTab === "reports" ? (
         <Reports client={client} />
-      ) : activeTab === "invoices" ? (
+      ) : activeTab === "invoices" && isAdmin ? (
         <Invoices client={client} clientId={clientId} />
       ) : activeTab === "notes" ? (
         <Notes client={client} clientId={clientId} />

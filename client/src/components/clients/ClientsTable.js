@@ -3,6 +3,7 @@
 import React from "react";
 import Link from "next/link";
 import StatusBadge from "@/components/ui/StatusBadge";
+import { getAssetUrl } from "@/services/apiClient";
 
 const COLUMNS = [
   { key: "name", label: "Client Name" },
@@ -98,8 +99,16 @@ export default function ClientsTable({
                   <td className="py-4 px-4">
                     <Link href={`/clients/${client.id}`} className="block">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-lg border border-outline-variant flex items-center justify-center bg-primary-container/10 shrink-0">
-                          <span className="font-bold text-primary">{initialsFor(client.name)}</span>
+                        <div
+                          className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${
+                            client.logo ? "" : "border border-outline-variant bg-primary-container/10"
+                          }`}
+                        >
+                          {client.logo ? (
+                            <img src={getAssetUrl(client.logo)} alt={client.name} className="w-full h-full object-contain" />
+                          ) : (
+                            <span className="font-bold text-primary">{initialsFor(client.name)}</span>
+                          )}
                         </div>
                         <div>
                           <p className="font-title-lg text-title-lg text-on-surface">{client.name}</p>

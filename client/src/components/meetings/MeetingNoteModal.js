@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
-import { useDispatch } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 import { createMeetingNote, updateMeetingNote } from "@/redux/slices/meetingNotesSlice";
+import { fetchTeamMembers } from "@/redux/slices/teamSlice";
 
 export default function MeetingNoteModal({
   open,
@@ -12,14 +13,22 @@ export default function MeetingNoteModal({
   isEdit = false,
 }) {
   const dispatch = useDispatch();
+  const teamMembers = useSelector((state) => state.team.teamMembers);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [meetingDate, setMeetingDate] = useState("");
   const [meetingType, setMeetingType] = useState("other");
-  const [attendees, setAttendees] = useState("");
+  const [attendees, setAttendees] = useState([]);
+  const [attendeesOpen, setAttendeesOpen] = useState(false);
   const [actionItems, setActionItems] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+
+  useEffect(() => {
+    if (open) {
+      dispatch(fetchTeamMembers());
+    }
+  }, [open, dispatch]);
 
   useEffect(() => {
     if (meetingNoteToEdit) {
@@ -27,18 +36,28 @@ export default function MeetingNoteModal({
       setDescription(meetingNoteToEdit.description || "");
       setMeetingDate(meetingNoteToEdit.meetingDate || "");
       setMeetingType(meetingNoteToEdit.meetingType || "other");
-      setAttendees(meetingNoteToEdit.attendees || "");
+      setAttendees(
+        meetingNoteToEdit.attendees
+          ? meetingNoteToEdit.attendees.split(",").map((name) => name.trim()).filter(Boolean)
+          : []
+      );
       setActionItems(meetingNoteToEdit.actionItems || "");
     } else {
       setTitle("");
       setDescription("");
       setMeetingDate("");
       setMeetingType("other");
-      setAttendees("");
+      setAttendees([]);
       setActionItems("");
     }
     setError(null);
   }, [meetingNoteToEdit, open]);
+
+  const toggleAttendee = (name) => {
+    setAttendees((prev) =>
+      prev.includes(name) ? prev.filter((n) => n !== name) : [...prev, name]
+    );
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -63,7 +82,7 @@ export default function MeetingNoteModal({
         description: description.trim() || null,
         meetingDate: meetingDate || null,
         meetingType,
-        attendees: attendees.trim() || null,
+        attendees: attendees.length > 0 ? attendees.join(", ") : null,
         actionItems: actionItems.trim() || null,
         clientId,
       };
@@ -95,7 +114,7 @@ export default function MeetingNoteModal({
 
   return (
     <div className="fixed inset-0 backdrop-blur-sm bg-black/30 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 p-6">
+      <div className="bg-white rounded-lg shadow-xl max-w-3xl w-full mx-4 p-6">
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-xl font-bold text-gray-900">
             {isEdit ? "Edit Meeting Note" : "Add Meeting Note"}
@@ -195,18 +214,78 @@ export default function MeetingNoteModal({
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-3">
+            <div className="space-y-3 relative">
               <label className="block text-sm font-medium text-gray-700">
                 Attendees
               </label>
-              <input
-                type="text"
-                value={attendees}
-                onChange={(e) => setAttendees(e.target.value)}
-                className="w-full py-2 px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                placeholder="Comma separated names"
+              <div className="flex flex-wrap gap-2 p-2 bg-gray-50 rounded-md border border-gray-200 min-h-[42px]">
+                {attendees.length > 0 ? (
+                  attendees.map((name) => (
+                    <span
+                      key={name}
+                      className="inline-flex items-center gap-1.5 px-3 py-1 bg-blue-50 text-blue-800 rounded-md text-xs border border-blue-200 font-medium"
+                    >
+                      <span>{name}</span>
+                      <button
+                        type="button"
+                        onClick={() => toggleAttendee(name)}
+                        disabled={loading}
+                        className="hover:bg-blue-200 p-0.5 rounded-full text-blue-700 transition-colors"
+                        title="Remove attendee"
+                      >
+                        <span className="material-symbols-outlined text-[14px]">close</span>
+                      </button>
+                    </span>
+                  ))
+                ) : (
+                  <span className="text-xs text-gray-400 italic py-1">No attendees added yet</span>
+                )}
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setAttendeesOpen((prev) => !prev)}
                 disabled={loading}
-              />
+                className="w-full py-2 px-3 border border-gray-300 rounded-md bg-white text-left text-sm flex items-center justify-between gap-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              >
+                <span className="text-gray-500">Select attendees…</span>
+                <span className="material-symbols-outlined text-[20px] text-gray-500 shrink-0">
+                  {attendeesOpen ? "expand_less" : "expand_more"}
+                </span>
+              </button>
+
+              {attendeesOpen && (
+                <>
+                  <div className="fixed inset-0 z-10" onClick={() => setAttendeesOpen(false)} />
+                  <div className="absolute z-20 mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg max-h-56 overflow-y-auto">
+                    {teamMembers.length === 0 ? (
+                      <p className="px-4 py-3 text-xs text-gray-400 italic">No team members found</p>
+                    ) : (
+                      teamMembers.map((member) => {
+                        const isSelected = attendees.includes(member.name);
+                        return (
+                          <div
+                            key={member.id}
+                            onClick={() => toggleAttendee(member.name)}
+                            className={`flex items-center gap-2 px-4 py-2 cursor-pointer transition-colors ${
+                              isSelected ? "bg-blue-50" : "hover:bg-gray-50"
+                            }`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={() => toggleAttendee(member.name)}
+                              onClick={(e) => e.stopPropagation()}
+                              className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                            />
+                            <span className="text-sm text-gray-900">{member.name}</span>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </>
+              )}
             </div>
 
             <div className="space-y-3">

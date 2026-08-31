@@ -1,10 +1,24 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useDispatch } from "react-redux";
-import { createClient, updateClient } from "@/redux/slices/clientsSlice";
+import { createClient, updateClient, uploadClientLogo } from "@/redux/slices/clientsSlice";
+import { getAssetUrl } from "@/services/apiClient";
 
 const INDUSTRY_OPTIONS = ["SaaS", "E-commerce", "Healthcare", "Finance", "Education", "Real Estate", "Other"];
+const SERVICE_OPTIONS = [
+  "Digital Marketing",
+  "Performance Marketing",
+  "Social Media Marketing",
+  "Web Development",
+  "Search Engine Optimization (Local SEO)",
+  "Brand Identity",
+  "Data Analytics",
+  "Content Strategy",
+  "Creative Design",
+];
+const MAX_LOGO_SIZE = 5 * 1024 * 1024;
+const todayISO = () => new Date().toISOString().split("T")[0];
 
 const toArray = (value) =>
   Array.isArray(value) ? value : value ? value.split(",").map((s) => s.trim()).filter(Boolean) : [];
@@ -39,14 +53,22 @@ function ClientForm({ client, teamMembers, onClose, onSuccess }) {
     whatsappNumber: "",
     address: "",
     email: "",
+    website: "",
     servicesSelected: [],
     clientManagedBy: "",
     clientHealth: 50,
     notes: "",
     renewal: "",
+    clientSince: todayISO(),
   });
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
+  const [servicesOpen, setServicesOpen] = useState(false);
+
+  const logoInputRef = useRef(null);
+  const [logoFile, setLogoFile] = useState(null);
+  const [logoPreview, setLogoPreview] = useState(null);
+  const [logoError, setLogoError] = useState("");
 
   useEffect(() => {
     if (client) {
@@ -57,18 +79,52 @@ function ClientForm({ client, teamMembers, onClose, onSuccess }) {
         whatsappNumber: client.whatsappNumber || "",
         address: client.address || "",
         email: client.email || "",
+        website: client.website || "",
         servicesSelected: toArray(client.servicesSelected),
         clientManagedBy: client.clientManagedBy || "",
         clientHealth: client.clientHealth ?? 50,
         notes: client.notes || "",
         renewal: client.renewal ? new Date(client.renewal).toISOString().split("T")[0] : "",
+        clientSince: (client.clientSince || client.createdAt)
+          ? new Date(client.clientSince || client.createdAt).toISOString().split("T")[0]
+          : todayISO(),
       });
+      setLogoPreview(client.logo || null);
     }
+    setLogoFile(null);
+    setLogoError("");
   }, [client]);
+
+  const handleLogoChange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      setLogoError("Only image files are allowed");
+      e.target.value = "";
+      return;
+    }
+    if (file.size > MAX_LOGO_SIZE) {
+      setLogoError("Logo must be under 5MB");
+      e.target.value = "";
+      return;
+    }
+    setLogoError("");
+    setLogoFile(file);
+    setLogoPreview(URL.createObjectURL(file));
+  };
 
   const handleChange = (field, value) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
     if (errors[field]) setErrors((prev) => ({ ...prev, [field]: null }));
+  };
+
+  const toggleService = (service) => {
+    setFormData((prev) => ({
+      ...prev,
+      servicesSelected: prev.servicesSelected.includes(service)
+        ? prev.servicesSelected.filter((s) => s !== service)
+        : [...prev.servicesSelected, service],
+    }));
   };
 
   const validateForm = () => {
@@ -96,13 +152,26 @@ function ClientForm({ client, teamMembers, onClose, onSuccess }) {
         clientManagedBy: formData.clientManagedBy ? parseInt(formData.clientManagedBy) : null,
         clientHealth: parseInt(formData.clientHealth),
         renewal: formData.renewal ? new Date(formData.renewal).toISOString() : null,
+        clientSince: formData.clientSince || null,
       };
+
+      let clientId = client?.id;
 
       if (client) {
         await dispatch(updateClient({ id: client.id, clientData: payload })).unwrap();
       } else {
-        await dispatch(createClient(payload)).unwrap();
+        const created = await dispatch(createClient(payload)).unwrap();
+        clientId = created?.data?.id;
       }
+
+      if (logoFile && clientId) {
+        try {
+          await dispatch(uploadClientLogo({ id: clientId, file: logoFile })).unwrap();
+        } catch (logoErr) {
+          alert((typeof logoErr === "string" ? logoErr : logoErr?.message) || "Client saved, but the logo failed to upload.");
+        }
+      }
+
       onSuccess();
     } catch (error) {
       console.error("Error saving client:", error);
@@ -114,6 +183,35 @@ function ClientForm({ client, teamMembers, onClose, onSuccess }) {
 
   return (
     <form onSubmit={handleSubmit} className="p-6 space-y-6">
+      <div className="flex items-center gap-4">
+        <div
+          className={`w-20 h-20 rounded-xl flex items-center justify-center shrink-0 ${
+            logoPreview ? "" : "border border-outline-variant bg-primary-container/10"
+          }`}
+        >
+          {logoPreview ? (
+            <img src={getAssetUrl(logoPreview)} alt="Client logo" className="w-full h-full object-contain" />
+          ) : (
+            <span className="font-display-md text-display-md text-primary font-bold">
+              {formData.name?.[0]?.toUpperCase() || "?"}
+            </span>
+          )}
+        </div>
+        <div>
+          <button
+            type="button"
+            onClick={() => logoInputRef.current?.click()}
+            className="px-3 py-1.5 rounded-lg border border-outline-variant text-secondary font-label-sm text-label-sm hover:bg-gray-50 transition-colors flex items-center gap-1.5"
+          >
+            <span className="material-symbols-outlined text-[16px]">upload</span>
+            {logoPreview ? "Change Logo" : "Upload Logo"}
+          </button>
+          <p className="font-label-sm text-label-sm text-secondary mt-1">Image, up to 5MB</p>
+          {logoError && <p className="text-red-500 text-xs mt-1">{logoError}</p>}
+          <input ref={logoInputRef} type="file" accept="image/*" onChange={handleLogoChange} className="hidden" />
+        </div>
+      </div>
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div>
           <label className="block font-label-sm text-label-sm text-secondary mb-1">Client Name *</label>
@@ -171,6 +269,28 @@ function ClientForm({ client, teamMembers, onClose, onSuccess }) {
           />
         </div>
         <div>
+          <label className="block font-label-sm text-label-sm text-secondary mb-1">Website</label>
+          <input
+            type="text"
+            value={formData.website}
+            onChange={(e) => handleChange("website", e.target.value)}
+            className="w-full px-4 py-2 border border-outline-variant rounded-lg focus:ring-1 focus:ring-primary focus:border-primary bg-white"
+            placeholder="https://example.com"
+          />
+        </div>
+        <div>
+          <label className="block font-label-sm text-label-sm text-secondary mb-1">Client Since</label>
+          <input
+            type="date"
+            value={formData.clientSince}
+            onChange={(e) => handleChange("clientSince", e.target.value)}
+            className="w-full px-4 py-2 border border-outline-variant rounded-lg focus:ring-1 focus:ring-primary focus:border-primary bg-white"
+          />
+          <p className="font-label-sm text-label-sm text-secondary mt-1">
+            Defaults to today — change it if this client actually joined earlier.
+          </p>
+        </div>
+        <div>
           <label className="block font-label-sm text-label-sm text-secondary mb-1">Client Health (%)</label>
           <input
             type="number"
@@ -192,15 +312,60 @@ function ClientForm({ client, teamMembers, onClose, onSuccess }) {
             placeholder="Client address"
           />
         </div>
-        <div className="md:col-span-2">
-          <label className="block font-label-sm text-label-sm text-secondary mb-1">Services Selected (comma separated)</label>
-          <textarea
-            value={formData.servicesSelected.join(", ")}
-            onChange={(e) => handleChange("servicesSelected", e.target.value.split(",").map((s) => s.trim()).filter(Boolean))}
-            rows={2}
-            className="w-full px-4 py-2 border border-outline-variant rounded-lg focus:ring-1 focus:ring-primary focus:border-primary bg-white"
-            placeholder="SEO, Content Marketing, PPC"
-          />
+        <div className="md:col-span-2 relative">
+          <label className="block font-label-sm text-label-sm text-secondary mb-1">Services Provided</label>
+          <button
+            type="button"
+            onClick={() => setServicesOpen((prev) => !prev)}
+            className="w-full min-h-[42px] px-4 py-2 border border-outline-variant rounded-lg bg-white flex items-center justify-between gap-2 text-left focus:ring-1 focus:ring-primary focus:border-primary"
+          >
+            {formData.servicesSelected.length > 0 ? (
+              <span className="flex flex-wrap gap-1.5">
+                {formData.servicesSelected.map((service) => (
+                  <span
+                    key={service}
+                    className="inline-flex items-center rounded-full bg-primary/10 text-primary px-2.5 py-0.5 text-xs font-medium"
+                  >
+                    {service}
+                  </span>
+                ))}
+              </span>
+            ) : (
+              <span className="text-secondary">Select services…</span>
+            )}
+            <span className="material-symbols-outlined text-[20px] text-secondary shrink-0">
+              {servicesOpen ? "expand_less" : "expand_more"}
+            </span>
+          </button>
+
+          {servicesOpen && (
+            <>
+              <div className="fixed inset-0 z-10" onClick={() => setServicesOpen(false)} />
+              <div className="absolute z-20 mt-1 w-full bg-white border border-outline-variant rounded-lg shadow-lg max-h-56 overflow-y-auto">
+                {SERVICE_OPTIONS.map((service) => {
+                  const isSelected = formData.servicesSelected.includes(service);
+                  return (
+                    <div
+                      key={service}
+                      onClick={() => toggleService(service)}
+                      className={`flex items-center gap-2 px-4 py-2 cursor-pointer transition-colors ${
+                        isSelected ? "bg-primary/10" : "hover:bg-gray-50"
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => toggleService(service)}
+                        onClick={(e) => e.stopPropagation()}
+                        className="rounded border-outline-variant text-primary focus:ring-primary"
+                      />
+                      <span className="font-body-sm text-body-sm text-on-surface">{service}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </>
+          )}
         </div>
         <div className="md:col-span-2">
           <label className="block font-label-sm text-label-sm text-secondary mb-1">Account Manager</label>

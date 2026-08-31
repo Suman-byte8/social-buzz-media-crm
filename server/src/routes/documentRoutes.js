@@ -1,6 +1,9 @@
 import express from "express";
 import multer from "multer";
-import { uploadFileToDrive, getFileStreamFromDrive, getOrCreateClientFolder, getOrCreateClientSubfolder } from "../utils/googleDrive.js";
+import { Op } from "sequelize";
+import { uploadFileToDrive, getFileBufferFromDrive, getOrCreateClientFolder, getOrCreateClientSubfolder, trashFileInDrive } from "../utils/googleDrive.js";
+import { getCachedFile, setCachedFile } from "../utils/fileCache.js";
+import { sendMail } from "../utils/mailer.js";
 
 const router = express.Router();
 
@@ -17,8 +20,32 @@ const upload = multer({
   },
 });
 
+// Broader upload for media-capable document types (currently just brand kit assets):
+// logos, color palette images, and other brand imagery, plus PDF brand guidelines.
+const mediaUpload = multer({
+  storage: storage,
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype.startsWith("image/") || file.mimetype === "application/pdf") {
+      cb(null, true);
+    } else {
+      cb(new Error("Only image or PDF files are allowed"), false);
+    }
+  },
+});
+
+// Agreements and Proposals are admin-only (hidden from team members).
+const ADMIN_ONLY_DOCUMENT_TYPES = ["agreement", "proposal"];
+
+const requireAdminForAgreements = (req, res, next) => {
+  if (req.user?.role !== "admin") {
+    return res.status(403).json({ success: false, message: "Admin access required" });
+  }
+  next();
+};
+
 // Upload agreement with specific subfolder
-router.post("/agreements/upload", upload.single("file"), async (req, res) => {
+router.post("/agreements/upload", requireAdminForAgreements, upload.single("file"), async (req, res) => {
   try {
     const { id, clientId, issuedDate, expiryDate, status, description } = req.body;
 
@@ -128,6 +155,10 @@ router.post("/documents/upload", upload.single("file"), async (req, res) => {
   try {
     const { clientId, description, documentType } = req.body;
 
+    if (ADMIN_ONLY_DOCUMENT_TYPES.includes(documentType) && req.user?.role !== "admin") {
+      return res.status(403).json({ success: false, message: "Admin access required" });
+    }
+
     if (!req.file) {
       return res.status(400).json({ success: false, message: "No PDF file provided" });
     }
@@ -144,6 +175,7 @@ router.post("/documents/upload", upload.single("file"), async (req, res) => {
         const subfolderName = documentType === "invoice" ? "Invoices" :
                               documentType === "report" ? "Reports" :
                               documentType === "content_calendar" ? "Content Calendar" :
+                              documentType === "proposal" ? "Proposals" :
                               "Other";
         const subfolder = await getOrCreateClientSubfolder(clientFolder.folderId, subfolderName);
         folderId = subfolder.folderId;
@@ -186,21 +218,111 @@ router.post("/documents/upload", upload.single("file"), async (req, res) => {
   }
 });
 
+// Upload media-capable document types (currently: brand kit logos/images/PDFs)
+router.post("/documents/upload-media", mediaUpload.single("file"), async (req, res) => {
+  try {
+    const { clientId, description, documentType } = req.body;
+
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: "No file provided" });
+    }
+    if (!clientId) {
+      return res.status(400).json({ success: false, message: "clientId is required" });
+    }
+
+    const { Document, Client } = req.app.locals.models;
+
+    const clientRecord = await Client.findByPk(parseInt(clientId));
+    if (!clientRecord) {
+      return res.status(404).json({ success: false, message: "Client not found" });
+    }
+
+    const clientFolder = await getOrCreateClientFolder(clientRecord.name, clientRecord.id);
+    const subfolderName = documentType === "brand_kit" ? "Brand Kit" : "Other";
+    const subfolder = await getOrCreateClientSubfolder(clientFolder.folderId, subfolderName);
+
+    const driveResult = await uploadFileToDrive(
+      req.file.buffer,
+      req.file.originalname,
+      req.file.mimetype,
+      subfolder.folderId
+    );
+
+    const document = await Document.create({
+      fileName: req.file.originalname,
+      fileType: req.file.mimetype,
+      fileSize: req.file.size,
+      fileId: driveResult.fileId,
+      driveLink: driveResult.googleUserContentLink,
+      webViewLink: driveResult.webViewLink,
+      googleUserContentLink: driveResult.googleUserContentLink,
+      folderId: subfolder.folderId,
+      clientId: parseInt(clientId),
+      description: description || null,
+      documentType: documentType || "other",
+    });
+
+    res.status(201).json({
+      success: true,
+      message: "File uploaded successfully",
+      data: document,
+    });
+  } catch (error) {
+    console.error("Error uploading media document:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message || "Failed to upload file",
+      error: error.message,
+    });
+  }
+});
+
+// `page`/`limit` are optional — omitting them preserves the historical
+// "return everything" behavior existing callers rely on.
 router.get("/documents", async (req, res) => {
   try {
     const { Document } = req.app.locals.models;
-    const { clientId } = req.query;
+    const { clientId, documentType, page, limit } = req.query;
 
     const where = {};
     if (clientId) {
       where.clientId = parseInt(clientId);
     }
+    if (documentType) {
+      where.documentType = documentType;
+    }
+    // Push the admin-only-type exclusion into the query itself for
+    // non-admins, instead of fetching every row and filtering in JS.
+    if (req.user?.role !== "admin") {
+      where.documentType = documentType
+        ? ADMIN_ONLY_DOCUMENT_TYPES.includes(documentType)
+          ? { [Op.in]: [] } // explicitly requested an admin-only type — matches nothing
+          : documentType
+        : { [Op.or]: [{ [Op.notIn]: ADMIN_ONLY_DOCUMENT_TYPES }, { [Op.is]: null }] };
+    }
 
-    const documents = await Document.findAll({
-      where,
-      order: [["createdAt", "DESC"]],
-    });
+    const queryOptions = { where, order: [["createdAt", "DESC"]] };
 
+    if (limit) {
+      const parsedLimit = parseInt(limit);
+      const parsedPage = parseInt(page) || 1;
+      queryOptions.limit = parsedLimit;
+      queryOptions.offset = (parsedPage - 1) * parsedLimit;
+
+      const { count, rows } = await Document.findAndCountAll(queryOptions);
+      return res.json({
+        success: true,
+        data: rows,
+        pagination: {
+          total: count,
+          page: parsedPage,
+          limit: parsedLimit,
+          totalPages: Math.ceil(count / parsedLimit),
+        },
+      });
+    }
+
+    const documents = await Document.findAll(queryOptions);
     res.json({ success: true, data: documents });
   } catch (error) {
     res.status(500).json({
@@ -218,6 +340,9 @@ router.get("/documents/:id", async (req, res) => {
 
     if (!document) {
       return res.status(404).json({ success: false, message: "Document not found" });
+    }
+    if (ADMIN_ONLY_DOCUMENT_TYPES.includes(document.documentType) && req.user?.role !== "admin") {
+      return res.status(403).json({ success: false, message: "Admin access required" });
     }
 
     res.json({ success: true, data: document });
@@ -237,6 +362,18 @@ router.delete("/documents/:id", async (req, res) => {
 
     if (!document) {
       return res.status(404).json({ success: false, message: "Document not found" });
+    }
+    if (ADMIN_ONLY_DOCUMENT_TYPES.includes(document.documentType) && req.user?.role !== "admin") {
+      return res.status(403).json({ success: false, message: "Admin access required" });
+    }
+
+    try {
+      await trashFileInDrive(document.fileId);
+    } catch (driveErr) {
+      // Best-effort: the file may already be missing/trashed in Drive, or
+      // the Drive API call could fail transiently — don't let that block
+      // removing the record itself.
+      console.warn("Could not trash document file in Drive:", driveErr.message);
     }
 
     await document.destroy();
@@ -259,10 +396,25 @@ router.get("/documents/:id/stream", async (req, res) => {
       return res.status(404).json({ success: false, message: "Document not found" });
     }
 
-    const fileStream = await getFileStreamFromDrive(document.fileId);
-    res.setHeader("Content-Type", "application/pdf");
+    let cached = getCachedFile(document.fileId);
+    if (!cached) {
+      const { buffer, contentType } = await getFileBufferFromDrive(document.fileId);
+      setCachedFile(document.fileId, buffer, contentType);
+      cached = { buffer, contentType };
+    }
+
+    // Prefer the content type recorded at upload time (from the browser's
+    // File.type — e.g. "image/png" for a brand kit logo) over whatever
+    // Drive's API reports, falling back to that only if it's missing. This
+    // used to be hardcoded to "application/pdf" for every document, which
+    // silently broke any non-PDF file (brand kit images): helmet sets
+    // X-Content-Type-Options: nosniff globally, so the browser refuses to
+    // render an <img> whose declared Content-Type doesn't match an image
+    // type, regardless of what the actual bytes are.
+    const contentType = document.fileType || cached.contentType || "application/octet-stream";
+    res.setHeader("Content-Type", contentType);
     res.setHeader("Content-Disposition", `inline; filename="${document.fileName}"`);
-    fileStream.pipe(res);
+    res.send(cached.buffer);
   } catch (error) {
     console.error("Error streaming document:", error);
     res.status(500).json({
@@ -273,8 +425,59 @@ router.get("/documents/:id/stream", async (req, res) => {
   }
 });
 
+// Emails a document to a given address with the actual file attached
+// (rather than a link) — used by the invoice "Send Email" action. Requires
+// SMTP_HOST/SMTP_USER/SMTP_PASS to be set in .env; see utils/mailer.js.
+router.post("/documents/:id/email", async (req, res) => {
+  try {
+    const { Document } = req.app.locals.models;
+    const { to, subject, text } = req.body;
+
+    if (!to) {
+      return res.status(400).json({ success: false, message: "Recipient email (to) is required" });
+    }
+
+    const document = await Document.findByPk(req.params.id);
+    if (!document) {
+      return res.status(404).json({ success: false, message: "Document not found" });
+    }
+    if (ADMIN_ONLY_DOCUMENT_TYPES.includes(document.documentType) && req.user?.role !== "admin") {
+      return res.status(403).json({ success: false, message: "Admin access required" });
+    }
+
+    let cached = getCachedFile(document.fileId);
+    if (!cached) {
+      const { buffer, contentType } = await getFileBufferFromDrive(document.fileId);
+      setCachedFile(document.fileId, buffer, contentType);
+      cached = { buffer };
+    }
+
+    await sendMail({
+      to,
+      subject: subject || `Document: ${document.fileName}`,
+      text: text || "Please find the attached document.",
+      attachments: [
+        {
+          filename: document.fileName,
+          content: cached.buffer,
+          contentType: "application/pdf",
+        },
+      ],
+    });
+
+    res.json({ success: true, message: "Email sent successfully" });
+  } catch (error) {
+    console.error("Error sending document email:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message || "Failed to send email",
+      error: error.message,
+    });
+  }
+});
+
 // Agreement-specific routes
-router.get("/agreements", async (req, res) => {
+router.get("/agreements", requireAdminForAgreements, async (req, res) => {
   try {
     const { Document } = req.app.locals.models;
     const { clientId, status } = req.query;
@@ -298,7 +501,7 @@ router.get("/agreements", async (req, res) => {
   }
 });
 
-router.get("/agreements/:id", async (req, res) => {
+router.get("/agreements/:id", requireAdminForAgreements, async (req, res) => {
   try {
     const { Document } = req.app.locals.models;
     const agreement = await Document.findOne({
@@ -319,7 +522,7 @@ router.get("/agreements/:id", async (req, res) => {
   }
 });
 
-router.put("/agreements/:id", async (req, res) => {
+router.put("/agreements/:id", requireAdminForAgreements, async (req, res) => {
   try {
     const { Document } = req.app.locals.models;
     const { issuedDate, expiryDate, status, description } = req.body;
@@ -350,7 +553,7 @@ router.put("/agreements/:id", async (req, res) => {
   }
 });
 
-router.delete("/agreements/:id", async (req, res) => {
+router.delete("/agreements/:id", requireAdminForAgreements, async (req, res) => {
   try {
     const { Document } = req.app.locals.models;
     const agreement = await Document.findOne({
@@ -359,6 +562,15 @@ router.delete("/agreements/:id", async (req, res) => {
 
     if (!agreement) {
       return res.status(404).json({ success: false, message: "Agreement not found" });
+    }
+
+    try {
+      await trashFileInDrive(agreement.fileId);
+    } catch (driveErr) {
+      // Best-effort: the file may already be missing/trashed in Drive, or
+      // the Drive API call could fail transiently — don't let that block
+      // removing the record itself.
+      console.warn("Could not trash agreement file in Drive:", driveErr.message);
     }
 
     await agreement.destroy();

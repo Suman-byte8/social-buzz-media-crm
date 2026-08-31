@@ -116,10 +116,14 @@ export const needsReEncryption = (text) => {
   return !text || isBcryptHash(text) || (!isEncrypted(text) && text !== "");
 };
 
-export const comparePassword = (inputPassword, storedPassword) => {
+// Async so the legacy-bcrypt-hash fallback path (bcrypt.compare) never
+// blocks the event loop — compareSync ties up the whole process for the
+// ~100ms a bcrypt comparison takes, which stalls every other in-flight
+// request on a single-threaded Node server.
+export const comparePassword = async (inputPassword, storedPassword) => {
   if (!inputPassword || !storedPassword) return false;
   if (isBcryptHash(storedPassword)) {
-    return bcrypt.compareSync(inputPassword, storedPassword);
+    return bcrypt.compare(inputPassword, storedPassword);
   }
   const actualPassword = decryptPassword(storedPassword);
   return inputPassword === actualPassword;

@@ -47,10 +47,12 @@ router.post("/meeting-notes", async (req, res) => {
   }
 });
 
+// `page`/`limit` are optional — omitting them preserves the historical
+// "return everything" behavior existing callers rely on.
 router.get("/meeting-notes", async (req, res) => {
   try {
     const { MeetingNote, Client } = req.app.locals.models;
-    const { clientId, search = "", meetingType } = req.query;
+    const { clientId, search = "", meetingType, page, limit } = req.query;
 
     const where = {};
 
@@ -69,26 +71,41 @@ router.get("/meeting-notes", async (req, res) => {
       ];
     }
 
-    const meetingNotes = await MeetingNote.findAll({
+    const queryOptions = {
       where,
+      include: [{ model: Client, as: "client", attributes: ["id", "name"] }],
       order: [["meetingDate", "DESC"]],
-    });
+    };
 
-    const clientIds = meetingNotes.map((n) => n.clientId).filter(Boolean);
-    const clients = await Client.findAll({
-      where: { id: { [Op.in]: clientIds } },
-      attributes: ["id", "name"],
-    });
+    let meetingNotes;
+    let pagination;
+    if (limit) {
+      const parsedLimit = parseInt(limit);
+      const parsedPage = parseInt(page) || 1;
+      queryOptions.limit = parsedLimit;
+      queryOptions.offset = (parsedPage - 1) * parsedLimit;
+
+      const { count, rows } = await MeetingNote.findAndCountAll(queryOptions);
+      meetingNotes = rows;
+      pagination = {
+        total: count,
+        page: parsedPage,
+        limit: parsedLimit,
+        totalPages: Math.ceil(count / parsedLimit),
+      };
+    } else {
+      meetingNotes = await MeetingNote.findAll(queryOptions);
+    }
 
     const enrichedNotes = meetingNotes.map((note) => {
-      const client = clients.find((c) => c.id === note.clientId);
+      const { client, ...noteFields } = note.toJSON();
       return {
-        ...note.toJSON(),
+        ...noteFields,
         clientName: client ? client.name : null,
       };
     });
 
-    res.json({ success: true, data: enrichedNotes });
+    res.json({ success: true, data: enrichedNotes, ...(pagination ? { pagination } : {}) });
   } catch (error) {
     console.error("Error fetching meeting notes:", error);
     res.status(500).json({
@@ -102,26 +119,17 @@ router.get("/meeting-notes", async (req, res) => {
 router.get("/meeting-notes/:id", async (req, res) => {
   try {
     const { MeetingNote, Client } = req.app.locals.models;
-    const meetingNote = await MeetingNote.findByPk(req.params.id);
+    const meetingNote = await MeetingNote.findByPk(req.params.id, {
+      include: [{ model: Client, as: "client", attributes: ["id", "name"] }],
+    });
 
     if (!meetingNote) {
       return res.status(404).json({ success: false, message: "Meeting note not found" });
     }
 
-    const noteData = meetingNote.toJSON();
-    let client = null;
-    if (noteData.clientId) {
-      client = await Client.findByPk(noteData.clientId, {
-        attributes: ["id", "name"],
-      });
-    }
-
     res.json({
       success: true,
-      data: {
-        ...noteData,
-        client,
-      },
+      data: meetingNote.toJSON(),
     });
   } catch (error) {
     console.error("Error fetching meeting note:", error);

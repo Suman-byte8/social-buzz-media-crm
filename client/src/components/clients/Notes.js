@@ -17,6 +17,43 @@ const meetingTypeColors = {
   other: "bg-gray-100 text-gray-800",
 };
 
+const getInitials = (name) => {
+  if (!name) return "?";
+  return name
+    .split(" ")
+    .map((n) => n[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2);
+};
+
+const renderAttendees = (attendees) => {
+  if (!attendees || !attendees.trim()) return null;
+  const names = attendees.split(",").map((name) => name.trim()).filter(Boolean);
+  if (names.length === 0) return null;
+
+  return (
+    <div className="flex flex-wrap items-center gap-2 mt-2">
+      <span className="font-label-sm text-label-sm text-on-surface-variant shrink-0">
+        Attendees:
+      </span>
+      {names.map((name, idx) => (
+        <span
+          key={idx}
+          className="inline-flex items-center gap-1.5 pl-1 pr-2.5 py-1 rounded-full bg-secondary-container"
+        >
+          <span className="w-5 h-5 rounded-full bg-white/70 flex items-center justify-center text-[10px] font-label-sm text-on-secondary-container shrink-0">
+            {getInitials(name)}
+          </span>
+          <span className="font-label-sm text-label-sm text-on-secondary-container">
+            {name}
+          </span>
+        </span>
+      ))}
+    </div>
+  );
+};
+
 export default function Notes({ client, clientId }) {
   const dispatch = useDispatch();
   const { meetingNotes, loading } = useSelector((state) => state.meetingNotes);
@@ -45,7 +82,7 @@ export default function Notes({ client, clientId }) {
 
   return (
     <main className="flex-1 overflow-y-auto p-container-margin">
-      <div className="max-w-4xl mx-auto space-y-6">
+      <div className="max-w-7xl mx-auto space-y-6">
         <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
             <h1 className="font-title-lg text-title-lg text-on-surface">Meeting Notes</h1>
@@ -86,6 +123,7 @@ export default function Notes({ client, clientId }) {
                     <p className="font-body-sm text-body-sm text-on-surface-variant">
                       {note.meetingDate ? new Date(note.meetingDate).toLocaleDateString() : "No date"}
                     </p>
+                    {renderAttendees(note.attendees)}
                   </div>
                   <div className="flex items-center gap-1 text-tertiary">
                     <button onClick={() => handleEdit(note)} className="rounded-lg p-2 hover:bg-surface-container-high transition-colors" title="Edit">
@@ -97,9 +135,15 @@ export default function Notes({ client, clientId }) {
                   </div>
                 </div>
                 {note.description && (
-                  <p className="font-body-sm text-body-sm text-on-surface-variant whitespace-pre-wrap">
-                    {note.description}
-                  </p>
+                  <div className="bg-surface-container-low rounded-lg p-4 mt-2">
+                    <h3 className="font-label-md text-label-md text-on-surface mb-2 flex items-center gap-1.5">
+                      <span className="material-symbols-outlined text-primary text-[16px]">subject</span>
+                      Meeting Brief
+                    </h3>
+                    <p className="font-body-md text-body-md text-on-surface leading-relaxed whitespace-pre-wrap">
+                      {note.description}
+                    </p>
+                  </div>
                 )}
               </article>
             ))}

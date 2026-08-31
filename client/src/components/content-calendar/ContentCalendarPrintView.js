@@ -1,5 +1,7 @@
 import React from "react";
-import { getPlatformMeta, formatDateDisplay, getWeekDay } from "./constants";
+import { getPlatformMeta, getStatusMeta, formatDateDisplay, getWeekDay } from "./constants";
+
+const STATUS_PRINT_COLORS = { pending: "#b45309", scheduled: "#1d4ed8", posted: "#15803d" };
 
 export default function ContentCalendarPrintView({ entries, title, showClientColumn }) {
   const generatedOn = new Date().toLocaleDateString("en-US", {
@@ -72,8 +74,8 @@ export default function ContentCalendarPrintView({ entries, title, showClientCol
                   ? `${entry.creatives.length} file${entry.creatives.length > 1 ? "s" : ""}: ${entry.creatives.map((c) => c.fileName).join(", ")}`
                   : "—"}
               </td>
-              <td style={{ ...td, whiteSpace: "nowrap", fontWeight: 600, color: entry.posted ? "#15803d" : "#b45309" }}>
-                {entry.posted ? "Posted" : "Pending"}
+              <td style={{ ...td, whiteSpace: "nowrap", fontWeight: 600, color: STATUS_PRINT_COLORS[entry.status] || "#b45309" }}>
+                {getStatusMeta(entry.status).label}
               </td>
             </tr>
           ))}
