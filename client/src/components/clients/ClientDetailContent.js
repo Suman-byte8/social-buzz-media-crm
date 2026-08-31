@@ -159,7 +159,7 @@ export default function ClientDetailContent({ activeTab, setActiveTab, client = 
       ) : activeTab === "reports" ? (
         <Reports client={client} />
       ) : activeTab === "invoices" ? (
-        <Invoices client={client} />
+        <Invoices client={client} clientId={clientId} />
       ) : activeTab === "notes" ? (
         <Notes client={client} clientId={clientId} />
       ) : activeTab === "renewal" ? (
@@ -167,7 +167,7 @@ export default function ClientDetailContent({ activeTab, setActiveTab, client = 
       ) : activeTab === "content_calendar" ? (
         <ContentCalendarTab clientId={clientId} client={client} />
       ) : (
-        <Overview client={client} />
+        <Overview client={client} clientId={clientId} teamMembers={teamMembers} />
       )}
 
       <AddEditClientModal
