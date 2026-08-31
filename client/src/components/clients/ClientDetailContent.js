@@ -199,7 +199,7 @@ export default function ClientDetailContent({ activeTab, setActiveTab, client = 
       ) : activeTab === "content_calendar" ? (
         <ContentCalendarTab clientId={clientId} client={client} />
       ) : (
-        <Overview client={client} />
+        <Overview client={client} clientId={clientId} teamMembers={teamMembers} />
       )}
 
       <AddEditClientModal
