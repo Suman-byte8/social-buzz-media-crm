@@ -447,11 +447,14 @@ router.post("/documents/:id/email", async (req, res) => {
 
     let cached = getCachedFile(document.fileId);
     if (!cached) {
+      const driveStart = Date.now();
       const { buffer, contentType } = await getFileBufferFromDrive(document.fileId);
+      console.log(`[documents/email] Drive fetch took ${Date.now() - driveStart}ms for file ${document.fileId}`);
       setCachedFile(document.fileId, buffer, contentType);
       cached = { buffer };
     }
 
+    const mailStart = Date.now();
     await sendMail({
       to,
       subject: subject || `Document: ${document.fileName}`,
@@ -464,6 +467,7 @@ router.post("/documents/:id/email", async (req, res) => {
         },
       ],
     });
+    console.log(`[documents/email] SMTP send took ${Date.now() - mailStart}ms`);
 
     res.json({ success: true, message: "Email sent successfully" });
   } catch (error) {

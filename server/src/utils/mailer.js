@@ -22,6 +22,23 @@ const getTransporter = () => {
     port: SMTP_PORT ? parseInt(SMTP_PORT, 10) : 587,
     secure: SMTP_SECURE === "true", // true for port 465 (implicit TLS), false for 587 (STARTTLS)
     auth: { user: SMTP_USER, pass: SMTP_PASS },
+    // Without `pool`, nodemailer opens a brand-new TCP+TLS+AUTH handshake
+    // with Gmail on every single sendMail() call — that's the dominant cost
+    // in production (Gmail is noticeably slower to complete this handshake
+    // from cloud/datacenter IPs like Render's than from a home connection).
+    // Pooling keeps a small set of authenticated connections open and
+    // reuses them across requests within this process's lifetime, so only
+    // the first send after a cold start pays full price.
+    pool: true,
+    maxConnections: 3,
+    maxMessages: 100,
+    // nodemailer's defaults (2min connection / 10min socket) let a stuck
+    // send hang far longer than any HTTP client will wait, so a slow Gmail
+    // handshake looks like the app is frozen. Fail fast instead so the UI's
+    // error state (and a retry) kicks in within seconds, not minutes.
+    connectionTimeout: 10_000,
+    greetingTimeout: 10_000,
+    socketTimeout: 20_000,
   });
 
   return transporter;
