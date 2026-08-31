@@ -131,6 +131,7 @@ import taskRoutes from "./src/routes/taskRoutes.js";
 import meetingNoteRoutes from "./src/routes/meetingNoteRoutes.js";
 import contentCalendarRoutes from "./src/routes/contentCalendarRoutes.js";
 import miscTaskRoutes from "./src/routes/miscTaskRoutes.js";
+import leadRoutes from "./src/routes/leadRoutes.js";
 import authRoutes from "./src/routes/authRoutes.js";
 import { authenticate } from "./src/middleware/auth.js";
 
@@ -161,6 +162,7 @@ app.use("/api", taskRoutes);
 app.use("/api", meetingNoteRoutes);
 app.use("/api", contentCalendarRoutes);
 app.use("/api", miscTaskRoutes);
+app.use("/api", leadRoutes);
 
 app.get("/", (req, res) => {
   res.json({

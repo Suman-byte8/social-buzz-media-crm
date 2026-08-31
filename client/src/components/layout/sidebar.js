@@ -8,6 +8,7 @@ import { useAuth } from "@/app/login/context/AuthContext";
 const navItems = [
   { label: "Dashboard", href: "/dashboard", icon: "dashboard", adminOnly: true },
   { label: "Clients", href: "/clients", icon: "group" },
+  { label: "Leads", href: "/leads", icon: "person_search" },
   { label: "Content Calendar", href: "/calendar", icon: "calendar_month" },
   { label: "Tasks", href: "/tasks", icon: "assignment" },
   { label: "Team", href: "/team", icon: "people" },

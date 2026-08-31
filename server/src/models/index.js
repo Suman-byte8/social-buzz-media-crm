@@ -9,6 +9,7 @@ import contentCalendarEntryModel from "./ContentCalendarEntry.js";
 import miscTaskModel from "./MiscTask.js";
 import userModel from "./User.js";
 import taskAssigneeModel from "./TaskAssignee.js";
+import leadModel from "./Lead.js";
 
 export const initModels = (sequelize) => {
   const Client = clientModel(sequelize, DataTypes);
@@ -21,6 +22,7 @@ export const initModels = (sequelize) => {
   const MiscTask = miscTaskModel(sequelize, DataTypes);
   const User = userModel(sequelize, DataTypes);
   const TaskAssignee = taskAssigneeModel(sequelize, DataTypes);
+  const Lead = leadModel(sequelize, DataTypes);
 
   Client.hasMany(Document, { foreignKey: "clientId", as: "documents" });
   Document.belongsTo(Client, { foreignKey: "clientId", as: "client" });
@@ -53,5 +55,5 @@ export const initModels = (sequelize) => {
     otherKey: "taskId",
   });
 
-  return { Client, TeamMember, AgencySetting, Document, Task, MeetingNote, ContentCalendarEntry, MiscTask, User, TaskAssignee };
+  return { Client, TeamMember, AgencySetting, Document, Task, MeetingNote, ContentCalendarEntry, MiscTask, User, TaskAssignee, Lead };
 };
