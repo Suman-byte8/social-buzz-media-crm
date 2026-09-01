@@ -5,7 +5,7 @@ import InvoiceToolbar from "./Invoicetoolbar";
 import InvoiceDocument from "./Invoicedocument";
 import { numberToIndianWords } from "../../lib/Numbertowords";
 import { computeInvoiceTotals } from "../../lib/invoiceTotals";
-import { DEFAULT_ROWS, DEFAULT_TERMS, DEFAULT_BANK } from "./invoiceDefaults";
+import { DEFAULT_ROWS, DEFAULT_TERMS } from "./invoiceDefaults";
 import { useInvoiceClients } from "./useInvoiceClients";
 import { useInvoiceActions } from "./useInvoiceActions";
 
@@ -29,7 +29,6 @@ export default function InvoiceBuilder() {
 
   const [rows, setRows] = useState(DEFAULT_ROWS);
   const [terms, setTerms] = useState(DEFAULT_TERMS);
-  const [bankDetails, setBankDetails] = useState(DEFAULT_BANK);
   const [advancePaid, setAdvancePaid] = useState(0);
 
   const invoiceSheetRef = useRef(null);
@@ -125,8 +124,6 @@ export default function InvoiceBuilder() {
           rows={rows}
           onUpdateRow={updateRow}
           onRemoveRow={removeRow}
-          bankDetails={bankDetails}
-          onBankDetailsChange={setBankDetails}
           totals={totals}
           amountInWords={amountInWords}
           advancePaid={advancePaid}

@@ -28,11 +28,3 @@ export const DEFAULT_TERMS = [
   "Overdue balances carry 1.5% interest per month.",
   "Subject to Kolkata jurisdiction.",
 ];
-
-export const DEFAULT_BANK = {
-  accountName: "Social Buzz Media",
-  accountNumber: "0000 0000 0000",
-  ifsc: "XXXX0000000",
-  bank: "Bank name, Branch",
-  upi: "socialbuzzmedia@upi",
-};

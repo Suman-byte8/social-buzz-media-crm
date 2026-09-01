@@ -46,7 +46,13 @@ export default function TermsAndSignature({
         </ol>
       </div>
       <div className="text-center">
-        <div className="h-[16mm]"></div>
+        <div className="flex h-[16mm] items-end justify-center">
+          <img
+            src="/images/signature.png"
+            alt="Authorised signatory"
+            className="max-h-[15mm] w-auto object-contain"
+          />
+        </div>
         <p className="border-t border-[#1A1A1A] pt-1.5 text-[10px] text-[#6E6A65]">
           Authorised signatory
         </p>

@@ -115,6 +115,7 @@ export default function InvoiceToolbar({
           >
             <option value="none">None</option>
             <option value="due">Payment due</option>
+            <option value="advance">Advance paid</option>
             <option value="paid">Paid</option>
           </select>
         </label>

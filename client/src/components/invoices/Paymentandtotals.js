@@ -10,8 +10,6 @@ const formatRupees = (n) =>
   }).format(n || 0);
 
 export default function PaymentAndTotals({
-  bankDetails,
-  onBankDetailsChange,
   totals,
   amountInWords,
   advancePaid,
@@ -20,77 +18,10 @@ export default function PaymentAndTotals({
 }) {
   const { subtotal, discount, taxable, cgst, sgst, igst, gstMode, roundAmt, grand } = totals;
 
-  const updateBank = (field, value) => {
-    onBankDetailsChange({ ...bankDetails, [field]: value });
-  };
-
   return (
     <section className="mt-8 grid grid-cols-[1fr_78mm] gap-8">
       <div>
-        <p className="font-display text-[9.5px] font-700 uppercase tracking-[.24em] text-[#6E6A65]">
-          Payment details
-        </p>
-        <table className="mt-2 text-[10.5px] leading-[1.85]">
-          <tbody>
-            <tr>
-              <td className="pr-4 text-[#6E6A65]">Account name</td>
-              <td>
-                <input
-                  type="text"
-                  value={bankDetails.accountName}
-                  onChange={(e) => updateBank("accountName", e.target.value)}
-                  className="bg-transparent outline-none"
-                />
-              </td>
-            </tr>
-            <tr>
-              <td className="pr-4 text-[#6E6A65]">Account no.</td>
-              <td>
-                <input
-                  type="text"
-                  value={bankDetails.accountNumber}
-                  onChange={(e) => updateBank("accountNumber", e.target.value)}
-                  className="bg-transparent font-mono outline-none"
-                />
-              </td>
-            </tr>
-            <tr>
-              <td className="pr-4 text-[#6E6A65]">IFSC</td>
-              <td>
-                <input
-                  type="text"
-                  value={bankDetails.ifsc}
-                  onChange={(e) => updateBank("ifsc", e.target.value)}
-                  className="bg-transparent font-mono outline-none"
-                />
-              </td>
-            </tr>
-            <tr>
-              <td className="pr-4 text-[#6E6A65]">Bank</td>
-              <td>
-                <input
-                  type="text"
-                  value={bankDetails.bank}
-                  onChange={(e) => updateBank("bank", e.target.value)}
-                  className="bg-transparent outline-none"
-                />
-              </td>
-            </tr>
-            <tr>
-              <td className="pr-4 text-[#6E6A65]">UPI</td>
-              <td>
-                <input
-                  type="text"
-                  value={bankDetails.upi}
-                  onChange={(e) => updateBank("upi", e.target.value)}
-                  className="bg-transparent font-mono outline-none"
-                />
-              </td>
-            </tr>
-          </tbody>
-        </table>
-
-        <div className="mt-5 border-l-[3px] border-[#E8262A] bg-[#F5F4F2] px-3 py-2.5">
+        <div className="border-l-[3px] border-[#E8262A] bg-[#F5F4F2] px-3 py-2.5">
           <p className="font-display text-[9px] font-700 uppercase tracking-[.2em] text-[#6E6A65]">
             Amount in words
           </p>

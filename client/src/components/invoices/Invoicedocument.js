@@ -28,8 +28,6 @@ const InvoiceDocument = forwardRef(function InvoiceDocument(props, ref) {
     rows,
     onUpdateRow,
     onRemoveRow,
-    bankDetails,
-    onBankDetailsChange,
     totals,
     amountInWords,
     advancePaid,
@@ -90,8 +88,6 @@ const InvoiceDocument = forwardRef(function InvoiceDocument(props, ref) {
       />
 
       <PaymentAndTotals
-        bankDetails={bankDetails}
-        onBankDetailsChange={onBankDetailsChange}
         totals={totals}
         amountInWords={amountInWords}
         advancePaid={advancePaid}
