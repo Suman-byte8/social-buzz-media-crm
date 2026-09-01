@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { parseArrayField } from "@/services/teamService";
 import StatusBadge from "@/components/ui/StatusBadge";
+import { getAssetUrl } from "@/services/apiClient";
 
 const STATUS_META = {
   active: { label: "Active", color: "green" },
@@ -43,7 +44,7 @@ export default function TeamMemberRow({ member, workload, onEdit, onDelete }) {
         <Link href={`/team/${member.id}`} className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-full bg-gray-200 overflow-hidden flex-shrink-0 border border-gray-300 flex items-center justify-center">
             {member.avatar ? (
-              <img className="w-full h-full object-cover" src={member.avatar} alt={member.name} />
+              <img className="w-full h-full object-cover" src={getAssetUrl(member.avatar)} alt={member.name} />
             ) : (
               <span className="font-title-lg text-on-surface font-bold">{initials}</span>
             )}

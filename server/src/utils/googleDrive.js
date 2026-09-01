@@ -249,6 +249,25 @@ export const getOrCreateClientFolder = async (clientName, clientId) => {
   return folder;
 };
 
+// A single shared "Team Members" folder (not per-client) — avatars and
+// resumes get uploaded here, one subfolder per member (see
+// getOrCreateClientSubfolder), the same nesting pattern used for a
+// client's own document subfolders.
+export const getOrCreateTeamMembersFolder = async () => {
+  const folderName = "Team Members";
+  const key = folderCacheKey(folderName, null);
+  if (folderCache.has(key)) return folderCache.get(key);
+
+  let folder = await findFolderInDrive(folderName);
+
+  if (!folder) {
+    folder = await createFolderInDrive(folderName);
+  }
+
+  folderCache.set(key, folder);
+  return folder;
+};
+
 export const getOrCreateClientSubfolder = async (parentFolderId, subfolderName) => {
   const key = folderCacheKey(subfolderName, parentFolderId);
   if (folderCache.has(key)) return folderCache.get(key);

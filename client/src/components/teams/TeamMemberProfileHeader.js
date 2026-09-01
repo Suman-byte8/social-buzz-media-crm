@@ -3,6 +3,7 @@
 import React from "react";
 import Link from "next/link";
 import StatusBadge from "@/components/ui/StatusBadge";
+import { getAssetUrl } from "@/services/apiClient";
 
 const MEMBER_STATUS_META = {
   active: { label: "Active", color: "green" },
@@ -46,7 +47,7 @@ export default function TeamMemberProfileHeader({ member, tenureMonths, onAssign
             <div className="flex flex-col md:flex-row gap-5 -mt-10 relative z-10">
               <div className="w-24 h-24 rounded-xl border-4 border-surface bg-surface-container-high overflow-hidden shadow-card shrink-0 flex items-center justify-center bg-gray-100">
                 {member.avatar ? (
-                  <img className="w-full h-full object-cover" src={member.avatar} alt={member.name} />
+                  <img className="w-full h-full object-cover" src={getAssetUrl(member.avatar)} alt={member.name} />
                 ) : (
                   <span className="font-headline-md text-headline-md text-primary font-bold">{initials}</span>
                 )}

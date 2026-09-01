@@ -1,6 +1,29 @@
 import express from "express";
+import multer from "multer";
+import {
+  uploadFileToDrive,
+  getOrCreateTeamMembersFolder,
+  getOrCreateClientSubfolder,
+} from "../utils/googleDrive.js";
 
 const router = express.Router();
+
+const avatarUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 1 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype === "image/png") {
+      cb(null, true);
+    } else {
+      cb(new Error("Profile image must be a PNG file"), false);
+    }
+  },
+});
+
+const resumeUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 },
+});
 
 // Helper to format array or object values to text/JSON
 const formatField = (val) => {
@@ -276,6 +299,59 @@ router.put("/team-members/:id", async (req, res) => {
       message: "Error updating team member",
       error: error.message,
     });
+  }
+});
+
+// POST /api/team-members/:id/upload-avatar - Upload/replace a member's
+// profile photo. Stored in Google Drive (Team Members/<member name>/),
+// same pattern as client logos — the DB column just holds the resulting
+// proxy link, not the file itself.
+router.post("/team-members/:id/upload-avatar", avatarUpload.single("avatar"), async (req, res) => {
+  try {
+    const { TeamMember } = req.app.locals.models;
+    const teamMember = await TeamMember.findByPk(req.params.id);
+    if (!teamMember) {
+      return res.status(404).json({ success: false, message: "Team member not found" });
+    }
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: "No image file provided, or it exceeds the 1MB limit / isn't a PNG" });
+    }
+
+    const teamFolder = await getOrCreateTeamMembersFolder();
+    const memberFolder = await getOrCreateClientSubfolder(teamFolder.folderId, teamMember.name);
+    const driveResult = await uploadFileToDrive(req.file.buffer, req.file.originalname, req.file.mimetype, memberFolder.folderId);
+
+    await teamMember.update({ avatar: driveResult.proxyLink });
+
+    res.json({ success: true, message: "Profile image uploaded successfully", data: teamMember });
+  } catch (error) {
+    console.error("Error uploading team member avatar:", error);
+    res.status(500).json({ success: false, message: error.message || "Error uploading profile image", error: error.message });
+  }
+});
+
+// POST /api/team-members/:id/upload-resume - Upload/replace a member's resume.
+router.post("/team-members/:id/upload-resume", resumeUpload.single("resume"), async (req, res) => {
+  try {
+    const { TeamMember } = req.app.locals.models;
+    const teamMember = await TeamMember.findByPk(req.params.id);
+    if (!teamMember) {
+      return res.status(404).json({ success: false, message: "Team member not found" });
+    }
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: "No file provided, or it exceeds the 10MB limit" });
+    }
+
+    const teamFolder = await getOrCreateTeamMembersFolder();
+    const memberFolder = await getOrCreateClientSubfolder(teamFolder.folderId, teamMember.name);
+    const driveResult = await uploadFileToDrive(req.file.buffer, req.file.originalname, req.file.mimetype, memberFolder.folderId);
+
+    await teamMember.update({ resume: driveResult.proxyLink });
+
+    res.json({ success: true, message: "Resume uploaded successfully", data: teamMember });
+  } catch (error) {
+    console.error("Error uploading team member resume:", error);
+    res.status(500).json({ success: false, message: error.message || "Error uploading resume", error: error.message });
   }
 });
 

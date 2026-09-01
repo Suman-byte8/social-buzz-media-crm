@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { createTeamMember } from "@/redux/slices/teamSlice";
+import { createTeamMember, uploadTeamMemberAvatar, uploadTeamMemberResume } from "@/redux/slices/teamSlice";
 import { fetchClients } from "@/redux/slices/clientsSlice";
 
 const DEPARTMENTS = [
@@ -26,9 +26,6 @@ export default function AddTeamMemberModal({ isOpen, onClose, onSuccess }) {
     whatsappNumber: "",
     address: "",
     aadharNumber: "",
-    avatar: "",
-    resume: "",
-    resumeName: "",
     bankDetails: {
       bankName: "",
       accountNumber: "",
@@ -52,10 +49,20 @@ export default function AddTeamMemberModal({ isOpen, onClose, onSuccess }) {
   const [errors, setErrors] = useState({});
   const [avatarError, setAvatarError] = useState("");
 
+  const [avatarFile, setAvatarFile] = useState(null);
+  const [avatarPreview, setAvatarPreview] = useState("");
+  const [resumeFile, setResumeFile] = useState(null);
+  const [resumeName, setResumeName] = useState("");
+
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = "hidden";
       dispatch(fetchClients({ limit: 100 }));
+      setAvatarFile(null);
+      setAvatarPreview("");
+      setResumeFile(null);
+      setResumeName("");
+      setAvatarError("");
     }
     return () => {
       document.body.style.overflow = "";
@@ -98,26 +105,16 @@ export default function AddTeamMemberModal({ isOpen, onClose, onSuccess }) {
     }
 
     setAvatarError("");
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setFormData((prev) => ({ ...prev, avatar: reader.result }));
-    };
-    reader.readAsDataURL(file);
+    setAvatarFile(file);
+    setAvatarPreview(URL.createObjectURL(file));
   };
 
   const handleResumeChange = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setFormData((prev) => ({
-        ...prev,
-        resume: reader.result,
-        resumeName: file.name,
-      }));
-    };
-    reader.readAsDataURL(file);
+    setResumeFile(file);
+    setResumeName(file.name);
   };
 
   // Add individual Work item
@@ -185,8 +182,6 @@ export default function AddTeamMemberModal({ isOpen, onClose, onSuccess }) {
         aadharNumber: formData.aadharNumber
           ? formData.aadharNumber.replace(/\s/g, "")
           : null,
-        avatar: formData.avatar || null,
-        resume: formData.resume || null,
         bankDetails:
           Object.values(formData.bankDetails).some(Boolean)
             ? JSON.stringify(formData.bankDetails)
@@ -207,7 +202,24 @@ export default function AddTeamMemberModal({ isOpen, onClose, onSuccess }) {
             : null,
       };
 
-      await dispatch(createTeamMember(payload)).unwrap();
+      const created = await dispatch(createTeamMember(payload)).unwrap();
+      const newMemberId = created?.data?.id;
+
+      if (newMemberId && avatarFile) {
+        try {
+          await dispatch(uploadTeamMemberAvatar({ id: newMemberId, file: avatarFile })).unwrap();
+        } catch (uploadErr) {
+          alert((typeof uploadErr === "string" ? uploadErr : uploadErr?.message) || "Team member added, but the photo failed to upload.");
+        }
+      }
+      if (newMemberId && resumeFile) {
+        try {
+          await dispatch(uploadTeamMemberResume({ id: newMemberId, file: resumeFile })).unwrap();
+        } catch (uploadErr) {
+          alert((typeof uploadErr === "string" ? uploadErr : uploadErr?.message) || "Team member added, but the resume failed to upload.");
+        }
+      }
+
       onSuccess();
     } catch (error) {
       console.error("Error adding team member:", error);
@@ -247,9 +259,9 @@ export default function AddTeamMemberModal({ isOpen, onClose, onSuccess }) {
             <div className="flex flex-col sm:flex-row items-start gap-6 mb-4">
               <div className="flex flex-col items-center">
                 <div className="w-24 h-24 rounded-full border-2 border-dashed border-gray-300 flex items-center justify-center overflow-hidden bg-gray-50 relative group">
-                  {formData.avatar ? (
+                  {avatarPreview ? (
                     <img
-                      src={formData.avatar}
+                      src={avatarPreview}
                       alt="Preview"
                       className="w-full h-full object-cover"
                     />
@@ -399,8 +411,7 @@ export default function AddTeamMemberModal({ isOpen, onClose, onSuccess }) {
                   />
                 </label>
                 <span className="text-xs text-secondary truncate">
-                  {formData.resumeName ||
-                    (formData.resume ? "Resume Attached" : "No file chosen")}
+                  {resumeName || "No file chosen"}
                 </span>
               </div>
             </div>

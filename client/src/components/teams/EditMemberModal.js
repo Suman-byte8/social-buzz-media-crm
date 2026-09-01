@@ -3,8 +3,9 @@
 import React, { useState, useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { parseArrayField } from "@/services/teamService";
-import { updateTeamMember } from "@/redux/slices/teamSlice";
+import { updateTeamMember, uploadTeamMemberAvatar, uploadTeamMemberResume } from "@/redux/slices/teamSlice";
 import { fetchClients } from "@/redux/slices/clientsSlice";
+import { getAssetUrl } from "@/services/apiClient";
 
 const DEPARTMENTS = [
   "",
@@ -28,9 +29,6 @@ export default function EditMemberModal({ isOpen, onClose, onSuccess, member }) 
     whatsappNumber: "",
     address: "",
     aadharNumber: "",
-    avatar: "",
-    resume: "",
-    resumeName: "",
     bankDetails: {
       bankName: "",
       accountNumber: "",
@@ -53,6 +51,15 @@ export default function EditMemberModal({ isOpen, onClose, onSuccess, member }) 
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
   const [avatarError, setAvatarError] = useState("");
+
+  // Staged file objects, uploaded to Drive (via dedicated endpoints) only
+  // after the rest of the form saves successfully — decoupled from
+  // formData so the preview can show a local object URL for a newly picked
+  // file without needing to base64-encode it into the form payload.
+  const [avatarFile, setAvatarFile] = useState(null);
+  const [avatarPreview, setAvatarPreview] = useState("");
+  const [resumeFile, setResumeFile] = useState(null);
+  const [resumeName, setResumeName] = useState("");
 
   useEffect(() => {
     if (isOpen && member) {
@@ -81,9 +88,6 @@ export default function EditMemberModal({ isOpen, onClose, onSuccess, member }) 
         whatsappNumber: member.whatsappNumber || "",
         address: member.address || "",
         aadharNumber: member.aadharNumber || "",
-        avatar: member.avatar || "",
-        resume: member.resume || "",
-        resumeName: member.resume ? "Uploaded Resume" : "",
         bankDetails: {
           bankName: parsedBank.bankName || "",
           accountNumber: parsedBank.accountNumber || "",
@@ -105,6 +109,10 @@ export default function EditMemberModal({ isOpen, onClose, onSuccess, member }) 
       setNewWorkInput("");
       setAvatarError("");
       setErrors({});
+      setAvatarFile(null);
+      setAvatarPreview(getAssetUrl(member.avatar) || "");
+      setResumeFile(null);
+      setResumeName(member.resume ? "Uploaded Resume" : "");
     }
   }, [isOpen, member]);
 
@@ -154,26 +162,16 @@ export default function EditMemberModal({ isOpen, onClose, onSuccess, member }) 
     }
 
     setAvatarError("");
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setFormData((prev) => ({ ...prev, avatar: reader.result }));
-    };
-    reader.readAsDataURL(file);
+    setAvatarFile(file);
+    setAvatarPreview(URL.createObjectURL(file));
   };
 
   const handleResumeChange = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setFormData((prev) => ({
-        ...prev,
-        resume: reader.result,
-        resumeName: file.name,
-      }));
-    };
-    reader.readAsDataURL(file);
+    setResumeFile(file);
+    setResumeName(file.name);
   };
 
   // Add individual Work item
@@ -241,8 +239,6 @@ export default function EditMemberModal({ isOpen, onClose, onSuccess, member }) 
         aadharNumber: formData.aadharNumber
           ? formData.aadharNumber.replace(/\s/g, "")
           : null,
-        avatar: formData.avatar || null,
-        resume: formData.resume || null,
         bankDetails:
           Object.values(formData.bankDetails).some(Boolean)
             ? JSON.stringify(formData.bankDetails)
@@ -264,6 +260,22 @@ export default function EditMemberModal({ isOpen, onClose, onSuccess, member }) 
       };
 
       await dispatch(updateTeamMember({ id: member.id, memberData: payload })).unwrap();
+
+      if (avatarFile) {
+        try {
+          await dispatch(uploadTeamMemberAvatar({ id: member.id, file: avatarFile })).unwrap();
+        } catch (uploadErr) {
+          alert((typeof uploadErr === "string" ? uploadErr : uploadErr?.message) || "Profile saved, but the photo failed to upload.");
+        }
+      }
+      if (resumeFile) {
+        try {
+          await dispatch(uploadTeamMemberResume({ id: member.id, file: resumeFile })).unwrap();
+        } catch (uploadErr) {
+          alert((typeof uploadErr === "string" ? uploadErr : uploadErr?.message) || "Profile saved, but the resume failed to upload.");
+        }
+      }
+
       onSuccess();
     } catch (error) {
       console.error("Error updating team member:", error);
@@ -303,9 +315,9 @@ export default function EditMemberModal({ isOpen, onClose, onSuccess, member }) 
             <div className="flex flex-col sm:flex-row items-start gap-6 mb-4">
               <div className="flex flex-col items-center">
                 <div className="w-24 h-24 rounded-full border-2 border-dashed border-gray-300 flex items-center justify-center overflow-hidden bg-gray-50 relative group">
-                  {formData.avatar ? (
+                  {avatarPreview ? (
                     <img
-                      src={formData.avatar}
+                      src={avatarPreview}
                       alt="Preview"
                       className="w-full h-full object-cover"
                     />
@@ -455,8 +467,7 @@ export default function EditMemberModal({ isOpen, onClose, onSuccess, member }) 
                   />
                 </label>
                 <span className="text-xs text-secondary truncate">
-                  {formData.resumeName ||
-                    (formData.resume ? "Resume Attached" : "No file chosen")}
+                  {resumeName || "No file chosen"}
                 </span>
               </div>
             </div>

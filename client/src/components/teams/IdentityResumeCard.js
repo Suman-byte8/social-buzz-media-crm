@@ -1,8 +1,13 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
+import { getAssetUrl } from "@/services/apiClient";
+import ResumePreviewModal from "./ResumePreviewModal";
 
 export default function IdentityResumeCard({ member }) {
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const resumeUrl = getAssetUrl(member.resume);
+
   return (
     <div className="bg-surface rounded-xl border border-outline-variant p-6 shadow-card">
       <h2 className="font-headline-sm text-headline-sm text-on-surface mb-5 flex items-center gap-2">
@@ -33,21 +38,26 @@ export default function IdentityResumeCard({ member }) {
         <div>
           <p className="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider mb-1.5">Resume Document</p>
           {member.resume ? (
-            <a
-              href={member.resume}
-              target="_blank"
-              rel="noopener noreferrer"
-              download={`Resume_${member.name.replace(/\s+/g, "_")}`}
+            <button
+              type="button"
+              onClick={() => setPreviewOpen(true)}
               className="inline-flex items-center gap-2 px-4 py-2 bg-primary/10 text-primary border border-primary/20 rounded-lg hover:bg-primary/20 transition-colors font-label-md text-label-md"
             >
               <span className="material-symbols-outlined text-[20px]">description</span>
-              View / Download Resume
-            </a>
+              Preview Resume
+            </button>
           ) : (
             <p className="font-body-md text-body-md text-on-surface-variant italic">No resume uploaded</p>
           )}
         </div>
       </div>
+
+      <ResumePreviewModal
+        open={previewOpen}
+        onClose={() => setPreviewOpen(false)}
+        resumeUrl={resumeUrl}
+        memberName={member.name}
+      />
     </div>
   );
 }

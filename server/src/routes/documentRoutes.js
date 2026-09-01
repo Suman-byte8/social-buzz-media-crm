@@ -414,6 +414,12 @@ router.get("/documents/:id/stream", async (req, res) => {
     const contentType = document.fileType || cached.contentType || "application/octet-stream";
     res.setHeader("Content-Type", contentType);
     res.setHeader("Content-Disposition", `inline; filename="${document.fileName}"`);
+    // Same reasoning as logo-proxy in settingRoutes.js: Helmet's default
+    // frame-ancestors 'self' blocks the frontend (a different origin) from
+    // embedding this in an <iframe> (AgreementViewModal's preview). This
+    // route is already in PUBLIC_ASSET_PATHS (no auth), so relaxing it to
+    // allow framing doesn't expose anything new.
+    res.setHeader("Content-Security-Policy", "frame-ancestors *");
     res.send(cached.buffer);
   } catch (error) {
     console.error("Error streaming document:", error);

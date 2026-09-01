@@ -173,6 +173,12 @@ router.get("/settings/logo-proxy/:fileId", async (req, res) => {
 
     res.setHeader("Content-Type", cached.contentType || "image/png");
     res.setHeader("Cache-Control", "public, max-age=86400");
+    // Helmet's default CSP sets frame-ancestors 'self', which blocks the
+    // frontend (a different origin from this API) from embedding this in
+    // an <iframe> (e.g. the resume preview modal). Safe to relax only
+    // here: this route is unauthenticated and serves nothing but public,
+    // already-shareable file bytes keyed by an unguessable Drive file ID.
+    res.setHeader("Content-Security-Policy", "frame-ancestors *");
     res.send(cached.buffer);
   } catch (error) {
     console.error("Error proxying Google Drive logo:", error.message);

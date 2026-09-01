@@ -258,6 +258,36 @@ export default function TeamMemberProfileShell({ member, onRefresh }) {
     }
   };
 
+  const handleRemoveClient = async (client) => {
+    if (!window.confirm(`Remove ${client.name} from ${member.name}'s assigned clients?`)) return;
+
+    try {
+      // Real (DB-linked) clients are "assigned" primarily via
+      // Client.clientManagedBy — clear that so the client no longer shows
+      // up here or under this member anywhere else in the app.
+      if (client.id) {
+        await dispatch(updateClient({ id: client.id, clientData: { clientManagedBy: null } })).unwrap();
+      }
+
+      // Also drop the name from the legacy TeamMember.clientHandling list,
+      // if present — assigning a client writes to both places (see
+      // handleAssignClientSubmit below), so removal should undo both too.
+      const updatedNames = clientHandlingNames.filter(
+        (name) => name.toLowerCase() !== client.name.toLowerCase()
+      );
+      if (updatedNames.length !== clientHandlingNames.length) {
+        await dispatch(
+          updateTeamMember({ id: member.id, memberData: { clientHandling: JSON.stringify(updatedNames) } })
+        ).unwrap();
+      }
+
+      if (onRefresh) onRefresh();
+    } catch (err) {
+      console.error("Error removing client:", err);
+      alert("Failed to remove client. Please try again.");
+    }
+  };
+
   const handleAssignClientSubmit = async (e) => {
     e.preventDefault();
     if (!selectedClientId) return;
@@ -316,6 +346,7 @@ export default function TeamMemberProfileShell({ member, onRefresh }) {
               clientHandlingNames={clientHandlingNames}
               loadingClients={loadingClients}
               onAssignClient={() => setIsAssignClientModalOpen(true)}
+              onRemoveClient={handleRemoveClient}
             />
 
             <AssignedWorksCard

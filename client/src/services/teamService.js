@@ -33,6 +33,26 @@ export const deleteTeamMember = async (id) => {
   return response;
 };
 
+export const uploadTeamMemberAvatar = async (id, file) => {
+  const formData = new FormData();
+  formData.append('avatar', file);
+  const response = await apiClient(`/team-members/${id}/upload-avatar`, {
+    method: 'POST',
+    body: formData,
+  });
+  return response;
+};
+
+export const uploadTeamMemberResume = async (id, file) => {
+  const formData = new FormData();
+  formData.append('resume', file);
+  const response = await apiClient(`/team-members/${id}/upload-resume`, {
+    method: 'POST',
+    body: formData,
+  });
+  return response;
+};
+
 export const parseArrayField = (field) => {
   if (!field) return [];
   if (Array.isArray(field)) return field;

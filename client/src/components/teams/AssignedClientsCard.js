@@ -3,7 +3,7 @@
 import React from "react";
 import Link from "next/link";
 
-export default function AssignedClientsCard({ memberName, assignedClientsList, clientHandlingNames, loadingClients, onAssignClient }) {
+export default function AssignedClientsCard({ memberName, assignedClientsList, clientHandlingNames, loadingClients, onAssignClient, onRemoveClient }) {
   return (
     <div className="bg-surface rounded-xl border border-outline-variant p-6 shadow-card">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-5">
@@ -45,17 +45,41 @@ export default function AssignedClientsCard({ memberName, assignedClientsList, c
                   </div>
                   <div className="pt-3 border-t border-outline-variant/30 flex items-center justify-between text-xs text-on-surface-variant">
                     <span>ID: #{client.id}</span>
-                    <Link href={`/clients/${client.id}`} className="text-primary hover:underline font-medium flex items-center gap-0.5">
-                      View Client
-                      <span className="material-symbols-outlined text-[14px]">arrow_forward</span>
-                    </Link>
+                    <div className="flex items-center gap-3">
+                      <Link href={`/clients/${client.id}`} className="text-primary hover:underline font-medium flex items-center gap-0.5">
+                        View Client
+                        <span className="material-symbols-outlined text-[14px]">arrow_forward</span>
+                      </Link>
+                      {onRemoveClient && (
+                        <button
+                          type="button"
+                          onClick={() => onRemoveClient(client)}
+                          title={`Remove ${client.name} from ${memberName}`}
+                          className="text-on-surface-variant hover:text-red-600 transition-colors flex items-center"
+                        >
+                          <span className="material-symbols-outlined text-[16px]">person_remove</span>
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
               ))
             : clientHandlingNames.map((clientName, idx) => (
-                <div key={`client-legacy-${idx}-${clientName}`} className="p-4 rounded-xl border border-outline-variant bg-surface">
-                  <h4 className="font-title-md text-title-md text-on-surface font-bold">{clientName}</h4>
-                  <p className="text-xs text-on-surface-variant">Assigned Client</p>
+                <div key={`client-legacy-${idx}-${clientName}`} className="p-4 rounded-xl border border-outline-variant bg-surface flex items-center justify-between gap-2">
+                  <div>
+                    <h4 className="font-title-md text-title-md text-on-surface font-bold">{clientName}</h4>
+                    <p className="text-xs text-on-surface-variant">Assigned Client</p>
+                  </div>
+                  {onRemoveClient && (
+                    <button
+                      type="button"
+                      onClick={() => onRemoveClient({ name: clientName })}
+                      title={`Remove ${clientName} from ${memberName}`}
+                      className="text-on-surface-variant hover:text-red-600 transition-colors shrink-0"
+                    >
+                      <span className="material-symbols-outlined text-[16px]">person_remove</span>
+                    </button>
+                  )}
                 </div>
               ))}
         </div>

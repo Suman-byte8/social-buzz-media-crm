@@ -5,6 +5,8 @@ import {
   createTeamMember as createTeamMemberApi,
   updateTeamMember as updateTeamMemberApi,
   deleteTeamMember as deleteTeamMemberApi,
+  uploadTeamMemberAvatar as uploadTeamMemberAvatarApi,
+  uploadTeamMemberResume as uploadTeamMemberResumeApi,
 } from "@/services/teamService";
 
 export const fetchTeamMembers = createAsyncThunk(
@@ -59,6 +61,28 @@ export const deleteTeamMember = createAsyncThunk(
       return id;
     } catch (error) {
       return rejectWithValue(error.message || "Failed to delete team member");
+    }
+  }
+);
+
+export const uploadTeamMemberAvatar = createAsyncThunk(
+  "team/uploadAvatar",
+  async ({ id, file }, { rejectWithValue }) => {
+    try {
+      return await uploadTeamMemberAvatarApi(id, file);
+    } catch (error) {
+      return rejectWithValue(error.message || "Failed to upload profile image");
+    }
+  }
+);
+
+export const uploadTeamMemberResume = createAsyncThunk(
+  "team/uploadResume",
+  async ({ id, file }, { rejectWithValue }) => {
+    try {
+      return await uploadTeamMemberResumeApi(id, file);
+    } catch (error) {
+      return rejectWithValue(error.message || "Failed to upload resume");
     }
   }
 );
@@ -123,6 +147,30 @@ const teamSlice = createSlice({
       })
       .addCase(updateTeamMember.rejected, (state, action) => {
         state.error = action.payload || "Failed to update team member";
+      })
+      .addCase(uploadTeamMemberAvatar.fulfilled, (state, action) => {
+        const updated = action.payload?.data;
+        if (updated?.id) {
+          const idx = state.teamMembers.findIndex((m) => m.id === updated.id);
+          if (idx !== -1) state.teamMembers[idx] = updated;
+          if (state.member?.id === updated.id) state.member = updated;
+        }
+        state.successMessage = "Profile image uploaded successfully";
+      })
+      .addCase(uploadTeamMemberAvatar.rejected, (state, action) => {
+        state.error = action.payload || "Failed to upload profile image";
+      })
+      .addCase(uploadTeamMemberResume.fulfilled, (state, action) => {
+        const updated = action.payload?.data;
+        if (updated?.id) {
+          const idx = state.teamMembers.findIndex((m) => m.id === updated.id);
+          if (idx !== -1) state.teamMembers[idx] = updated;
+          if (state.member?.id === updated.id) state.member = updated;
+        }
+        state.successMessage = "Resume uploaded successfully";
+      })
+      .addCase(uploadTeamMemberResume.rejected, (state, action) => {
+        state.error = action.payload || "Failed to upload resume";
       })
       .addCase(deleteTeamMember.fulfilled, (state, action) => {
         state.teamMembers = state.teamMembers.filter((m) => m.id !== action.payload);
