@@ -43,7 +43,7 @@ export default function MeetingNotesPage() {
   const [deleteLoading, setDeleteLoading] = useState({});
 
   useEffect(() => {
-    dispatch(fetchClients());
+    dispatch(fetchClients({ limit: 100 }));
     dispatch(fetchMeetingNotes());
   }, [dispatch]);
 

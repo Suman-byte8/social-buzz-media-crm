@@ -27,7 +27,7 @@ export default function AgreementsPage() {
   const [viewingAgreement, setViewingAgreement] = useState(null);
 
   useEffect(() => {
-    dispatch(fetchClients());
+    dispatch(fetchClients({ limit: 100 }));
   }, [dispatch]);
 
   useEffect(() => {

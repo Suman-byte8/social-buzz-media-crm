@@ -11,7 +11,7 @@ export function useInvoiceClients({ onClientSelected } = {}) {
   const [selectedClientId, setSelectedClientId] = useState("");
 
   useEffect(() => {
-    dispatch(fetchClients());
+    dispatch(fetchClients({ limit: 100 }));
   }, [dispatch]);
 
   const clients = useMemo(() => {

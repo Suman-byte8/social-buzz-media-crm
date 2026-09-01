@@ -44,7 +44,7 @@ export default function MiscellaneousPage() {
   const [editError, setEditError] = useState("");
 
   useEffect(() => {
-    dispatch(fetchClients());
+    dispatch(fetchClients({ limit: 100 }));
     if (teamMembers.length === 0) {
       dispatch(fetchTeamMembers());
     }
