@@ -1,8 +1,7 @@
 "use client";
 
 import React from "react";
-
-const INDUSTRY_OPTIONS = ["SaaS", "E-commerce", "Healthcare", "Finance", "Education", "Real Estate"];
+import { CLIENT_INDUSTRY_OPTIONS } from "@/lib/clientIndustries";
 
 export default function ClientsFilters({
   search,
@@ -37,7 +36,7 @@ export default function ClientsFilters({
           className="border border-outline-variant rounded-lg px-3 py-2 text-body-sm font-body-sm bg-white focus:ring-1 focus:ring-primary focus:border-primary outline-none"
         >
           <option value="">All Industries</option>
-          {INDUSTRY_OPTIONS.map((opt) => (
+          {CLIENT_INDUSTRY_OPTIONS.map((opt) => (
             <option key={opt} value={opt}>{opt}</option>
           ))}
         </select>

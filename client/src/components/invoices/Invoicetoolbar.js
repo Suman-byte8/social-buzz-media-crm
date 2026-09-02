@@ -76,9 +76,9 @@ export default function InvoiceToolbar({
             onChange={(e) => onGstModeChange(e.target.value)}
             className="rounded bg-white/10 px-2 py-1 text-[12px] text-white focus:outline-none focus:ring-2 focus:ring-white/60"
           >
-            <option value="intra">CGST + SGST (within WB)</option>
-            <option value="inter">IGST (other state)</option>
-            <option value="none">No GST</option>
+            <option value="intra" className="bg-white text-ink">CGST + SGST (within WB)</option>
+            <option value="inter" className="bg-white text-ink">IGST (other state)</option>
+            <option value="none" className="bg-white text-ink">No GST</option>
           </select>
         </label>
 
@@ -113,10 +113,10 @@ export default function InvoiceToolbar({
             onChange={(e) => onStampModeChange(e.target.value)}
             className="rounded bg-white/10 px-2 py-1 text-[12px] text-white focus:outline-none focus:ring-2 focus:ring-white/60"
           >
-            <option value="none">None</option>
-            <option value="due">Payment due</option>
-            <option value="advance">Advance paid</option>
-            <option value="paid">Paid</option>
+            <option value="none" className="bg-white text-ink">None</option>
+            <option value="due" className="bg-white text-ink">Payment due</option>
+            <option value="advance" className="bg-white text-ink">Advance paid</option>
+            <option value="paid" className="bg-white text-ink">Paid</option>
           </select>
         </label>
 

@@ -1,5 +1,6 @@
 "use client";
 import React from "react";
+import ClientSelectDropdown from "./ClientSelectDropdown";
 
 export default function BillingDetails({
   clients,
@@ -31,22 +32,12 @@ export default function BillingDetails({
           <label className="sr-only" htmlFor="billToClient">
             Select client
           </label>
-          <select
-            id="billToClient"
-            value={selectedClientId}
-            onChange={(e) => onClientChange(e.target.value)}
-            disabled={isClientLoading}
-            className="w-full max-w-[74mm] cursor-pointer rounded border border-[#DEDBD6] bg-white px-2 py-1.5 font-display text-[13px] font-700 text-[#1A1A1A] focus:outline-none focus:border-[#E8262A] focus:ring-1 focus:ring-[#E8262A]"
-          >
-            <option value="">
-              {isClientLoading ? "Loading clients…" : "Select a client…"}
-            </option>
-            {clients.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
+          <ClientSelectDropdown
+            clients={clients}
+            isClientLoading={isClientLoading}
+            selectedClientId={selectedClientId}
+            onClientChange={onClientChange}
+          />
         </div>
 
         <div className="mt-2">
@@ -61,7 +52,7 @@ export default function BillingDetails({
                 </p>
               )}
               <p className="mt-0.5 text-[10.5px] leading-[1.6] text-[#6E6A65]">
-                {selectedClient.address || "—"}
+                {selectedClient.address || ""}
               </p>
             </>
           ) : (
@@ -84,14 +75,11 @@ export default function BillingDetails({
           }
           className="mt-2 w-full bg-transparent font-display text-[15px] font-700 outline-none"
         />
-        <textarea
-          value={engagement.description}
-          onChange={(e) =>
-            onEngagementChange({ ...engagement, description: e.target.value })
-          }
-          rows={2}
-          className="mt-1 w-full resize-none bg-transparent text-[10.5px] leading-[1.7] text-[#6E6A65] outline-none"
-        />
+        <p className="mt-1 text-[10.5px] leading-[1.7] text-[#6E6A65]">
+          {selectedClient
+            ? selectedClient.address || ""
+            : "Select a client to show their address."}
+        </p>
       </div>
     </section>
   );

@@ -4,6 +4,9 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchClients } from "@/redux/slices/clientsSlice";
 
+const toServiceArray = (value) =>
+  Array.isArray(value) ? value : value ? value.split(",").map((s) => s.trim()).filter(Boolean) : [];
+
 export function useInvoiceClients({ onClientSelected } = {}) {
   const dispatch = useDispatch();
   const rawClients = useSelector((state) => state.clients.clients);
@@ -27,6 +30,7 @@ export function useInvoiceClients({ onClientSelected } = {}) {
       whatsappNumber: c.whatsappNumber || "",
       phoneNumber: c.phoneNumber || "",
       address: c.address || c.billingAddress || "",
+      services: toServiceArray(c.servicesSelected),
     }));
   }, [rawClients]);
 

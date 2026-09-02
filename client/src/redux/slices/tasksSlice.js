@@ -2,6 +2,7 @@ import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 import {
   fetchTasks as fetchTasksApi,
   fetchTasksByAssignee as fetchTasksByAssigneeApi,
+  fetchTasksByClient as fetchTasksByClientApi,
   createTask as createTaskApi,
   updateTask as updateTaskApi,
   deleteTask as deleteTaskApi,
@@ -23,6 +24,17 @@ export const fetchTasksByAssignee = createAsyncThunk(
   async (assigneeId, { rejectWithValue }) => {
     try {
       return await fetchTasksByAssigneeApi(assigneeId);
+    } catch (error) {
+      return rejectWithValue(error.message || "Failed to fetch tasks");
+    }
+  }
+);
+
+export const fetchTasksByClient = createAsyncThunk(
+  "tasks/fetchTasksByClient",
+  async (clientId, { rejectWithValue }) => {
+    try {
+      return await fetchTasksByClientApi(clientId);
     } catch (error) {
       return rejectWithValue(error.message || "Failed to fetch tasks");
     }
@@ -69,8 +81,12 @@ const initialState = {
   // member-profile lookup never clobbers the site-wide task list other
   // pages (Tasks board, Dashboard) are reading from the same store.
   memberTasks: [],
+  // Populated by fetchTasksByClient — kept separate for the same reason
+  // as memberTasks above (used by the client profile's Recent Activity).
+  clientTasks: [],
   loading: false,
   loadingMemberTasks: false,
+  loadingClientTasks: false,
   error: null,
   successMessage: null,
 };
@@ -113,6 +129,17 @@ const tasksSlice = createSlice({
       .addCase(fetchTasksByAssignee.rejected, (state, action) => {
         state.loadingMemberTasks = false;
         state.error = action.payload || "Failed to fetch member tasks";
+      })
+      .addCase(fetchTasksByClient.pending, (state) => {
+        state.loadingClientTasks = true;
+      })
+      .addCase(fetchTasksByClient.fulfilled, (state, action) => {
+        state.loadingClientTasks = false;
+        state.clientTasks = action.payload?.data || action.payload || [];
+      })
+      .addCase(fetchTasksByClient.rejected, (state, action) => {
+        state.loadingClientTasks = false;
+        state.error = action.payload || "Failed to fetch client tasks";
       })
       .addCase(createTask.fulfilled, (state) => {
         state.successMessage = "Task created successfully";

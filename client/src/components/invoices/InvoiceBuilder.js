@@ -17,9 +17,7 @@ export default function InvoiceBuilder() {
   const [gstin, setGstin] = useState("19AEXFS2063Q1ZW");
 
   const [engagement, setEngagement] = useState({
-    title: "Social Media Retainer",
-    description:
-      "Scope: content, community, paid media · PO / Ref: — · Place of supply: West Bengal (19)",
+    title: "Digital Marketing Retainer",
   });
 
   const [gstMode, setGstMode] = useState("intra");
@@ -38,7 +36,7 @@ export default function InvoiceBuilder() {
   });
 
   const addRow = useCallback(() => {
-    setRows((prev) => [...prev, { id: Date.now(), desc: "", sac: "", qty: 1, rate: 0 }]);
+    setRows((prev) => [...prev, { id: Date.now(), desc: "", qty: 1, rate: 0 }]);
   }, []);
 
   const updateRow = useCallback((id, field, value) => {
@@ -118,6 +116,7 @@ export default function InvoiceBuilder() {
           clients={clients}
           isClientLoading={isClientLoading}
           selectedClientId={selectedClientId}
+          selectedClient={selectedClient}
           onClientChange={handleClientChange}
           engagement={engagement}
           onEngagementChange={setEngagement}

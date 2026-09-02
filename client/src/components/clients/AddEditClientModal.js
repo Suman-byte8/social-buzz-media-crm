@@ -4,8 +4,8 @@ import React, { useState, useEffect, useRef } from "react";
 import { useDispatch } from "react-redux";
 import { createClient, updateClient, uploadClientLogo } from "@/redux/slices/clientsSlice";
 import { getAssetUrl } from "@/services/apiClient";
+import { CLIENT_INDUSTRY_OPTIONS } from "@/lib/clientIndustries";
 
-const INDUSTRY_OPTIONS = ["SaaS", "E-commerce", "Healthcare", "Finance", "Education", "Real Estate", "Other"];
 const SERVICE_OPTIONS = [
   "Digital Marketing",
   "Performance Marketing",
@@ -232,7 +232,7 @@ function ClientForm({ client, teamMembers, onClose, onSuccess }) {
             className="w-full px-4 py-2 border border-outline-variant rounded-lg focus:ring-1 focus:ring-primary focus:border-primary bg-white"
           >
             <option value="">Select Industry</option>
-            {INDUSTRY_OPTIONS.map((opt) => (
+            {CLIENT_INDUSTRY_OPTIONS.map((opt) => (
               <option key={opt} value={opt}>{opt}</option>
             ))}
           </select>

@@ -22,6 +22,7 @@ const InvoiceDocument = forwardRef(function InvoiceDocument(props, ref) {
     clients,
     isClientLoading,
     selectedClientId,
+    selectedClient,
     onClientChange,
     engagement,
     onEngagementChange,
@@ -85,6 +86,7 @@ const InvoiceDocument = forwardRef(function InvoiceDocument(props, ref) {
         rows={rows}
         onUpdateRow={onUpdateRow}
         onRemoveRow={onRemoveRow}
+        services={selectedClient?.services || []}
       />
 
       <PaymentAndTotals

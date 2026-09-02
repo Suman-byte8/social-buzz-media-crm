@@ -5,18 +5,7 @@ import { useDispatch, useSelector } from "react-redux";
 import Card from "@/components/ui/Card";
 import StatusBadge from "@/components/ui/StatusBadge";
 import { fetchMeetingNotes } from "@/redux/slices/meetingNotesSlice";
-
-const meetingTypeLabels = {
-  client_sync: "Client Sync",
-  internal_sync: "Internal Sync",
-  other: "Other",
-};
-
-const meetingTypeColors = {
-  client_sync: "blue",
-  internal_sync: "purple",
-  other: "gray",
-};
+import { fetchTasksByClient } from "@/redux/slices/tasksSlice";
 
 const initialsFor = (name) =>
   name ? name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2) : "?";
@@ -24,10 +13,12 @@ const initialsFor = (name) =>
 export default function Overview({ client, clientId, teamMembers = [] }) {
   const dispatch = useDispatch();
   const { meetingNotes, loading: loadingNotes } = useSelector((state) => state.meetingNotes);
+  const { clientTasks, loadingClientTasks } = useSelector((state) => state.tasks);
 
   useEffect(() => {
     if (clientId) {
       dispatch(fetchMeetingNotes(clientId));
+      dispatch(fetchTasksByClient(clientId));
     }
   }, [dispatch, clientId]);
 
@@ -58,11 +49,38 @@ export default function Overview({ client, clientId, teamMembers = [] }) {
     { id: 4, title: "Next Renewal", value: client?.renewal ? new Date(client.renewal).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : "Not set", change: daysUntilRenewal !== null ? (daysUntilRenewal >= 0 ? `${daysUntilRenewal} days away` : "Overdue") : "" },
   ];
 
-  const recentActivities = client?.notes ? [
-    { id: 1, date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }), message: client.notes.substring(0, 100) + (client.notes.length > 100 ? '...' : ''), type: "Note" },
-  ] : [
-    { id: 1, date: "N/A", message: "No recent activity recorded", type: "Note" },
-  ];
+  const recentActivities = useMemo(() => {
+    const activities = [];
+
+    clientTasks.forEach((task) => {
+      const assigneeNames = (task.assigneeDetails || []).map((a) => a.name).filter(Boolean);
+      const isCompleted = task.status === "completed";
+      activities.push({
+        id: `task-${task.id}`,
+        title: task.title || "Untitled task",
+        description: assigneeNames.length > 0 ? `Assigned to ${assigneeNames.join(", ")}` : "Unassigned",
+        date: task.createdAt,
+        type: isCompleted ? "Task Completed" : "Task Assigned",
+        typeColor: isCompleted ? "green" : "blue",
+      });
+    });
+
+    if (client?.notes) {
+      activities.push({
+        id: "client-note",
+        title: "Note logged",
+        description: client.notes.length > 100 ? `${client.notes.substring(0, 100)}...` : client.notes,
+        date: client.updatedAt || client.createdAt,
+        type: "Note",
+        typeColor: "gray",
+      });
+    }
+
+    return activities
+      .filter((a) => a.date)
+      .sort((a, b) => new Date(b.date) - new Date(a.date))
+      .slice(0, 8);
+  }, [clientTasks, client]);
 
   const keyContacts = [
     { role: "Client Name", name: clientName },
@@ -114,7 +132,7 @@ export default function Overview({ client, clientId, teamMembers = [] }) {
               <h2 className="font-title-lg text-title-lg text-on-surface">Recent Activity</h2>
               <StatusBadge status={healthLabel} color={healthColor} showDot />
             </div>
-            {loadingNotes ? (
+            {loadingNotes || loadingClientTasks ? (
               <div className="py-8 text-center text-on-surface-variant">
                 <span className="animate-spin material-symbols-outlined text-[24px]">progress_activity</span>
               </div>
@@ -128,14 +146,11 @@ export default function Overview({ client, clientId, teamMembers = [] }) {
                           <p className="font-body-md text-body-md text-on-surface font-semibold truncate">
                             {activity.title}
                           </p>
-                          <StatusBadge
-                            status={meetingTypeLabels[activity.meetingType] || activity.meetingType}
-                            color={meetingTypeColors[activity.meetingType] || "gray"}
-                          />
+                          <StatusBadge status={activity.type} color={activity.typeColor} />
                         </div>
                         <p className="font-label-sm text-label-sm text-on-surface-variant mt-1">
-                          {activity.meetingDate
-                            ? new Date(activity.meetingDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+                          {activity.date
+                            ? new Date(activity.date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
                             : "No date"}
                         </p>
                         {activity.description && (
@@ -151,7 +166,7 @@ export default function Overview({ client, clientId, teamMembers = [] }) {
             ) : (
               <div className="py-8 text-center text-on-surface-variant">
                 <span className="material-symbols-outlined text-3xl mb-2 block">event_note</span>
-                <p className="font-body-sm text-body-sm">No meeting notes recorded yet.</p>
+                <p className="font-body-sm text-body-sm">No recent activity recorded yet.</p>
               </div>
             )}
           </Card>

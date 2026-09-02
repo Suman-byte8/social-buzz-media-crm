@@ -9,7 +9,7 @@ const formatRupees = (n) =>
     maximumFractionDigits: 2,
   }).format(n || 0);
 
-export default function LineItemsTable({ rows, onUpdateRow, onRemoveRow }) {
+export default function LineItemsTable({ rows, onUpdateRow, onRemoveRow, services = [] }) {
   return (
     <section className="mt-7">
       <table className="w-full border-collapse text-[11px]">
@@ -20,9 +20,6 @@ export default function LineItemsTable({ rows, onUpdateRow, onRemoveRow }) {
             </th>
             <th className="px-2 py-2.5 text-left font-display text-[9px] font-700 uppercase tracking-[.18em]">
               Description
-            </th>
-            <th className="w-[22mm] px-2 py-2.5 text-left font-display text-[9px] font-700 uppercase tracking-[.18em]">
-              SAC
             </th>
             <th className="w-[16mm] px-2 py-2.5 text-right font-display text-[9px] font-700 uppercase tracking-[.18em]">
               Qty
@@ -43,20 +40,21 @@ export default function LineItemsTable({ rows, onUpdateRow, onRemoveRow }) {
                 {String(i + 1).padStart(2, "0")}
               </td>
               <td className="px-2 py-2.5">
-                <textarea
+                <select
                   value={r.desc}
                   onChange={(e) => onUpdateRow(r.id, "desc", e.target.value)}
-                  rows={1}
-                  className="min-h-[16px] w-full resize-none bg-transparent leading-snug outline-none"
-                />
-              </td>
-              <td className="px-2 py-2.5">
-                <input
-                  type="text"
-                  value={r.sac}
-                  onChange={(e) => onUpdateRow(r.id, "sac", e.target.value)}
-                  className="w-full bg-transparent font-mono text-[10.5px] outline-none"
-                />
+                  disabled={services.length === 0}
+                  className="w-full bg-transparent leading-snug outline-none disabled:text-[#B8B4AF]"
+                >
+                  <option value="">
+                    {services.length === 0 ? "Select a client to load services" : "Select a service…"}
+                  </option>
+                  {services.map((s) => (
+                    <option key={s} value={s} className="text-black bg-white">
+                      {s}
+                    </option>
+                  ))}
+                </select>
               </td>
               <td className="px-2 py-2.5 text-right">
                 <input
@@ -95,7 +93,7 @@ export default function LineItemsTable({ rows, onUpdateRow, onRemoveRow }) {
           ))}
           {rows.length === 0 && (
             <tr>
-              <td colSpan={7} className="px-2 py-6 text-center text-[#6E6A65]">
+              <td colSpan={6} className="px-2 py-6 text-center text-[#6E6A65]">
                 No line items yet — click &ldquo;+ Add line item&rdquo; above.
               </td>
             </tr>

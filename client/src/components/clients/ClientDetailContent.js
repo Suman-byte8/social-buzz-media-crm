@@ -14,6 +14,7 @@ import Invoices from "@/components/clients/Invoices";
 import Notes from "@/components/clients/Notes";
 import Renewal from "@/components/clients/Renewal";
 import ContentCalendarTab from "@/components/clients/ContentCalendarTab";
+import ClientAgreementTab from "@/components/clients/ClientAgreementTab";
 import AddEditClientModal from "@/components/clients/AddEditClientModal";
 import { fetchClientById } from "@/redux/slices/clientsSlice";
 import { fetchTeamMembers } from "@/redux/slices/teamSlice";
@@ -30,6 +31,7 @@ const tabs = [
   { id: "social", label: "Social", icon: "thumb_up" },
   { id: "reports", label: "Reports", icon: "bar_chart" },
   { id: "invoices", label: "Invoices", icon: "receipt_long", adminOnly: true },
+  { id: "agreement", label: "Agreement", icon: "gavel", adminOnly: true },
   { id: "notes", label: "Notes", icon: "event_note" },
   { id: "renewal", label: "Renewal", icon: "autorenew" },
   { id: "content_calendar", label: "Content Calendar", icon: "calendar_today" },
@@ -192,6 +194,8 @@ export default function ClientDetailContent({ activeTab, setActiveTab, client = 
         <Reports client={client} />
       ) : activeTab === "invoices" && isAdmin ? (
         <Invoices client={client} clientId={clientId} />
+      ) : activeTab === "agreement" && isAdmin ? (
+        <ClientAgreementTab client={client} clientId={clientId} />
       ) : activeTab === "notes" ? (
         <Notes client={client} clientId={clientId} />
       ) : activeTab === "renewal" ? (

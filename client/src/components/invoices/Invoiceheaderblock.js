@@ -29,7 +29,9 @@ export default function InvoiceHeaderBlock({
         <p className="mt-3 max-w-[62mm] text-[10.5px] leading-[1.7] text-[#6E6A65]">
           Malda, West Bengal 732101, India
           <br />
-          hello@socialbuzzmedia.in &middot; +91 79826 99410
+          hellosocialbuzzmedia@gmail.com
+          <br />
+          +91 80177 20547
           <br />
           <span className="inline-flex items-center gap-1 font-mono">
             GSTIN
