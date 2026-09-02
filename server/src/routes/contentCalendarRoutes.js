@@ -7,6 +7,10 @@ import {
   getOrCreateClientFolder,
   getOrCreateClientSubfolder,
 } from "../utils/googleDrive.js";
+import {
+  fetchAndParseGoogleSheet,
+  parseWorkbookBuffer,
+} from "../utils/sheetParser.js";
 
 const router = express.Router();
 
@@ -21,6 +25,11 @@ const upload = multer({
       cb(new Error("Only image or video files are allowed for creatives!"), false);
     }
   },
+});
+
+const sheetUpload = multer({
+  storage,
+  limits: { fileSize: 20 * 1024 * 1024 },
 });
 
 const CREATIVES_SUBFOLDER = "Content Calendar Creatives";
@@ -288,6 +297,322 @@ router.delete("/content-calendar/:id/creatives/:fileId", async (req, res) => {
     res.json({ success: true, message: "Creative removed", data: formatEntry(entry.toJSON()) });
   } catch (error) {
     res.status(500).json({ success: false, message: "Error removing creative", error: error.message });
+  }
+});
+
+// ── Live On-Demand Sheet Fetching (Last 4 Months) ──────────────────────
+router.get("/content-calendar/live/:clientId", async (req, res) => {
+  try {
+    const { Client } = req.app.locals.models;
+    const { clientId } = req.params;
+    const { sheetUrl: querySheetUrl } = req.query;
+
+    const client = await Client.findByPk(clientId, {
+      attributes: ["id", "name", "contentCalendar"],
+    });
+    if (!client) {
+      return res.status(404).json({ success: false, message: "Client not found" });
+    }
+
+    let savedConfig = {};
+    if (client.contentCalendar) {
+      try {
+        savedConfig = JSON.parse(client.contentCalendar);
+      } catch {
+        savedConfig = {};
+      }
+    }
+
+    const targetUrl = querySheetUrl || savedConfig.googleSheetUrl;
+    if (!targetUrl) {
+      return res.json({
+        success: true,
+        isLive: false,
+        sheetUrl: null,
+        tabs: [],
+        entries: [],
+        totalEntries: 0,
+        message: "No Google Sheet URL connected for this client yet.",
+      });
+    }
+
+    // Fetch and parse the 4 most recent month tabs
+    const parsedResult = await fetchAndParseGoogleSheet(targetUrl, clientId, 4);
+
+    const formattedList = parsedResult.entries.map((e) => ({
+      ...e,
+      platforms: parseJsonArray(e.platforms),
+      creatives: parseJsonArray(e.creatives),
+      clientName: client.name,
+    }));
+
+    // Extract distinct month keys from the parsed 4-month entries
+    const monthMap = {};
+    for (const e of formattedList) {
+      if (!e.date) continue;
+      const monthKey = e.date.slice(0, 7);
+      monthMap[monthKey] = (monthMap[monthKey] || 0) + 1;
+    }
+
+    const months = Object.keys(monthMap)
+      .sort()
+      .map((key) => {
+        const [year, m] = key.split("-").map(Number);
+        const date = new Date(year, m - 1, 1);
+        const label = date.toLocaleDateString("en-US", { month: "short", year: "numeric" });
+        return {
+          key,
+          label,
+          count: monthMap[key],
+        };
+      });
+
+    res.json({
+      success: true,
+      isLive: true,
+      sheetUrl: targetUrl,
+      title: parsedResult.title,
+      tabs: parsedResult.tabs,
+      months,
+      entries: formattedList,
+      totalEntries: formattedList.length,
+    });
+  } catch (error) {
+    console.error("Error in live calendar fetch:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message || "Failed to fetch live calendar from sheet",
+      error: error.message,
+    });
+  }
+});
+
+// ── Save Google Sheet URL to Client ────────────────────────────────────
+router.post("/content-calendar/save-sheet-url", async (req, res) => {
+  try {
+    const { Client } = req.app.locals.models;
+    const { clientId, sheetUrl } = req.body;
+
+    if (!clientId) {
+      return res.status(400).json({ success: false, message: "Client ID is required" });
+    }
+
+    const client = await Client.findByPk(clientId);
+    if (!client) {
+      return res.status(404).json({ success: false, message: "Client not found" });
+    }
+
+    let existingConfig = {};
+    try {
+      existingConfig = client.contentCalendar ? JSON.parse(client.contentCalendar) : {};
+    } catch {
+      existingConfig = {};
+    }
+
+    existingConfig.googleSheetUrl = sheetUrl ? sheetUrl.trim() : null;
+    existingConfig.updatedAt = new Date().toISOString();
+
+    await client.update({ contentCalendar: JSON.stringify(existingConfig) });
+
+    res.json({
+      success: true,
+      message: sheetUrl ? "Google Sheet link saved for client" : "Google Sheet link removed",
+      data: { sheetUrl: existingConfig.googleSheetUrl },
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// ── Sync Google Sheet ──────────────────────────────────────────────────
+router.post("/content-calendar/sync-google-sheet", async (req, res) => {
+  try {
+    const { ContentCalendarEntry, Client } = req.app.locals.models;
+    const { clientId, sheetUrl, clearExisting } = req.body;
+
+    if (!clientId) {
+      return res.status(400).json({ success: false, message: "Client is required to sync sheet" });
+    }
+    if (!sheetUrl) {
+      return res.status(400).json({ success: false, message: "Google Sheet URL is required" });
+    }
+
+    const client = await Client.findByPk(clientId);
+    if (!client) {
+      return res.status(404).json({ success: false, message: "Client not found" });
+    }
+
+    const parsedResult = await fetchAndParseGoogleSheet(sheetUrl, clientId);
+
+    if (!parsedResult.entries || parsedResult.entries.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "No content calendar rows could be found in the sheet. Ensure headers (Date, Title, Caption, etc.) are present.",
+      });
+    }
+
+    // Save the sheet URL in client metadata
+    try {
+      let existingConfig = {};
+      try {
+        existingConfig = client.contentCalendar ? JSON.parse(client.contentCalendar) : {};
+      } catch {
+        existingConfig = {};
+      }
+      existingConfig.googleSheetUrl = sheetUrl;
+      existingConfig.lastSyncedAt = new Date().toISOString();
+      existingConfig.sheetTabs = parsedResult.tabs.map((t) => t.name);
+      await client.update({ contentCalendar: JSON.stringify(existingConfig) });
+    } catch (configErr) {
+      console.warn("Could not persist sheet config to client:", configErr.message);
+    }
+
+    // Optional: Clear existing entries for this client if requested
+    if (clearExisting) {
+      await ContentCalendarEntry.destroy({ where: { clientId: parseInt(clientId) } });
+    }
+
+    // Bulk create entries
+    const createdEntries = await ContentCalendarEntry.bulkCreate(parsedResult.entries);
+
+    res.status(200).json({
+      success: true,
+      message: `Successfully synced ${createdEntries.length} entries across ${parsedResult.tabs.length} tabs from Google Sheet.`,
+      data: {
+        title: parsedResult.title,
+        sheetId: parsedResult.sheetId,
+        tabs: parsedResult.tabs,
+        totalEntries: createdEntries.length,
+      },
+    });
+  } catch (error) {
+    console.error("Error syncing Google Sheet:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message || "Failed to sync Google Sheet",
+      error: error.message,
+    });
+  }
+});
+
+// ── Import XLSX / CSV File ─────────────────────────────────────────────
+router.post("/content-calendar/import-file", sheetUpload.single("file"), async (req, res) => {
+  try {
+    const { ContentCalendarEntry, Client } = req.app.locals.models;
+    const { clientId, clearExisting } = req.body;
+
+    if (!clientId) {
+      return res.status(400).json({ success: false, message: "Client is required for file import" });
+    }
+
+    if (!req.file || !req.file.buffer) {
+      return res.status(400).json({ success: false, message: "Please upload an Excel (.xlsx) or CSV file." });
+    }
+
+    const client = await Client.findByPk(clientId);
+    if (!client) {
+      return res.status(404).json({ success: false, message: "Client not found" });
+    }
+
+    const parsedResult = parseWorkbookBuffer(req.file.buffer, clientId);
+
+    if (!parsedResult.entries || parsedResult.entries.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "No content calendar rows could be found in the uploaded workbook. Ensure headers (Date, Title, Caption, etc.) are present.",
+      });
+    }
+
+    // Save tabs in client metadata
+    try {
+      let existingConfig = {};
+      try {
+        existingConfig = client.contentCalendar ? JSON.parse(client.contentCalendar) : {};
+      } catch {
+        existingConfig = {};
+      }
+      existingConfig.lastImportedFile = req.file.originalname;
+      existingConfig.lastImportedAt = new Date().toISOString();
+      existingConfig.sheetTabs = parsedResult.tabs.map((t) => t.name);
+      await client.update({ contentCalendar: JSON.stringify(existingConfig) });
+    } catch (configErr) {
+      console.warn("Could not persist import config to client:", configErr.message);
+    }
+
+    if (clearExisting === "true" || clearExisting === true) {
+      await ContentCalendarEntry.destroy({ where: { clientId: parseInt(clientId) } });
+    }
+
+    const createdEntries = await ContentCalendarEntry.bulkCreate(parsedResult.entries);
+
+    res.status(200).json({
+      success: true,
+      message: `Successfully imported ${createdEntries.length} entries across ${parsedResult.tabs.length} tabs.`,
+      data: {
+        fileName: req.file.originalname,
+        tabs: parsedResult.tabs,
+        totalEntries: createdEntries.length,
+      },
+    });
+  } catch (error) {
+    console.error("Error importing file:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message || "Failed to parse workbook file",
+      error: error.message,
+    });
+  }
+});
+
+// ── Get Client Months / Tabs Summary ──────────────────────────────────
+router.get("/content-calendar/client-months/:clientId", async (req, res) => {
+  try {
+    const { ContentCalendarEntry, Client } = req.app.locals.models;
+    const { clientId } = req.params;
+
+    const entries = await ContentCalendarEntry.findAll({
+      where: { clientId: parseInt(clientId) },
+      attributes: ["date"],
+      order: [["date", "ASC"]],
+    });
+
+    const monthMap = {};
+    for (const e of entries) {
+      if (!e.date) continue;
+      const monthKey = e.date.slice(0, 7); // YYYY-MM
+      monthMap[monthKey] = (monthMap[monthKey] || 0) + 1;
+    }
+
+    const client = await Client.findByPk(clientId, { attributes: ["contentCalendar"] });
+    let savedConfig = {};
+    if (client && client.contentCalendar) {
+      try {
+        savedConfig = JSON.parse(client.contentCalendar);
+      } catch {
+        savedConfig = {};
+      }
+    }
+
+    const months = Object.keys(monthMap).sort().map((key) => {
+      const [year, m] = key.split("-").map(Number);
+      const date = new Date(year, m - 1, 1);
+      const label = date.toLocaleDateString("en-US", { month: "short", year: "numeric" });
+      return {
+        key,
+        label,
+        count: monthMap[key],
+      };
+    });
+
+    res.json({
+      success: true,
+      data: {
+        months,
+        savedConfig,
+      },
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
   }
 });
 
