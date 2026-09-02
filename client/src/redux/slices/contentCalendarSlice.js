@@ -6,7 +6,33 @@ import {
   deleteContentCalendarEntry as deleteContentCalendarEntryApi,
   uploadCreatives as uploadCreativesApi,
   deleteCreative as deleteCreativeApi,
+  syncGoogleSheet as syncGoogleSheetApi,
+  importCalendarFile as importCalendarFileApi,
+  fetchLiveCalendar as fetchLiveCalendarApi,
+  saveClientSheetUrl as saveClientSheetUrlApi,
 } from "@/services/contentCalendarService";
+
+export const fetchLiveCalendar = createAsyncThunk(
+  "contentCalendar/fetchLiveCalendar",
+  async ({ clientId, sheetUrl }, { rejectWithValue }) => {
+    try {
+      return await fetchLiveCalendarApi(clientId, sheetUrl);
+    } catch (error) {
+      return rejectWithValue(error.message || "Failed to fetch live calendar");
+    }
+  }
+);
+
+export const saveClientSheetUrl = createAsyncThunk(
+  "contentCalendar/saveClientSheetUrl",
+  async ({ clientId, sheetUrl }, { rejectWithValue }) => {
+    try {
+      return await saveClientSheetUrlApi({ clientId, sheetUrl });
+    } catch (error) {
+      return rejectWithValue(error.message || "Failed to save Google Sheet link");
+    }
+  }
+);
 
 export const fetchContentCalendarEntries = createAsyncThunk(
   "contentCalendar/fetchEntries",
@@ -15,6 +41,39 @@ export const fetchContentCalendarEntries = createAsyncThunk(
       return await fetchContentCalendarEntriesApi(params);
     } catch (error) {
       return rejectWithValue(error.message || "Failed to fetch content calendar entries");
+    }
+  }
+);
+
+export const syncGoogleSheet = createAsyncThunk(
+  "contentCalendar/syncGoogleSheet",
+  async ({ clientId, sheetUrl, clearExisting }, { rejectWithValue }) => {
+    try {
+      return await syncGoogleSheetApi({ clientId, sheetUrl, clearExisting });
+    } catch (error) {
+      return rejectWithValue(error.message || "Failed to sync Google Sheet");
+    }
+  }
+);
+
+export const importCalendarFile = createAsyncThunk(
+  "contentCalendar/importCalendarFile",
+  async ({ clientId, file, clearExisting }, { rejectWithValue }) => {
+    try {
+      return await importCalendarFileApi({ clientId, file, clearExisting });
+    } catch (error) {
+      return rejectWithValue(error.message || "Failed to import calendar file");
+    }
+  }
+);
+
+export const fetchClientMonths = createAsyncThunk(
+  "contentCalendar/fetchClientMonths",
+  async (clientId, { rejectWithValue }) => {
+    try {
+      return await fetchClientMonthsApi(clientId);
+    } catch (error) {
+      return rejectWithValue(error.message || "Failed to fetch client months");
     }
   }
 );
@@ -78,7 +137,11 @@ export const deleteCreative = createAsyncThunk(
 
 const initialState = {
   entries: [],
+  clientMonths: [],
+  savedSheetConfig: null,
   loading: false,
+  syncingSheet: false,
+  importingFile: false,
   error: null,
   successMessage: null,
 };
@@ -99,6 +162,32 @@ const contentCalendarSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder
+      .addCase(fetchLiveCalendar.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(fetchLiveCalendar.fulfilled, (state, action) => {
+        state.loading = false;
+        state.entries = action.payload?.entries || [];
+        state.clientMonths = action.payload?.months || [];
+        if (action.payload?.sheetUrl) {
+          state.savedSheetConfig = {
+            ...(state.savedSheetConfig || {}),
+            googleSheetUrl: action.payload.sheetUrl,
+          };
+        }
+      })
+      .addCase(fetchLiveCalendar.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload || "Failed to load live calendar";
+      })
+      .addCase(saveClientSheetUrl.fulfilled, (state, action) => {
+        state.savedSheetConfig = {
+          ...(state.savedSheetConfig || {}),
+          googleSheetUrl: action.payload?.data?.sheetUrl || null,
+        };
+        state.successMessage = action.payload?.message || "Sheet URL saved";
+      })
       .addCase(fetchContentCalendarEntries.pending, (state) => {
         state.loading = true;
         state.error = null;
@@ -110,6 +199,34 @@ const contentCalendarSlice = createSlice({
       .addCase(fetchContentCalendarEntries.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload || "Failed to fetch content calendar entries";
+      })
+      .addCase(fetchClientMonths.fulfilled, (state, action) => {
+        state.clientMonths = action.payload?.data?.months || [];
+        state.savedSheetConfig = action.payload?.data?.savedConfig || null;
+      })
+      .addCase(syncGoogleSheet.pending, (state) => {
+        state.syncingSheet = true;
+        state.error = null;
+      })
+      .addCase(syncGoogleSheet.fulfilled, (state, action) => {
+        state.syncingSheet = false;
+        state.successMessage = action.payload?.message || "Google Sheet synced successfully";
+      })
+      .addCase(syncGoogleSheet.rejected, (state, action) => {
+        state.syncingSheet = false;
+        state.error = action.payload || "Failed to sync Google Sheet";
+      })
+      .addCase(importCalendarFile.pending, (state) => {
+        state.importingFile = true;
+        state.error = null;
+      })
+      .addCase(importCalendarFile.fulfilled, (state, action) => {
+        state.importingFile = false;
+        state.successMessage = action.payload?.message || "File imported successfully";
+      })
+      .addCase(importCalendarFile.rejected, (state, action) => {
+        state.importingFile = false;
+        state.error = action.payload || "Failed to import file";
       })
       .addCase(createContentCalendarEntry.fulfilled, (state) => {
         state.successMessage = "Entry created successfully";
