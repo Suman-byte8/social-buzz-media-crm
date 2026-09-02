@@ -4,6 +4,8 @@ import React, { useEffect, useState, useMemo } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchTeamMembers, deleteTeamMember } from "@/redux/slices/teamSlice";
 import { fetchTasks } from "@/redux/slices/tasksSlice";
+import { fetchClients } from "@/redux/slices/clientsSlice";
+import { parseArrayField } from "@/services/teamService";
 import TeamToolbar from "@/components/teams/TeamToolbar";
 import TeamStats from "@/components/teams/TeamStats";
 import TeamFilters from "@/components/teams/TeamFilters";
@@ -19,6 +21,7 @@ export default function TeamPageShell() {
   const dispatch = useDispatch();
   const teamMembers = useSelector((state) => state.team.teamMembers);
   const tasks = useSelector((state) => state.tasks.tasks);
+  const clients = useSelector((state) => state.clients.clients);
 
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
@@ -32,6 +35,7 @@ export default function TeamPageShell() {
   useEffect(() => {
     dispatch(fetchTeamMembers());
     dispatch(fetchTasks({ limit: 500 }));
+    dispatch(fetchClients({ limit: 100 }));
   }, [dispatch]);
 
   const handleTeamMemberUpdate = async () => {
@@ -95,6 +99,26 @@ export default function TeamPageShell() {
     }, {});
   }, [teamMembers, tasks]);
 
+  // Real per-member client lists, combining live Client.clientManagedBy
+  // assignments (set from the Clients page or the Assign Client modal)
+  // with the legacy TeamMember.clientHandling text field, so the table
+  // doesn't show "None assigned" for clients that were only ever linked
+  // via clientManagedBy.
+  const clientNamesById = useMemo(() => {
+    return teamMembers.reduce((acc, member) => {
+      const legacyNames = parseArrayField(member.clientHandling);
+      const realNames = clients
+        .filter((c) => String(c.clientManagedBy) === String(member.id))
+        .map((c) => c.name);
+      const merged = [...realNames];
+      legacyNames.forEach((name) => {
+        if (!merged.some((n) => n.toLowerCase() === name.toLowerCase())) merged.push(name);
+      });
+      acc[member.id] = merged;
+      return acc;
+    }, {});
+  }, [teamMembers, clients]);
+
   const stats = useMemo(() => {
     const activeNow = teamMembers.filter((m) => (m.status || "").toLowerCase() === "active").length;
     const openTasks = tasks.filter((t) => t.status !== "completed").length;
@@ -131,7 +155,13 @@ export default function TeamPageShell() {
           }}
         />
 
-        <TeamTable members={paginatedMembers} workloadById={workloadById} onEdit={handleEdit} onDelete={handleDelete} />
+        <TeamTable
+          members={paginatedMembers}
+          workloadById={workloadById}
+          clientNamesById={clientNamesById}
+          onEdit={handleEdit}
+          onDelete={handleDelete}
+        />
 
         <TeamPagination
           currentPage={currentPage}

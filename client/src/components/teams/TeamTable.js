@@ -3,7 +3,7 @@
 import React from "react";
 import TeamMemberRow from "@/components/teams/TeamMemberRow";
 
-export default function TeamTable({ members, workloadById, onEdit, onDelete }) {
+export default function TeamTable({ members, workloadById, clientNamesById, onEdit, onDelete }) {
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-left border-collapse min-w-[1000px]">
@@ -24,6 +24,7 @@ export default function TeamTable({ members, workloadById, onEdit, onDelete }) {
                 key={member.id}
                 member={member}
                 workload={workloadById[member.id] || { openTaskCount: 0, widthPercent: 0 }}
+                clientNames={clientNamesById[member.id] || []}
                 onEdit={onEdit}
                 onDelete={onDelete}
               />

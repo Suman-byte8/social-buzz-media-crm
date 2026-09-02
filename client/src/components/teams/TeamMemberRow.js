@@ -11,7 +11,7 @@ const STATUS_META = {
   inactive: { label: "Inactive", color: "gray" },
 };
 
-export default function TeamMemberRow({ member, workload, onEdit, onDelete }) {
+export default function TeamMemberRow({ member, workload, clientNames, onEdit, onDelete }) {
   const [showDropdown, setShowDropdown] = useState(false);
   const dropdownRef = useRef(null);
 
@@ -29,7 +29,7 @@ export default function TeamMemberRow({ member, workload, onEdit, onDelete }) {
   const statusMeta = STATUS_META[status] || { label: "No Status", color: "orange" };
 
   const assignedWorks = parseArrayField(member.assignedWorks);
-  const clientHandling = parseArrayField(member.clientHandling);
+  const clientHandling = clientNames || [];
 
   const initials = member.name
     ? member.name.split(" ").map((n) => n[0]).join("").toUpperCase()
