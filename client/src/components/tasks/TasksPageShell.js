@@ -9,10 +9,11 @@ import AddTaskModal from "@/components/tasks/AddTaskModal";
 import TaskViewModal from "@/components/tasks/TaskViewModal";
 import TasksToolbar from "@/components/tasks/TasksToolbar";
 import TasksFilters from "@/components/tasks/TasksFilters";
-import TasksBoard from "@/components/tasks/TasksBoard";
+import TasksTable from "@/components/tasks/TasksTable";
 
-const COLUMN_IDS = ["todo", "in_progress", "review", "completed"];
 const SEARCH_DEBOUNCE_MS = 350;
+const PRIORITY_RANK = { urgent: 0, high: 1, medium: 2, low: 3 };
+const STATUS_RANK = { todo: 0, in_progress: 1, review: 2, completed: 3 };
 
 export default function TasksPageShell() {
   const dispatch = useDispatch();
@@ -30,6 +31,8 @@ export default function TasksPageShell() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingTask, setEditingTask] = useState(null);
   const [viewingTask, setViewingTask] = useState(null);
+  const [sortBy, setSortBy] = useState("dueDate");
+  const [sortOrder, setSortOrder] = useState("ASC");
 
   // Seed filters from URL query params (e.g. deep-linked from a team member's profile).
   useEffect(() => {
@@ -117,23 +120,57 @@ export default function TasksPageShell() {
     if (deleted) setViewingTask(null);
   };
 
-  const tasksByColumn = useMemo(() => {
-    const result = {};
-    COLUMN_IDS.forEach((id) => {
-      result[id] = tasks.filter((t) => t.status === id);
+  const handleSort = (column) => {
+    if (sortBy === column) {
+      setSortOrder((prev) => (prev === "ASC" ? "DESC" : "ASC"));
+    } else {
+      setSortBy(column);
+      setSortOrder("ASC");
+    }
+  };
+
+  // Tasks are fetched flat (no server-side sort support), so sorting for
+  // the table view happens here on the already-fetched page.
+  const sortedTasks = useMemo(() => {
+    const arr = [...tasks];
+    arr.sort((a, b) => {
+      let cmp = 0;
+      switch (sortBy) {
+        case "title":
+          cmp = (a.title || "").localeCompare(b.title || "");
+          break;
+        case "clientName":
+          cmp = (a.clientName || "").localeCompare(b.clientName || "");
+          break;
+        case "priority":
+          cmp = (PRIORITY_RANK[a.priority] ?? 9) - (PRIORITY_RANK[b.priority] ?? 9);
+          break;
+        case "status":
+          cmp = (STATUS_RANK[a.status] ?? 9) - (STATUS_RANK[b.status] ?? 9);
+          break;
+        case "dueDate": {
+          const aTime = a.dueDate ? new Date(a.dueDate).getTime() : Infinity;
+          const bTime = b.dueDate ? new Date(b.dueDate).getTime() : Infinity;
+          cmp = aTime - bTime;
+          break;
+        }
+        default:
+          cmp = 0;
+      }
+      return sortOrder === "ASC" ? cmp : -cmp;
     });
-    return result;
-  }, [tasks]);
+    return arr;
+  }, [tasks, sortBy, sortOrder]);
 
   const stats = useMemo(
     () => ({
       totalTasks: tasks.length,
-      todo: tasksByColumn.todo.length,
-      in_progress: tasksByColumn.in_progress.length,
-      review: tasksByColumn.review.length,
-      completed: tasksByColumn.completed.length,
+      todo: tasks.filter((t) => t.status === "todo").length,
+      in_progress: tasks.filter((t) => t.status === "in_progress").length,
+      review: tasks.filter((t) => t.status === "review").length,
+      completed: tasks.filter((t) => t.status === "completed").length,
     }),
-    [tasks, tasksByColumn]
+    [tasks]
   );
 
   return (
@@ -157,10 +194,13 @@ export default function TasksPageShell() {
         teamMembers={teamMembers}
       />
 
-      <TasksBoard
-        tasksByColumn={tasksByColumn}
+      <TasksTable
+        tasks={sortedTasks}
         loading={loading}
         hasAnyTasks={tasks.length > 0}
+        sortBy={sortBy}
+        sortOrder={sortOrder}
+        onSort={handleSort}
         onStatusChange={handleStatusChange}
         onEdit={handleEdit}
         onDelete={handleDelete}
