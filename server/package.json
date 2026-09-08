@@ -14,6 +14,7 @@
     "db:add-indexes": "node scripts/add-indexes.js",
     "migrate:task-assignees": "node scripts/migrate-task-assignees.js",
     "migrate:client-columns": "node scripts/add-client-columns.js",
+    "migrate:document-type-values": "node scripts/add-document-type-values.js",
     "seed:users": "node scripts/seed-users.js"
   },
   "dependencies": {

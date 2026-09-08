@@ -9,6 +9,8 @@ import {
   fetchBrandKitFiles as fetchBrandKitFilesApi,
   uploadBrandKitFile as uploadBrandKitFileApi,
   uploadBrandKitFilesBulk as uploadBrandKitFilesBulkApi,
+  fetchClientFilesByType as fetchClientFilesByTypeApi,
+  uploadClientFilesBulk as uploadClientFilesBulkApi,
   fetchAgreements as fetchAgreementsApi,
   uploadAgreement as uploadAgreementApi,
   updateAgreement as updateAgreementApi,
@@ -159,6 +161,47 @@ export const deleteBrandKit = createAsyncThunk(
   }
 );
 
+// ── Client Files (generic per-client tabs: Creatives, Strategy, ...) ────────
+// Same media-capable upload/list/delete endpoints as Brand Kit, generalized
+// with a documentType so any future per-client file tab can reuse this
+// instead of adding another dedicated set of thunks/state.
+
+export const fetchClientFiles = createAsyncThunk(
+  "documents/fetchClientFiles",
+  async ({ clientId, documentType }, { rejectWithValue }) => {
+    try {
+      const response = await fetchClientFilesByTypeApi({ clientId, documentType });
+      return { documentType, ...response };
+    } catch (error) {
+      return rejectWithValue(error.message || "Failed to fetch files");
+    }
+  }
+);
+
+export const uploadClientFiles = createAsyncThunk(
+  "documents/uploadClientFiles",
+  async ({ formData, documentType }, { rejectWithValue }) => {
+    try {
+      const response = await uploadClientFilesBulkApi(formData);
+      return { documentType, ...response };
+    } catch (error) {
+      return rejectWithValue(error.message || "Failed to upload files");
+    }
+  }
+);
+
+export const deleteClientFile = createAsyncThunk(
+  "documents/deleteClientFile",
+  async ({ id, documentType }, { rejectWithValue }) => {
+    try {
+      await deleteDocumentApi(id);
+      return { id, documentType };
+    } catch (error) {
+      return rejectWithValue(error.message || "Failed to delete file");
+    }
+  }
+);
+
 // ── Agreements ───────────────────────────────────────────────────────────
 
 export const fetchAgreements = createAsyncThunk(
@@ -211,11 +254,15 @@ const initialState = {
   proposals: [],
   invoiceDocuments: [],
   brandKit: [],
+  // Keyed by documentType (e.g. "creative", "strategy") — see the
+  // "Client Files" thunks above.
+  filesByType: {},
   agreements: [],
   loading: false,
   loadingProposals: false,
   loadingInvoiceDocuments: false,
   loadingBrandKit: false,
+  loadingFilesByType: {},
   loadingAgreements: false,
   error: null,
   successMessage: null,
@@ -348,6 +395,42 @@ const documentsSlice = createSlice({
         state.successMessage = "File deleted successfully";
       })
       .addCase(deleteBrandKit.rejected, (state, action) => {
+        state.error = action.payload || "Failed to delete file";
+      })
+      .addCase(fetchClientFiles.pending, (state, action) => {
+        state.loadingFilesByType[action.meta.arg.documentType] = true;
+        state.error = null;
+      })
+      .addCase(fetchClientFiles.fulfilled, (state, action) => {
+        const { documentType, data } = action.payload;
+        state.loadingFilesByType[documentType] = false;
+        state.filesByType[documentType] = data || [];
+      })
+      .addCase(fetchClientFiles.rejected, (state, action) => {
+        state.loadingFilesByType[action.meta.arg.documentType] = false;
+        state.error = action.payload || "Failed to fetch files";
+      })
+      .addCase(uploadClientFiles.fulfilled, (state, action) => {
+        const { documentType, data = [], message } = action.payload;
+        if (!state.filesByType[documentType]) state.filesByType[documentType] = [];
+        // Same duplicate-id guard as Brand Kit's bulk upload — see the
+        // comment above uploadBrandKitBulk.fulfilled.
+        const existingIds = new Set(state.filesByType[documentType].map((f) => f.id));
+        const newDocs = data.filter((d) => !existingIds.has(d.id));
+        state.filesByType[documentType].push(...newDocs);
+        state.successMessage = message || "Files uploaded successfully";
+      })
+      .addCase(uploadClientFiles.rejected, (state, action) => {
+        state.error = action.payload || "Failed to upload files";
+      })
+      .addCase(deleteClientFile.fulfilled, (state, action) => {
+        const { id, documentType } = action.payload;
+        if (state.filesByType[documentType]) {
+          state.filesByType[documentType] = state.filesByType[documentType].filter((f) => f.id !== id);
+        }
+        state.successMessage = "File deleted successfully";
+      })
+      .addCase(deleteClientFile.rejected, (state, action) => {
         state.error = action.payload || "Failed to delete file";
       })
       .addCase(fetchAgreements.pending, (state) => {

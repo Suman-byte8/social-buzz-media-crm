@@ -42,6 +42,15 @@ const requireAdminForAgreements = (req, res, next) => {
   next();
 };
 
+// Maps a documentType to the Drive subfolder its files land in, for the
+// media-capable upload routes (brand kit, creatives, strategy).
+const MEDIA_SUBFOLDER_BY_TYPE = {
+  brand_kit: "Brand Kit",
+  creative: "Creatives",
+  strategy: "Strategy",
+};
+const mediaSubfolderName = (documentType) => MEDIA_SUBFOLDER_BY_TYPE[documentType] || "Other";
+
 // Upload agreement with specific subfolder
 router.post("/agreements/upload", requireAdminForAgreements, upload.single("file"), async (req, res) => {
   try {
@@ -236,7 +245,7 @@ router.post("/documents/upload-media", mediaUpload.single("file"), async (req, r
     }
 
     const clientFolder = await getOrCreateClientFolder(clientRecord.name, clientRecord.id);
-    const subfolderName = documentType === "brand_kit" ? "Brand Kit" : "Other";
+    const subfolderName = mediaSubfolderName(documentType);
     const subfolder = await getOrCreateClientSubfolder(clientFolder.folderId, subfolderName);
 
     const driveResult = await uploadFileToDrive(
@@ -300,7 +309,7 @@ router.post("/documents/upload-media-bulk", mediaUpload.array("files", 20), asyn
     }
 
     const clientFolder = await getOrCreateClientFolder(clientRecord.name, clientRecord.id);
-    const subfolderName = documentType === "brand_kit" ? "Brand Kit" : "Other";
+    const subfolderName = mediaSubfolderName(documentType);
     const subfolder = await getOrCreateClientSubfolder(clientFolder.folderId, subfolderName);
 
     const uploaded = [];

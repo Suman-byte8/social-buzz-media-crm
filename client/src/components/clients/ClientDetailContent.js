@@ -7,6 +7,7 @@ import ProposalTab from "@/components/clients/ProposalTab";
 import Overview from "@/components/clients/Overview";
 import Credentials from "@/components/clients/Credentials";
 import BrandKit from "@/components/clients/BrandKit";
+import ClientFilesTab from "@/components/clients/ClientFilesTab";
 import AdsTab from "@/components/clients/AdsTab";
 import MetaAdsTab from "@/components/clients/MetaAdsTab";
 import SocialMedia from "@/components/clients/SocialMedia";
@@ -27,6 +28,8 @@ const tabs = [
   { id: "proposal", label: "Proposal", icon: "description", adminOnly: true },
   { id: "credentials", label: "Credentials", icon: "key" },
   { id: "brand_kit", label: "Brand Kit", icon: "palette" },
+  { id: "creative", label: "Creatives", icon: "brush" },
+  { id: "strategy", label: "Strategy", icon: "lightbulb" },
   { id: "google_ads", label: "Google Ads", icon: "ads_click" },
   { id: "meta_ads", label: "Meta Ads", icon: "campaign" },
   { id: "social", label: "Social", icon: "thumb_up" },
@@ -195,6 +198,24 @@ export default function ClientDetailContent({ activeTab, setActiveTab, client = 
         <Credentials client={client} clientId={clientId} />
       ) : activeTab === "brand_kit" ? (
         <BrandKit client={client} clientId={clientId} />
+      ) : activeTab === "creative" ? (
+        <ClientFilesTab
+          client={client}
+          clientId={clientId}
+          documentType="creative"
+          title="Creatives"
+          icon="brush"
+          uploadHint="Creative assets — designs, videos, drafts, and more"
+        />
+      ) : activeTab === "strategy" ? (
+        <ClientFilesTab
+          client={client}
+          clientId={clientId}
+          documentType="strategy"
+          title="Strategy"
+          icon="lightbulb"
+          uploadHint="Strategy documents — plans, decks, research, and more"
+        />
       ) : activeTab === "google_ads" ? (
         <AdsTab client={client} />
       ) : activeTab === "meta_ads" ? (

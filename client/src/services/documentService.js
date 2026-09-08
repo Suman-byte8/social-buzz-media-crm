@@ -96,6 +96,25 @@ export const uploadBrandKitFilesBulk = async (formData) => {
   return response;
 };
 
+// ── Client Files (generic per-client tabs: Creatives, Strategy, ...) ────────
+// Reuses the same media-capable upload/list/delete endpoints as Brand Kit,
+// just parametrized by documentType instead of a dedicated set of routes.
+
+export const fetchClientFilesByType = async ({ clientId, documentType }) => {
+  const params = new URLSearchParams({ documentType });
+  if (clientId) params.append("clientId", clientId);
+  const response = await apiClient(`/documents?${params.toString()}`);
+  return response;
+};
+
+export const uploadClientFilesBulk = async (formData) => {
+  const response = await apiClient("/documents/upload-media-bulk", {
+    method: "POST",
+    body: formData,
+  });
+  return response;
+};
+
 // ── Agreements ───────────────────────────────────────────────────────────
 
 export const fetchAgreements = async (clientId) => {
