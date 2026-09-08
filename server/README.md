@@ -1,7 +1,7 @@
 # Social Buzz Media CRM - API Documentation
 
 ## Overview
-CRM API built with Express, PostgreSQL (Sequelize), and Google Drive integration for document management.
+CRM API built with Express, PostgreSQL (Sequelize), and Google Drive integration for document management — covering clients, a sales lead pipeline, tasks, team members, meeting notes, a content calendar (with Google Sheets sync), misc creative tasks, and documents (proposals/invoices/reports/brand kit/creatives/strategy/agreements). A shared response cache (Redis or in-process) sits in front of the heaviest-read endpoints — see [Caching](#caching).
 
 **Base URL:** `http://localhost:5000/api` (or the `PORT` set in `.env`)
 
@@ -29,6 +29,18 @@ Authorization: Bearer <token>
 A request with a missing/invalid/expired token gets `401 { "success": false, "message": "Authentication required" }` (or `"Invalid or expired session"`). A request from a valid but under-privileged user gets `403 { "success": false, "message": "Admin access required" }`.
 
 Passwords are stored **encrypted (reversible), not hashed** — the admin needs to be able to view and hand out the team member's password from Settings > Login Access.
+
+---
+
+## Caching
+
+The heaviest-read GET endpoints (`GET /clients`, `GET /team-members`, `GET /tasks`, `GET /documents`, `GET /agreements`) are wrapped with a shared response cache (`src/middleware/cacheRoute.js` + `src/utils/serverCache.js`), independent of and stacked underneath the client's own localStorage cache (see `client/README.md#caching--pagination`).
+
+- **Storage**: Redis (via `ioredis`) when `REDIS_URL` is set — e.g. [Upstash](https://upstash.com)'s free tier — otherwise a transparent in-process `Map` fallback with the same TTL/invalidation semantics. Nothing else in the app needs to change either way; a Redis outage mid-request also falls back to the in-process cache rather than failing the request.
+- **Cache key**: `` `${keyPrefix}:${role}:${req.originalUrl}` `` — the requester's role is *always* part of the key, never optional. Several of these routes redact fields by role (`GET /clients` strips `invoices` for non-admins, `GET /documents`/`GET /agreements` hide `agreement`/`proposal` rows entirely) — a role-blind cache key would risk one role's response leaking to another.
+- **TTLs**: clients 60s, team members 120s, tasks 30s, documents/agreements 120s (shared prefix, since both read from the same `documents` table).
+- **Invalidation**: every create/update/delete route for a cached resource calls `invalidateCache(prefix)` (e.g. `invalidateCache("tasks")`) after the write succeeds, clearing every cached URL variant (different filters/pagination) for that resource in both Redis and the in-process fallback.
+- Responses carry an `X-Cache: HIT` or `X-Cache: MISS` header, useful for confirming the cache is actually being hit in a given environment.
 
 ### 1. Login
 **Endpoint:** `POST /auth/login`
@@ -144,7 +156,8 @@ All endpoints below require auth. The `invoices` field is stripped from every re
 | whatsappNumber | string | No | WhatsApp contact number |
 | address | string | No | Client address |
 | email | string | No | Client email address |
-| servicesSelected | array or string | No | Services selected (comma-joined on write, array on read) |
+| website | string | No | Client website URL |
+| servicesSelected | array or string | No | Services selected (comma-joined on write, array on read) — the Invoice Generator scopes its service line-item dropdown to whatever a client has selected here |
 | clientManagedBy | integer | No | ID of the `TeamMember` managing this client |
 | clientHealth | integer | No | Client health score (0-100) |
 | proposals | array or string | No | Proposal names/refs (legacy plain-text field — real proposal files live in Documents) |
@@ -155,7 +168,8 @@ All endpoints below require auth. The `invoices` field is stripped from every re
 | invoices | array or string | No | **Admin only** — silently ignored for `team_member` |
 | notes | string | No | Free-text notes |
 | renewal | string (ISO 8601) | No | Contract renewal date |
-| contentCalendar | array or string | No | Legacy plain-text field — real entries live in Content Calendar |
+| clientSince | string (YYYY-MM-DD) | No | Editable "became a client" date — distinct from `createdAt` (always "now" at row-insert time), for backdating clients onboarded before this CRM existed. Defaults to `createdAt` if never set |
+| contentCalendar | JSON string | No | Dual-purpose: a legacy plain-text field for real entries (which now live in Content Calendar), and the storage for that client's Google Sheet sync config (`{ googleSheetUrl, lastSyncedAt, sheetTabs, lastImportedFile, lastImportedAt }`) — see the Content Calendar section. Not meant to be written directly by API consumers; use the `save-sheet-url`/`sync-google-sheet`/`import-file` endpoints instead |
 
 **Example Request:**
 ```json
@@ -225,6 +239,8 @@ All endpoints below require auth. The `invoices` field is stripped from every re
 | managedBy | integer | - | Filter by `clientManagedBy` |
 | healthMin | integer | - | Minimum `clientHealth` |
 | healthMax | integer | - | Maximum `clientHealth` |
+
+This route is cached — see [Caching](#caching) (`clients`, 60s TTL).
 
 **Success Response (200 OK):**
 ```json
@@ -364,6 +380,8 @@ All endpoints require auth (no admin restriction).
 ### 2. Get All Team Members
 **Endpoint:** `GET /team-members`
 
+This route is cached — see [Caching](#caching) (`team`, 120s TTL).
+
 **Success Response (200 OK):** `{ "success": true, "data": [ {...full team member...} ] }`
 
 ---
@@ -394,6 +412,8 @@ All endpoints require auth (no admin restriction).
 ## Task Management
 
 All endpoints require auth. Assigning/unassigning a team member automatically adds/removes the task title from that member's `assignedWorks` list.
+
+`assignees` is accepted and returned as a plain array of `TeamMember` IDs, same as always, but is no longer backed by the `tasks.assignees` TEXT column under the hood — it's now a real `task_assignees` join table (see `TaskAssignee` in Data Models), migrated via `scripts/migrate-task-assignees.js`. The old column is kept only as a rollback reference and is never read or written by the app.
 
 ### 1. Create Task
 **Endpoint:** `POST /tasks`
@@ -441,6 +461,9 @@ All endpoints require auth. Assigning/unassigning a team member automatically ad
 | priority | string | - | Filter by priority (`all` = no filter) |
 | clientId | integer | - | Filter by client (`all` = no filter) |
 | assigneeId | integer | - | Filter by assignee (`all` = no filter) |
+| month | string (YYYY-MM) | - | Filter to tasks whose `dueDate` falls in this month |
+
+This route is cached — see [Caching](#caching) (`tasks`, 30s TTL).
 
 **Success Response (200 OK):**
 ```json
@@ -484,6 +507,95 @@ All endpoints require auth. Assigning/unassigning a team member automatically ad
 **Endpoint:** `DELETE /tasks/:id`
 
 Also removes the task title from every assignee's `assignedWorks`.
+
+**Error Responses:** `404 Not Found`
+
+---
+
+## Leads (Sales Pipeline)
+
+A separate pre-client pipeline — distinct from `Client`. All endpoints require auth (no admin restriction). Not response-cached.
+
+### 1. List Leads
+**Endpoint:** `GET /leads`
+
+**Query Parameters:**
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| page | integer | 1 | Page number |
+| limit | integer | 10 | Page size |
+| search | string | - | Matches `companyName`, `contactName`, or `email` |
+| status | string | - | One of `new`, `contacted`, `qualified`, `hot`, `lost` |
+| source | string | - | Exact match (free-text field — no fixed list) |
+| sortBy | string | createdAt | Any Lead column |
+| sortOrder | string | DESC | `ASC` or `DESC` |
+
+**Success Response (200 OK):** `{ "success": true, "data": [...], "pagination": { "total", "page", "limit", "totalPages" } }`
+
+---
+
+### 2. Pipeline Metrics
+Summary counts for the Leads page's overview cards.
+
+**Endpoint:** `GET /leads/metrics`
+
+**Success Response (200 OK):**
+```json
+{
+  "success": true,
+  "data": {
+    "totalLeads": 42,
+    "hotProspects": 5,
+    "followUpDue": 3,
+    "lostThisMonth": 1,
+    "newThisMonth": 8
+  }
+}
+```
+`followUpDue` counts leads with `nextFollowUpAt` on or before end-of-today, excluding `lost`.
+
+---
+
+### 3. Create Lead
+**Endpoint:** `POST /leads`
+
+**Request Body:**
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| companyName | string | Yes | — |
+| contactName | string | No | — |
+| email | string | No | — |
+| phone | string | No | — |
+| source | string | No | Free text (e.g. "Referral", "Website") |
+| status | string | No | Defaults to `new` if omitted/invalid |
+| notes | string | No | — |
+| lastContactAt | string (ISO 8601) | No | — |
+| nextFollowUpAt | string (ISO 8601) | No | — |
+
+**Error Responses:** `400 Bad Request` - Missing `companyName`
+
+---
+
+### 4. Update Lead
+**Endpoint:** `PUT /leads/:id`
+
+**Request Body:** Same fields as Create, all optional — a field that's omitted entirely is left untouched (as opposed to `null`, which clears it), so a quick "log a call" request that only sends `{ lastContactAt }` doesn't wipe anything else.
+
+**Error Responses:** `404 Not Found`
+
+---
+
+### 5. Delete Lead
+**Endpoint:** `DELETE /leads/:id` — **Error Responses:** `404 Not Found`
+
+---
+
+### 6. Convert Lead to Client
+Creates a real `Client` from the lead's `companyName`/`email`/`phone`/`notes`, then deletes the lead (it's no longer a "potential" client).
+
+**Endpoint:** `POST /leads/:id/convert`
+
+**Success Response (201 Created):** `{ "success": true, "message": "Lead converted to client successfully", "data": { ...new Client... } }`
 
 **Error Responses:** `404 Not Found`
 
@@ -557,8 +669,9 @@ All endpoints require auth. `status` replaced a legacy boolean `posted` field �
 | from / to | Filter by `date` range (YYYY-MM-DD, inclusive) |
 | status | `pending`, `scheduled`, or `posted` |
 | platform | Filter to entries whose `platforms` array includes this value |
+| page / limit | Optional pagination — omitted entirely (or ignored) whenever `platform` is set, since that filter runs in JS *after* the SQL query (platforms are a JSON-serialized column), and paginating before it would make `total`/`totalPages` wrong |
 
-**Success Response (200 OK):** Entries ordered by `date` ASC, each enriched with `clientName`, `platforms` and `creatives` parsed to arrays.
+**Success Response (200 OK):** Entries ordered by `date` ASC, each enriched with `clientName`, `platforms` and `creatives` parsed to arrays. Includes `pagination` only when `page`/`limit` were honored (see above).
 
 ---
 
@@ -625,6 +738,75 @@ Removes the file from the entry's `creatives` list and deletes it from Google Dr
 
 ---
 
+### Google Sheets Sync / File Import
+
+A client's content calendar can also be driven from an external spreadsheet instead of (or alongside) manually-created entries. The sheet/file must have recognizable headers (Date, Title, Caption, etc. — see `src/utils/sheetParser.js`); each tab is treated as a separate month/batch. All of these persist bookkeeping (`googleSheetUrl`, `sheetTabs`, `lastSyncedAt`/`lastImportedAt`/`lastImportedFile`) into the client's `contentCalendar` JSON column (see the `Client` model).
+
+#### 8. Live Sheet View (read-only, not persisted)
+Fetches and parses a Google Sheet on demand — the last 4 month-tabs — without writing any `ContentCalendarEntry` rows. Used for previewing a connected sheet's content directly, live.
+
+**Endpoint:** `GET /content-calendar/live/:clientId`
+
+**Query Parameters:** `sheetUrl` (optional — falls back to the client's previously-saved sheet URL if omitted)
+
+**Success Response (200 OK):** `{ success, isLive, sheetUrl, title, tabs, months, entries, totalEntries }`. If no sheet URL is available (neither passed nor previously saved), returns `{ success: true, isLive: false, entries: [], message: "..." }` rather than an error.
+
+---
+
+#### 9. Save a Client's Sheet URL
+Just stores/clears the URL in the client's `contentCalendar` config — does not fetch or sync anything.
+
+**Endpoint:** `POST /content-calendar/save-sheet-url`
+
+**Request Body:** `{ "clientId": 1, "sheetUrl": "https://docs.google.com/spreadsheets/..." }` (omit/empty `sheetUrl` to remove it)
+
+**Error Responses:** `400 Bad Request` - Missing `clientId`; `404 Not Found` - Client not found
+
+---
+
+#### 10. Sync a Google Sheet into Real Entries
+Fetches the sheet, parses every tab, and **persists** the rows as real `ContentCalendarEntry` records (unlike the read-only Live Sheet View above).
+
+**Endpoint:** `POST /content-calendar/sync-google-sheet`
+
+**Request Body:**
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| clientId | integer | Yes | — |
+| sheetUrl | string | Yes | Google Sheets URL |
+| clearExisting | boolean | No | If true, deletes this client's existing entries before inserting the synced ones |
+
+**Success Response (200 OK):** `{ success, message, data: { title, sheetId, tabs, totalEntries } }`
+
+**Error Responses:**
+- `400 Bad Request` - Missing `clientId`/`sheetUrl`, or the sheet had no recognizable rows
+- `404 Not Found` - Client not found
+
+---
+
+#### 11. Import an Uploaded Excel/CSV File
+Same as syncing a Google Sheet, but the source is an uploaded workbook instead of a live Sheets URL.
+
+**Endpoint:** `POST /content-calendar/import-file`
+**Content-Type:** `multipart/form-data`
+
+**Form Body:** `file` (`.xlsx`/`.csv`, max 20MB), `clientId`, `clearExisting` (optional)
+
+**Success Response (200 OK):** `{ success, message, data: { fileName, tabs, totalEntries } }`
+
+**Error Responses:** `400 Bad Request` - Missing `clientId`/file, or no recognizable rows; `404 Not Found` - Client not found
+
+---
+
+#### 12. Client Months/Tabs Summary
+Returns a per-month entry-count breakdown for a client (used to populate a month picker), plus that client's saved sheet-sync config.
+
+**Endpoint:** `GET /content-calendar/client-months/:clientId`
+
+**Success Response (200 OK):** `{ success, data: { months: [{ key, label, count }], savedConfig } }`
+
+---
+
 ## Miscellaneous Tasks
 
 Tracked one-off creative tasks (banners, videos, OOH, etc.) — separate from the general Task Management feature. All endpoints require auth.
@@ -632,7 +814,7 @@ Tracked one-off creative tasks (banners, videos, OOH, etc.) — separate from th
 ### 1. List Tasks
 **Endpoint:** `GET /misc-tasks`
 
-**Query Parameters:** `clientId`, `status` (`pending`/`progress`/`delivered`), `assignedTo` (TeamMember id), `typeOfWork` (`banner`/`video`/`social_media_banner`/`ooh`)
+**Query Parameters:** `clientId`, `status` (`pending`/`progress`/`delivered`), `assignedTo` (TeamMember id), `typeOfWork` (`banner`/`video`/`social_media_banner`/`ooh`), `page`/`limit` (optional — omitting them returns everything, unpaginated, for existing callers)
 
 ---
 
@@ -650,6 +832,7 @@ Tracked one-off creative tasks (banners, videos, OOH, etc.) — separate from th
 | deliveryDate | string (YYYY-MM-DD) | No | Delivery deadline |
 | status | string | No | `pending` (default), `progress`, `delivered` |
 | assignedTo | integer | No | `TeamMember` id |
+| notes | string | No | Free-text notes |
 | file | file | No | Image/video/PDF, max 15MB — uploaded to `Miscellaneous/` in the client's Drive folder |
 
 **Error Responses:**
@@ -668,9 +851,11 @@ Tracked one-off creative tasks (banners, videos, OOH, etc.) — separate from th
 
 ---
 
-## Documents (Proposals, Invoices, Reports, Brand Kit, Agreements)
+## Documents (Proposals, Invoices, Reports, Brand Kit, Creatives, Strategy, Agreements)
 
-A single `documents` table backs several features via `documentType`. All endpoints require auth. **`agreement` and `proposal` types are admin-only** — for `team_member`, listing filters them out, and get/upload/delete on them return `403`.
+A single `documents` table backs several features via `documentType` (`agreement`, `proposal`, `invoice`, `report`, `content_calendar`, `brand_kit`, `creative`, `strategy`, `other`). All endpoints require auth. **`agreement` and `proposal` types are admin-only** — for `team_member`, listing filters them out, and get/upload/delete on them return `403`. `GET /documents` and `GET /agreements` are response-cached — see [Caching](#caching).
+
+`brand_kit`, `creative`, and `strategy` files (client profile's Brand Kit/Creatives/Strategy tabs) land in a `Brand Kit` / `Creatives` / `Strategy` subfolder (respectively) of the client's Drive folder — anything else falls back to an `Other` subfolder.
 
 ### 1. Upload a PDF Document (proposal / invoice / report / content_calendar / other)
 **Endpoint:** `POST /documents/upload`
@@ -704,17 +889,19 @@ A single `documents` table backs several features via `documentType`. All endpoi
 
 ---
 
-### 2. Upload a Media Document (Brand Kit)
+### 2. Upload a Media Document (Brand Kit / Creatives / Strategy)
+Any file type/size these features want to store — no MIME filter, since Brand Kit accepts logos, PDFs, video, fonts, zipped asset packs, whatever the client hands over.
+
 **Endpoint:** `POST /documents/upload-media`
 **Content-Type:** `multipart/form-data`
 
 **Form Body:**
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| file | file | Yes | Image or PDF, max 10MB |
-| clientId | integer | Yes | Uploads into `Brand Kit/` (or `Other/`) in the client's Drive folder |
+| file | file | Yes | Any type, max 200MB |
+| clientId | integer | Yes | Uploads into `Brand Kit/`, `Creatives/`, `Strategy/`, or `Other/` in the client's Drive folder, based on `documentType` |
 | description | string | No | Free-text label |
-| documentType | string | No | `brand_kit` or `other` |
+| documentType | string | No | `brand_kit`, `creative`, `strategy`, or `other` |
 
 **Error Responses:**
 - `400 Bad Request` - No file, or no `clientId`
@@ -722,16 +909,40 @@ A single `documents` table backs several features via `documentType`. All endpoi
 
 ---
 
-### 3. List Documents
-**Endpoint:** `GET /documents`
+### 3. Bulk Upload Media Documents
+Same as above, but accepts several files in one request (e.g. selecting a whole batch of brand assets at once). Files are uploaded one at a time server-side (not in parallel, to avoid bursting the Drive API) — a per-file failure is recorded and skipped rather than aborting files that already succeeded.
 
-**Query Parameters:** `clientId`, `documentType`
+**Endpoint:** `POST /documents/upload-media-bulk`
+**Content-Type:** `multipart/form-data`
 
-**Success Response (200 OK):** Documents ordered by `createdAt` DESC. `agreement`/`proposal` rows are excluded for `team_member`.
+**Form Body:** `files` (file[], up to 20, any type, 200MB each), `clientId`, `description`, `documentType` — same meaning as above.
+
+**Success Response (201 Created):**
+```json
+{
+  "success": true,
+  "message": "3 file(s) uploaded, 1 failed",
+  "data": [ { "...uploaded Document...": "" } ],
+  "failed": [ { "fileName": "bad-file.xyz", "error": "..." } ]
+}
+```
+
+**Error Responses:** `400 Bad Request` - No files, or no `clientId`; `404 Not Found` - Client not found
 
 ---
 
-### 4. Get Document by ID
+### 4. List Documents
+**Endpoint:** `GET /documents`
+
+**Query Parameters:** `clientId`, `documentType`, `page`/`limit` (optional — omitted returns everything, unpaginated)
+
+This route is cached — see [Caching](#caching) (`documents`, 120s TTL).
+
+**Success Response (200 OK):** Documents ordered by `createdAt` DESC. `agreement`/`proposal` rows are excluded for `team_member`. Includes `pagination` only when `page`/`limit` were passed.
+
+---
+
+### 5. Get Document by ID
 **Endpoint:** `GET /documents/:id`
 
 **Error Responses:**
@@ -740,7 +951,7 @@ A single `documents` table backs several features via `documentType`. All endpoi
 
 ---
 
-### 5. Delete Document
+### 6. Delete Document
 **Endpoint:** `DELETE /documents/:id`
 
 Only removes the database row — does **not** delete the underlying Drive file.
@@ -751,8 +962,8 @@ Only removes the database row — does **not** delete the underlying Drive file.
 
 ---
 
-### 6. Stream Document (view inline)
-Streams the PDF from Google Drive with `Content-Disposition: inline`, for embedding in an `<iframe>`/`<a>` without exposing the raw Drive URL. **Not gated by document type or role** (no Authorization header reaches this route — see the Authentication section).
+### 7. Stream Document (view inline)
+Streams the file from Google Drive (cached in-process by `fileId` after the first fetch — see `src/utils/fileCache.js`) with `Content-Disposition: inline`, for embedding in an `<iframe>`/`<a>`/`<img>` without exposing the raw Drive URL. Content-Type is taken from the document's own recorded `fileType` (falling back to Drive's reported type) so non-PDF files (e.g. Brand Kit images) render correctly rather than being forced to `application/pdf`. **Not gated by document type or role** (no Authorization header reaches this route — see the Authentication section).
 
 **Endpoint:** `GET /documents/:id/stream`
 
@@ -760,7 +971,26 @@ Streams the PDF from Google Drive with `Content-Disposition: inline`, for embedd
 
 ---
 
-### 7. Upload Agreement
+### 8. Email a Document
+Emails the document to a given address with the actual file attached (not just a link) — used by the Invoice Generator's "Send Email" action. Requires `SMTP_HOST`/`SMTP_USER`/`SMTP_PASS` to be configured (see Environment Variables) — returns an error otherwise.
+
+**Endpoint:** `POST /documents/:id/email`
+
+**Request Body:**
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| to | string | Yes | Recipient email address |
+| subject | string | No | Email subject |
+| text | string | No | Email body |
+
+**Error Responses:**
+- `400 Bad Request` - Missing `to`
+- `404 Not Found` - Document not found
+- `403 Forbidden` - Document is `agreement`/`proposal` and caller isn't admin
+
+---
+
+### 9. Upload Agreement
 **Endpoint:** `POST /agreements/upload` — **admin only**
 **Content-Type:** `multipart/form-data`
 
@@ -782,19 +1012,23 @@ Streams the PDF from Google Drive with `Content-Disposition: inline`, for embedd
 
 ---
 
-### 8. List Agreements
+### 10. List Agreements
 **Endpoint:** `GET /agreements` — **admin only**
 
-**Query Parameters:** `clientId`, `status`
+**Query Parameters:** `clientId`, `status`, `page`/`limit` (optional — omitted returns everything, unpaginated)
+
+This route is cached — see [Caching](#caching) (shares the `documents` prefix/TTL, 120s).
+
+**Success Response (200 OK):** Includes `pagination` only when `page`/`limit` were passed.
 
 ---
 
-### 9. Get Agreement by ID
+### 11. Get Agreement by ID
 **Endpoint:** `GET /agreements/:id` — **admin only** — **Error Responses:** `404 Not Found`
 
 ---
 
-### 10. Update Agreement
+### 12. Update Agreement
 **Endpoint:** `PUT /agreements/:id` — **admin only**
 
 **Request Body:** `issuedDate`, `expiryDate`, `status`, `description`. Transitioning `status` from `pending_signature` to `active` auto-sets `signedAt`.
@@ -803,7 +1037,7 @@ Streams the PDF from Google Drive with `Content-Disposition: inline`, for embedd
 
 ---
 
-### 11. Delete Agreement
+### 13. Delete Agreement
 **Endpoint:** `DELETE /agreements/:id` — **admin only** — **Error Responses:** `404 Not Found`
 
 ---
@@ -961,6 +1195,7 @@ Proxies a Google Drive file stream so `<img>` tags can render it without CORS/au
 | whatsappNumber | STRING | NULLABLE | WhatsApp contact number |
 | address | STRING | NULLABLE | Client address |
 | email | STRING | NULLABLE | Client email address |
+| website | STRING | NULLABLE | Client website URL |
 | servicesSelected | TEXT | NULLABLE | Comma-separated |
 | clientManagedBy | INTEGER | NULLABLE | References `TeamMember.id` (not FK-enforced) |
 | clientHealth | INTEGER | NULLABLE, 0-100 | Client health score |
@@ -972,7 +1207,8 @@ Proxies a Google Drive file stream so `<img>` tags can render it without CORS/au
 | invoices | TEXT | NULLABLE | Comma-separated — **admin only** |
 | notes | TEXT | NULLABLE | Free-text notes |
 | renewal | DATE | NULLABLE | Contract renewal date |
-| contentCalendar | TEXT | NULLABLE | Legacy comma-separated field |
+| clientSince | DATEONLY | NULLABLE | Editable "became a client" date, defaults to `createdAt` if unset |
+| contentCalendar | TEXT | NULLABLE | Legacy comma-separated field **and** JSON-serialized Google Sheet sync config (`googleSheetUrl`, `sheetTabs`, `lastSyncedAt`, etc.) — see Content Calendar |
 | createdAt / updatedAt | TIMESTAMP | DEFAULT NOW() | — |
 
 **Table Name:** `clients`
@@ -988,12 +1224,43 @@ Proxies a Google Drive file stream so `<img>` tags can render it without CORS/au
 | status | STRING | DEFAULT `todo` | `todo`, `in_progress`, `review`, `completed` |
 | priority | STRING | DEFAULT `medium` | `urgent`, `high`, `medium`, `low` |
 | clientId | INTEGER | NULLABLE | Associated client |
-| assignees | TEXT | NULLABLE | JSON array of `TeamMember` IDs |
+| assignees | TEXT | NULLABLE, **deprecated** | Legacy JSON array of `TeamMember` IDs — no longer read/written; superseded by the `TaskAssignee` join table below (kept only as a rollback reference) |
 | dueDate | DATE | NULLABLE | Due date |
 | completedAt | DATE | NULLABLE | Set when status becomes `completed` |
 | createdAt / updatedAt | TIMESTAMP | DEFAULT NOW() | — |
 
 **Table Name:** `tasks`
+
+---
+
+### Task Assignee
+Join table for `Task` ↔ `TeamMember` (many-to-many). Replaced the old `tasks.assignees` JSON-in-TEXT column, which had to be filtered with fragile `OR`'d `LIKE` patterns and could never use an index. Backfilled from that column via `scripts/migrate-task-assignees.js`.
+
+| Field | Type | Constraints | Description |
+|-------|------|-------------|-------------|
+| taskId | INTEGER | PK (composite), FK → `tasks.id` | — |
+| teamMemberId | INTEGER | PK (composite), FK → `team_members.id` | — |
+
+No `createdAt`/`updatedAt` (`timestamps: false`). **Table Name:** `task_assignees`
+
+---
+
+### Lead
+| Field | Type | Constraints | Description |
+|-------|------|-------------|-------------|
+| id | INTEGER | PK, Auto-increment | Unique identifier |
+| companyName | STRING | NOT NULL | — |
+| contactName | STRING | NULLABLE | — |
+| email | STRING | NULLABLE | — |
+| phone | STRING | NULLABLE | — |
+| source | STRING | NULLABLE | Free text (no fixed list — a new source needs no migration) |
+| status | STRING | NOT NULL, DEFAULT `new` | `new`, `contacted`, `qualified`, `hot`, `lost` (app-level `isIn` validation, not a Postgres ENUM — adding a status is a code change, not a migration) |
+| notes | TEXT | NULLABLE | Free-text notes |
+| lastContactAt | DATE | NULLABLE | — |
+| nextFollowUpAt | DATE | NULLABLE | Drives the `followUpDue` pipeline metric |
+| createdAt / updatedAt | TIMESTAMP | DEFAULT NOW() | — |
+
+**Table Name:** `leads`
 
 ---
 
@@ -1046,6 +1313,7 @@ Proxies a Google Drive file stream so `<img>` tags can render it without CORS/au
 | deliveryDate | DATEONLY | NULLABLE | Delivery deadline |
 | status | ENUM | NOT NULL, DEFAULT `pending` | `pending`, `progress`, `delivered` |
 | assignedTo | INTEGER | NULLABLE | References `TeamMember.id` |
+| notes | TEXT | NULLABLE | Free-text notes |
 | fileName / fileType / fileSize | STRING/STRING/INTEGER | NULLABLE | Uploaded file metadata |
 | fileId / driveLink / webViewLink / googleUserContentLink / folderId | STRING | NULLABLE | Google Drive references |
 | createdAt / updatedAt | TIMESTAMP | DEFAULT NOW() | — |
@@ -1067,7 +1335,7 @@ Proxies a Google Drive file stream so `<img>` tags can render it without CORS/au
 | clientId | INTEGER | NULLABLE | Associated client |
 | uploadedBy | STRING | NULLABLE | Uploader name (not currently populated) |
 | description | TEXT | NULLABLE | Free-text label |
-| documentType | ENUM | DEFAULT `other` | `agreement`, `proposal`, `invoice`, `report`, `content_calendar`, `brand_kit`, `other` |
+| documentType | ENUM | DEFAULT `other` | `agreement`, `proposal`, `invoice`, `report`, `content_calendar`, `brand_kit`, `creative`, `strategy`, `other` |
 | issuedDate / expiryDate | DATEONLY | NULLABLE | Agreement-specific |
 | status | ENUM | DEFAULT `active` | Agreement-specific: `active`, `pending_signature`, `expired` |
 | signedAt | DATE | NULLABLE | Agreement-specific, auto-set on activation |
@@ -1088,13 +1356,15 @@ Proxies a Google Drive file stream so `<img>` tags can render it without CORS/au
 
 4. **Client Health:** The `clientHealth` field is validated to be between 0 and 100.
 
-5. **Text/JSON Fields:** Many Client fields (`servicesSelected`, `proposals`, `campaigns`, `socialMediaAccounts`, `reports`, `invoices`, `contentCalendar`) are stored as comma-separated TEXT and returned as arrays. `credentials` is a genuine JSON array.
+5. **Text/JSON Fields:** Many Client fields (`servicesSelected`, `proposals`, `campaigns`, `socialMediaAccounts`, `reports`, `invoices`) are stored as comma-separated TEXT and returned as arrays. `contentCalendar` is a JSON-serialized config object (see the Content Calendar section), not comma-separated. `credentials` is a genuine JSON array.
 
 6. **Soft Deletes:** Not implemented. `DELETE` permanently removes the record (deleting a Document row does **not** delete the underlying Google Drive file).
 
-7. **Schema changes:** `server/index.js` runs a non-destructive `sequelize.sync()` on every boot (creates missing tables, never alters existing columns). Real schema changes must be applied explicitly via `npm run db:sync` (destructive `alter: true` — only run this deliberately, on the current code, against the database you intend to change).
+7. **Schema changes:** `server/index.js` runs a non-destructive `sequelize.sync()` on every boot (creates missing tables, never alters existing columns). There are two ways to apply a real schema change:
+   - **Preferred, for a live/shared database:** write a small idempotent script under `server/scripts/` (see `add-misc-task-notes-column.js` or `add-document-type-values.js` for the pattern — `ADD COLUMN IF NOT EXISTS` / `ADD VALUE IF NOT EXISTS`, safe to re-run), wire it up as an `npm run migrate:*` script in `package.json`, and run it deliberately. This never touches unrelated columns/data.
+   - **Only when you can afford to, on a database you fully control:** `npm run db:sync` runs a destructive `sequelize.sync({ alter: true })`, which can drop/rewrite columns based on whatever the current models say — never run this against a database with data you care about without a backup.
 
-8. **Rate Limiting:** Not implemented. Consider adding for production.
+8. **Rate Limiting:** Not implemented anywhere, including auth (`POST /auth/login`) and the newer Leads/Content-Calendar-sync endpoints. Consider adding for production.
 
 ---
 
@@ -1106,16 +1376,24 @@ Proxies a Google Drive file stream so `<img>` tags can render it without CORS/au
 | NODE_ENV | Environment (`development` enables verbose SQL logging and dev-only behavior) | development |
 | DATABASE_URL | Full Postgres connection string (preferred — used for Neon/managed hosts, auto-enables SSL) | - |
 | DB_HOST / DB_PORT / DB_DATABASE / DB_USER / DB_PASS | Discrete Postgres connection params (used if `DATABASE_URL` isn't set) | - |
-| CORS_ORIGIN | Allowed CORS origin | * |
+| DB_SSL | Force SSL on even when the host doesn't match the auto-detected managed-Postgres patterns (`neon.tech`, `supabase.co`, etc.) | auto-detected |
 | SESSION_SECRET | Legacy secret used by `utils/password.js` (agency settings password encryption) | - |
 | JWT_SECRET | Signs login JWTs. Generate with `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"` | dev fallback (change in production) |
 | CREDENTIALS_ENCRYPTION_KEY | Encrypts client social media credentials and user login passwords at rest. Generate the same way as `JWT_SECRET` | - (required — throws if unset) |
+| REDIS_URL | Connection string for the shared server-side response cache (see [Caching](#caching)) — e.g. an [Upstash](https://upstash.com) free-tier URL. Omit to use the in-process fallback (fine for a single server instance) | - (falls back to in-process cache) |
 | GOOGLE_DRIVE_CLIENT_ID | Google Drive API OAuth client ID | - |
 | GOOGLE_DRIVE_CLIENT_SECRET | Google Drive API OAuth client secret | - |
-| GOOGLE_DRIVE_REFRESH_TOKEN | Google Drive OAuth refresh token | - |
+| GOOGLE_DRIVE_REFRESH_TOKEN | Google Drive OAuth refresh token. Also used for Google Sheets API access (Content Calendar sync) | - |
 | GOOGLE_DRIVE_FOLDER_ID | Root Drive folder new client/agency folders are created under | - |
+| SMTP_HOST / SMTP_PORT / SMTP_USER / SMTP_PASS | SMTP credentials for `POST /documents/:id/email` (e.g. the Invoice Generator's "Send Email" action). Emailing fails with a descriptive error if unset — everything else works without it | - |
+| SMTP_SECURE | `true` for implicit TLS (port 465), `false`/unset for STARTTLS (port 587) | false |
+| MAIL_FROM | From-address for outgoing mail | `SMTP_USER` |
+| RENDER_EXTERNAL_URL | Set automatically by Render on every web service — enables a self-ping every 10 minutes (`src/utils/keepAlive.js`) so Render's free tier doesn't idle the service down and pay a 30-60s cold start on the next request | - (set by Render) |
+| KEEP_ALIVE_URL | Manual override/equivalent to `RENDER_EXTERNAL_URL` for self-pinging on a non-Render host | - |
 | SEED_ADMIN_NAME / SEED_ADMIN_EMAIL / SEED_ADMIN_PASSWORD | Overrides for the admin account created by `npm run seed:users` | Admin / hellosocialbuzzmedia@gmail.com / (see script) |
 | SEED_TEAM_NAME / SEED_TEAM_EMAIL / SEED_TEAM_PASSWORD | Overrides for the team_member account created by `npm run seed:users` | Team Member / team@socialbuzzmedia.com / (see script) |
+
+> `CORS_ORIGIN` is **not** currently read anywhere in the code — `index.js` calls `cors()` with no options, which allows all origins unconditionally. Wire up an env-driven origin allowlist before relying on CORS as a boundary in production.
 
 ---
 
@@ -1137,18 +1415,23 @@ npm start
 
 Server will run on `http://localhost:5000` (or `PORT` from `.env`). Log in via `POST /api/auth/login` with the seeded (or `SEED_*`-overridden) credentials, then use the returned token as a `Bearer` token on every other request.
 
-To apply a real schema change (new column/table), edit the relevant model then run `npm run db:sync` deliberately — see note 7 above.
+To apply a real schema change, prefer writing a new `server/scripts/*.js` migration and an `npm run migrate:*` script for it (see note 7 above and the existing `migrate:*` scripts in `package.json`); reach for `npm run db:sync` only when you can afford a destructive `alter: true` against the target database.
+
+Optional integrations that degrade gracefully when unconfigured: `REDIS_URL` (server response cache — falls back to in-process), `SMTP_*` (document/invoice emailing — fails with a clear error if unset, doesn't block anything else).
 
 ---
 
 ## Future Enhancements
 
 - [x] User authentication & authorization (JWT, admin/team_member roles)
+- [x] Shared response caching (Redis-or-in-memory) for the heaviest list endpoints
+- [x] Pagination for Clients/Tasks/Leads/Agreements/Misc Tasks/Documents
 - [ ] Fine-grained permissions beyond the current two roles
 - [ ] Soft deletes
-- [ ] Search & filtering for more list endpoints
+- [ ] Search & filtering for more list endpoints (e.g. Content Calendar has no free-text search)
 - [ ] Input validation middleware (currently ad hoc per-route)
 - [ ] Rate limiting
 - [ ] Audit logging
 - [ ] API versioning
-- [ ] Proper Sequelize migrations instead of `sync({ alter: true })`
+- [ ] Proper Sequelize migrations instead of ad hoc `scripts/*.js` + `sync({ alter: true })`
+- [ ] An env-driven `CORS_ORIGIN` allowlist (currently `cors()` allows all origins unconditionally)

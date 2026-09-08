@@ -1,6 +1,6 @@
 # Social Buzz Media — Agency CRM
 
-A CRM for managing agency clients, content calendars, tasks, team members, invoices, agreements, and proposals — a Next.js frontend backed by an Express/PostgreSQL API.
+A CRM for managing agency clients, a sales lead pipeline, content calendars (with Google Sheets sync), tasks, team members, invoices, agreements, and proposals — a Next.js frontend backed by an Express/PostgreSQL API.
 
 This is a monorepo with two independent projects:
 
@@ -38,7 +38,8 @@ The client expects the API URL in `client/.env` (`NEXT_PUBLIC_API_URL`, defaults
 
 - **Auth**: JWT-based, two fixed roles (`admin`, `team_member`). Issued by the API on login, verified on every subsequent request. See [server/README.md](server/README.md) for the auth endpoints and [client/README.md](client/README.md#authentication--roles) for how the frontend stores and gates on the token.
 - **Database**: PostgreSQL via Sequelize. Client credentials and the admin/team-member login password are stored reversibly encrypted (not hashed) — the admin can view and hand out a team member's password from Settings.
-- **File storage**: Client logos, agreements, proposals, brand kit assets, and content calendar creatives are all stored in Google Drive via a service integration, not on the API's own disk.
+- **Caching**: Two independent layers stacked on top of each other, both keyed/invalidated per-resource. The client caches GET-list responses in localStorage for a few minutes per feature (survives page navigation, not logout); the server additionally caches the same routes' JSON responses in Redis (or an in-process fallback when no Redis is configured) so every browser hitting the API shares one cache instead of hitting Postgres on every request. See [server/README.md](server/README.md#caching) and [client/README.md](client/README.md#caching--pagination).
+- **File storage**: Client logos, agreements, proposals, brand kit assets, creatives/strategy files, and content calendar creatives are all stored in Google Drive via a service integration, not on the API's own disk.
 - **Frontend/backend split**: The client is a static export (`output: 'export'`) that talks to the API purely over HTTP — there's no server-side rendering in production.
 
 ---
