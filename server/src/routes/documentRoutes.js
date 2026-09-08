@@ -585,20 +585,46 @@ router.post("/documents/:id/email", async (req, res) => {
 });
 
 // Agreement-specific routes
+// `page`/`limit` are optional — omitting them preserves the historical
+// "return everything" behavior existing callers rely on (e.g. a client
+// profile's Agreement tab, which wants its one client's full list).
 router.get("/agreements", requireAdminForAgreements, cacheRoute("documents", 120), async (req, res) => {
   try {
     const { Document } = req.app.locals.models;
-    const { clientId, status } = req.query;
+    const { clientId, status, search, page, limit } = req.query;
 
     const where = { documentType: "agreement" };
     if (clientId) where.clientId = parseInt(clientId);
     if (status) where.status = status;
+    if (search) {
+      where[Op.or] = [
+        { fileName: { [Op.iLike]: `%${search}%` } },
+        { description: { [Op.iLike]: `%${search}%` } },
+      ];
+    }
 
-    const agreements = await Document.findAll({
-      where,
-      order: [["createdAt", "DESC"]],
-    });
+    const queryOptions = { where, order: [["createdAt", "DESC"]] };
 
+    if (limit) {
+      const parsedLimit = parseInt(limit);
+      const parsedPage = parseInt(page) || 1;
+      queryOptions.limit = parsedLimit;
+      queryOptions.offset = (parsedPage - 1) * parsedLimit;
+
+      const { count, rows } = await Document.findAndCountAll(queryOptions);
+      return res.json({
+        success: true,
+        data: rows,
+        pagination: {
+          total: count,
+          page: parsedPage,
+          limit: parsedLimit,
+          totalPages: Math.ceil(count / parsedLimit),
+        },
+      });
+    }
+
+    const agreements = await Document.findAll(queryOptions);
     res.json({ success: true, data: agreements });
   } catch (error) {
     res.status(500).json({

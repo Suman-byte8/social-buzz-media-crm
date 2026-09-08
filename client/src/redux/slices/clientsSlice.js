@@ -103,6 +103,8 @@ const initialState = {
   totalPages: 1,
   currentPage: 1,
   totalItems: 0,
+  // Keyed by id — see deleteClient's optimistic-update reducers below.
+  pendingDeleteSnapshots: {},
 };
 
 const clientsSlice = createSlice({
@@ -180,15 +182,31 @@ const clientsSlice = createSlice({
     builder.addCase(uploadClientLogo.rejected, (state, action) => {
       state.error = action.payload || "Failed to upload logo";
     });
-    // deleteClient
-    builder.addCase(deleteClient.pending, (state) => {
+    // deleteClient — optimistic: remove immediately on click rather than
+    // waiting for the round-trip, snapshotting the removed row so a
+    // failure can restore it instead of just leaving the list wrong until
+    // the caller's own refetch catches up.
+    builder.addCase(deleteClient.pending, (state, action) => {
       state.error = null;
+      const id = action.meta.arg;
+      const idx = state.clients.findIndex((c) => c.id === id);
+      if (idx !== -1) {
+        state.pendingDeleteSnapshots[id] = { item: state.clients[idx], index: idx };
+        state.clients.splice(idx, 1);
+      }
     });
-    builder.addCase(deleteClient.fulfilled, (state) => {
+    builder.addCase(deleteClient.fulfilled, (state, action) => {
+      delete state.pendingDeleteSnapshots[action.payload];
       state.successMessage = "Client deleted successfully";
       state.error = null;
     });
     builder.addCase(deleteClient.rejected, (state, action) => {
+      const id = action.meta.arg;
+      const snapshot = state.pendingDeleteSnapshots[id];
+      if (snapshot) {
+        state.clients.splice(Math.min(snapshot.index, state.clients.length), 0, snapshot.item);
+        delete state.pendingDeleteSnapshots[id];
+      }
       state.error = action.payload || "Failed to delete client";
     });
     // exportClients

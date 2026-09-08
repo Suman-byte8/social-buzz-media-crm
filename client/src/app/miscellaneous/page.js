@@ -5,9 +5,12 @@ import { useDispatch, useSelector } from "react-redux";
 import MiscTaskToolbar from "@/components/miscellaneous/MiscTaskToolbar";
 import MiscTaskFilters from "@/components/miscellaneous/MiscTaskFilters";
 import MiscTaskTable from "@/components/miscellaneous/MiscTaskTable";
+import Pagination from "@/components/ui/Pagination";
 import { fetchClients } from "@/redux/slices/clientsSlice";
 import { fetchTeamMembers } from "@/redux/slices/teamSlice";
 import { fetchMiscTasks, saveMiscTask, updateMiscTask, deleteMiscTask } from "@/redux/slices/miscTasksSlice";
+
+const LIMIT = 20;
 
 let draftIdCounter = 0;
 const nextDraftId = () => `draft-${Date.now()}-${draftIdCounter++}`;
@@ -27,11 +30,12 @@ export default function MiscellaneousPage() {
   const dispatch = useDispatch();
   const { clients, loading: loadingClients } = useSelector((state) => state.clients);
   const { teamMembers } = useSelector((state) => state.team);
-  const { miscTasks, loading } = useSelector((state) => state.miscTasks);
+  const { miscTasks, loading, totalPages, totalItems } = useSelector((state) => state.miscTasks);
 
   const [clientFilter, setClientFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [typeFilter, setTypeFilter] = useState("");
+  const [page, setPage] = useState(1);
 
   const [draftRows, setDraftRows] = useState([]);
   const [savingDraftId, setSavingDraftId] = useState(null);
@@ -56,13 +60,28 @@ export default function MiscellaneousPage() {
       ...(clientFilter ? { clientId: clientFilter } : {}),
       ...(statusFilter ? { status: statusFilter } : {}),
       ...(typeFilter ? { typeOfWork: typeFilter } : {}),
+      page,
+      limit: LIMIT,
     }));
   };
 
   useEffect(() => {
     loadTasks();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dispatch, clientFilter, statusFilter, typeFilter]);
+  }, [dispatch, clientFilter, statusFilter, typeFilter, page]);
+
+  const handleClientFilterChange = (value) => {
+    setClientFilter(value);
+    setPage(1);
+  };
+  const handleStatusFilterChange = (value) => {
+    setStatusFilter(value);
+    setPage(1);
+  };
+  const handleTypeFilterChange = (value) => {
+    setTypeFilter(value);
+    setPage(1);
+  };
 
   // ── Bulk add (draft rows) ────────────────────────────────────────────
   const handleAddRow = () => {
@@ -140,7 +159,6 @@ export default function MiscellaneousPage() {
       assignedTo: task.assignedTo || "",
     });
     setEditStagedFile(null);
-    setEditRemoveExisting(false);
     setEditError("");
   };
 
@@ -212,11 +230,11 @@ export default function MiscellaneousPage() {
 
       <MiscTaskFilters
         clientFilter={clientFilter}
-        onClientChange={setClientFilter}
+        onClientChange={handleClientFilterChange}
         statusFilter={statusFilter}
-        onStatusChange={setStatusFilter}
+        onStatusChange={handleStatusFilterChange}
         typeFilter={typeFilter}
-        onTypeChange={setTypeFilter}
+        onTypeChange={handleTypeFilterChange}
         clients={clients}
       />
 
@@ -247,6 +265,15 @@ export default function MiscellaneousPage() {
         onCancelEdit={handleCancelEdit}
         savingEdit={savingEdit}
         editError={editError}
+      />
+
+      <Pagination
+        page={page}
+        limit={LIMIT}
+        totalItems={totalItems}
+        totalPages={totalPages}
+        loading={loading}
+        onPageChange={setPage}
       />
     </main>
   );

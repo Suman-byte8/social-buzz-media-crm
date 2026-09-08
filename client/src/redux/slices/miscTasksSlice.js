@@ -51,9 +51,14 @@ export const deleteMiscTask = createAsyncThunk(
 
 const initialState = {
   miscTasks: [],
+  totalPages: 1,
+  currentPage: 1,
+  totalItems: 0,
   loading: false,
   error: null,
   successMessage: null,
+  // Keyed by id — see deleteMiscTask's optimistic-update reducers below.
+  pendingDeleteSnapshots: {},
 };
 
 const miscTasksSlice = createSlice({
@@ -74,6 +79,9 @@ const miscTasksSlice = createSlice({
       .addCase(fetchMiscTasks.fulfilled, (state, action) => {
         state.loading = false;
         state.miscTasks = action.payload.data || [];
+        state.totalPages = action.payload.pagination?.totalPages || 1;
+        state.currentPage = action.payload.pagination?.page || 1;
+        state.totalItems = action.payload.pagination?.total || action.payload.data?.length || 0;
       })
       .addCase(fetchMiscTasks.rejected, (state, action) => {
         state.loading = false;
@@ -102,11 +110,26 @@ const miscTasksSlice = createSlice({
       .addCase(updateMiscTask.rejected, (state, action) => {
         state.error = action.payload || "Failed to update task";
       })
+      .addCase(deleteMiscTask.pending, (state, action) => {
+        state.error = null;
+        const id = action.meta.arg;
+        const idx = state.miscTasks.findIndex((t) => t.id === id);
+        if (idx !== -1) {
+          state.pendingDeleteSnapshots[id] = { item: state.miscTasks[idx], index: idx };
+          state.miscTasks.splice(idx, 1);
+        }
+      })
       .addCase(deleteMiscTask.fulfilled, (state, action) => {
-        state.miscTasks = state.miscTasks.filter((t) => t.id !== action.payload);
+        delete state.pendingDeleteSnapshots[action.payload];
         state.successMessage = "Task deleted successfully";
       })
       .addCase(deleteMiscTask.rejected, (state, action) => {
+        const id = action.meta.arg;
+        const snapshot = state.pendingDeleteSnapshots[id];
+        if (snapshot) {
+          state.miscTasks.splice(Math.min(snapshot.index, state.miscTasks.length), 0, snapshot.item);
+          delete state.pendingDeleteSnapshots[id];
+        }
         state.error = action.payload || "Failed to delete task";
       });
   },

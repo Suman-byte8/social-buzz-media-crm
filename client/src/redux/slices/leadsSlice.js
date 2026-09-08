@@ -88,6 +88,8 @@ const initialState = {
   totalItems: 0,
   metrics: { totalLeads: 0, hotProspects: 0, followUpDue: 0, lostThisMonth: 0, newThisMonth: 0 },
   loadingMetrics: false,
+  // Keyed by id — see deleteLead/convertLead's optimistic-update reducers.
+  pendingRemovalSnapshots: {},
 };
 
 const leadsSlice = createSlice({
@@ -140,20 +142,50 @@ const leadsSlice = createSlice({
       .addCase(updateLead.rejected, (state, action) => {
         state.error = action.payload || "Failed to update lead";
       })
+      .addCase(deleteLead.pending, (state, action) => {
+        state.error = null;
+        const id = action.meta.arg;
+        const idx = state.leads.findIndex((l) => l.id === id);
+        if (idx !== -1) {
+          state.pendingRemovalSnapshots[id] = { item: state.leads[idx], index: idx };
+          state.leads.splice(idx, 1);
+        }
+      })
       .addCase(deleteLead.fulfilled, (state, action) => {
-        state.leads = state.leads.filter((l) => l.id !== action.payload);
+        delete state.pendingRemovalSnapshots[action.payload];
         state.successMessage = "Lead deleted successfully";
         state.error = null;
       })
       .addCase(deleteLead.rejected, (state, action) => {
+        const id = action.meta.arg;
+        const snapshot = state.pendingRemovalSnapshots[id];
+        if (snapshot) {
+          state.leads.splice(Math.min(snapshot.index, state.leads.length), 0, snapshot.item);
+          delete state.pendingRemovalSnapshots[id];
+        }
         state.error = action.payload || "Failed to delete lead";
       })
+      .addCase(convertLead.pending, (state, action) => {
+        state.error = null;
+        const id = action.meta.arg;
+        const idx = state.leads.findIndex((l) => l.id === id);
+        if (idx !== -1) {
+          state.pendingRemovalSnapshots[id] = { item: state.leads[idx], index: idx };
+          state.leads.splice(idx, 1);
+        }
+      })
       .addCase(convertLead.fulfilled, (state, action) => {
-        state.leads = state.leads.filter((l) => l.id !== action.meta.arg);
+        delete state.pendingRemovalSnapshots[action.meta.arg];
         state.successMessage = "Lead converted to client successfully";
         state.error = null;
       })
       .addCase(convertLead.rejected, (state, action) => {
+        const id = action.meta.arg;
+        const snapshot = state.pendingRemovalSnapshots[id];
+        if (snapshot) {
+          state.leads.splice(Math.min(snapshot.index, state.leads.length), 0, snapshot.item);
+          delete state.pendingRemovalSnapshots[id];
+        }
         state.error = action.payload || "Failed to convert lead";
       });
   },

@@ -101,6 +101,8 @@ const initialState = {
   loadingMember: false,
   error: null,
   successMessage: null,
+  // Keyed by id — see deleteTeamMember's optimistic-update reducers below.
+  pendingDeleteSnapshots: {},
 };
 
 const teamSlice = createSlice({
@@ -179,11 +181,26 @@ const teamSlice = createSlice({
       .addCase(uploadTeamMemberResume.rejected, (state, action) => {
         state.error = action.payload || "Failed to upload resume";
       })
+      .addCase(deleteTeamMember.pending, (state, action) => {
+        state.error = null;
+        const id = action.meta.arg;
+        const idx = state.teamMembers.findIndex((m) => m.id === id);
+        if (idx !== -1) {
+          state.pendingDeleteSnapshots[id] = { item: state.teamMembers[idx], index: idx };
+          state.teamMembers.splice(idx, 1);
+        }
+      })
       .addCase(deleteTeamMember.fulfilled, (state, action) => {
-        state.teamMembers = state.teamMembers.filter((m) => m.id !== action.payload);
+        delete state.pendingDeleteSnapshots[action.payload];
         state.successMessage = "Team member deleted successfully";
       })
       .addCase(deleteTeamMember.rejected, (state, action) => {
+        const id = action.meta.arg;
+        const snapshot = state.pendingDeleteSnapshots[id];
+        if (snapshot) {
+          state.teamMembers.splice(Math.min(snapshot.index, state.teamMembers.length), 0, snapshot.item);
+          delete state.pendingDeleteSnapshots[id];
+        }
         state.error = action.payload || "Failed to delete team member";
       });
   },

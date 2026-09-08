@@ -1,24 +1,34 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import AgreementUploadModal from "@/components/agreements/AgreementUploadModal";
 import AgreementViewModal from "@/components/agreements/AgreementViewModal";
 import AgreementsToolbar from "@/components/agreements/AgreementsToolbar";
 import AgreementsFilters from "@/components/agreements/AgreementsFilters";
 import AgreementsTable from "@/components/agreements/AgreementsTable";
+import Pagination from "@/components/ui/Pagination";
 import { fetchClients } from "@/redux/slices/clientsSlice";
 import { fetchAgreements, deleteAgreement } from "@/redux/slices/documentsSlice";
 import RequireAdmin from "@/components/auth/RequireAdmin";
 
+const LIMIT = 15;
+
 export default function AgreementsPage() {
   const dispatch = useDispatch();
   const { clients, loading: loadingClients } = useSelector((state) => state.clients);
-  const { agreements, loadingAgreements, error } = useSelector((state) => state.documents);
+  const {
+    agreements,
+    loadingAgreements,
+    error,
+    agreementsTotalPages,
+    agreementsTotalItems,
+  } = useSelector((state) => state.documents);
 
   const [search, setSearch] = useState("");
   const [clientFilter, setClientFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [page, setPage] = useState(1);
 
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
@@ -31,11 +41,30 @@ export default function AgreementsPage() {
   }, [dispatch]);
 
   useEffect(() => {
-    dispatch(fetchAgreements(clientFilter || undefined));
-  }, [dispatch, clientFilter]);
+    dispatch(
+      fetchAgreements({
+        clientId: clientFilter || undefined,
+        status: statusFilter || undefined,
+        search: search || undefined,
+        page,
+        limit: LIMIT,
+      })
+    );
+  }, [dispatch, clientFilter, statusFilter, search, page]);
+
+  const handleSearchChange = (value) => {
+    setSearch(value);
+    setPage(1);
+  };
 
   const handleClientFilterChange = (value) => {
     setClientFilter(value);
+    setPage(1);
+  };
+
+  const handleStatusFilterChange = (value) => {
+    setStatusFilter(value);
+    setPage(1);
   };
 
   const handleUploadSuccess = () => {
@@ -71,17 +100,6 @@ export default function AgreementsPage() {
     return client ? client.name : "Unknown Client";
   };
 
-  const filteredAgreements = useMemo(() => {
-    return agreements.filter((agreement) => {
-      const matchesSearch =
-        !search ||
-        agreement.fileName?.toLowerCase().includes(search.toLowerCase()) ||
-        agreement.description?.toLowerCase().includes(search.toLowerCase());
-      const matchesStatus = !statusFilter || agreement.status === statusFilter;
-      return matchesSearch && matchesStatus;
-    });
-  }, [agreements, search, statusFilter]);
-
   return (
     <RequireAdmin>
     <main className="flex-1 p-6 lg:p-8 max-w-[1600px] mx-auto w-full">
@@ -89,11 +107,11 @@ export default function AgreementsPage() {
 
       <AgreementsFilters
         search={search}
-        onSearchChange={setSearch}
+        onSearchChange={handleSearchChange}
         clientFilter={clientFilter}
         onClientChange={handleClientFilterChange}
         statusFilter={statusFilter}
-        onStatusChange={setStatusFilter}
+        onStatusChange={handleStatusFilterChange}
         clients={clients}
       />
 
@@ -104,13 +122,22 @@ export default function AgreementsPage() {
       )}
 
       <AgreementsTable
-        agreements={filteredAgreements}
+        agreements={agreements}
         loading={loadingClients || loadingAgreements}
         clients={clients}
         getClientName={getClientName}
         onView={handleView}
         onEdit={handleEdit}
         onDelete={handleDelete}
+      />
+
+      <Pagination
+        page={page}
+        limit={LIMIT}
+        totalItems={agreementsTotalItems}
+        totalPages={agreementsTotalPages}
+        loading={loadingAgreements}
+        onPageChange={setPage}
       />
 
       <AgreementUploadModal

@@ -87,6 +87,8 @@ const initialState = {
   loadingClientTasks: false,
   error: null,
   successMessage: null,
+  // Keyed by id — see deleteTask's optimistic-update reducers below.
+  pendingDeleteSnapshots: {},
 };
 
 const tasksSlice = createSlice({
@@ -158,12 +160,28 @@ const tasksSlice = createSlice({
       .addCase(updateTask.rejected, (state, action) => {
         state.error = action.payload || "Failed to update task";
       })
+      .addCase(deleteTask.pending, (state, action) => {
+        state.error = null;
+        const id = action.meta.arg;
+        const idx = state.tasks.findIndex((t) => t.id === id);
+        if (idx !== -1) {
+          state.pendingDeleteSnapshots[id] = state.tasks[idx];
+          state.tasks.splice(idx, 1);
+        }
+        state.memberTasks = state.memberTasks.filter((t) => t.id !== id);
+        state.clientTasks = state.clientTasks.filter((t) => t.id !== id);
+      })
       .addCase(deleteTask.fulfilled, (state, action) => {
-        state.tasks = state.tasks.filter((t) => t.id !== action.payload);
-        state.memberTasks = state.memberTasks.filter((t) => t.id !== action.payload);
+        delete state.pendingDeleteSnapshots[action.payload];
         state.successMessage = "Task deleted successfully";
       })
       .addCase(deleteTask.rejected, (state, action) => {
+        const id = action.meta.arg;
+        const snapshot = state.pendingDeleteSnapshots[id];
+        if (snapshot) {
+          state.tasks.push(snapshot);
+          delete state.pendingDeleteSnapshots[id];
+        }
         state.error = action.payload || "Failed to delete task";
       });
   },

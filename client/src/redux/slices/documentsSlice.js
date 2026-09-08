@@ -245,6 +245,13 @@ const initialState = {
   // "Client Files" thunks above.
   filesByType: {},
   agreements: [],
+  // Only populated when fetchAgreements is called with page/limit (the
+  // admin Agreements page) — callers that fetch a single client's full
+  // list (e.g. the client profile's Agreement tab) leave these at their
+  // defaults.
+  agreementsTotalPages: 1,
+  agreementsCurrentPage: 1,
+  agreementsTotalItems: 0,
   loading: false,
   loadingProposals: false,
   loadingInvoiceDocuments: false,
@@ -427,6 +434,9 @@ const documentsSlice = createSlice({
       .addCase(fetchAgreements.fulfilled, (state, action) => {
         state.loadingAgreements = false;
         state.agreements = action.payload.data || [];
+        state.agreementsTotalPages = action.payload.pagination?.totalPages || 1;
+        state.agreementsCurrentPage = action.payload.pagination?.page || 1;
+        state.agreementsTotalItems = action.payload.pagination?.total || action.payload.data?.length || 0;
       })
       .addCase(fetchAgreements.rejected, (state, action) => {
         state.loadingAgreements = false;
