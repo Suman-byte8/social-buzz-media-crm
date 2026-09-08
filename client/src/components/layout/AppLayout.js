@@ -3,6 +3,7 @@
 import React from "react";
 import { usePathname } from "next/navigation";
 import Sidebar from "./sidebar";
+import RealtimeBridge from "@/components/realtime/RealtimeBridge";
 
 export default function AppLayout({ children }) {
   const pathname = usePathname();
@@ -14,6 +15,7 @@ export default function AppLayout({ children }) {
 
   return (
     <div className="text-on-surface antialiased overflow-x-hidden min-h-screen flex">
+      <RealtimeBridge />
       <Sidebar />
       <div className="flex-1 flex flex-col min-h-screen md:ml-[260px] min-w-0">
         {children}

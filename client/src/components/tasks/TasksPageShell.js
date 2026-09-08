@@ -5,6 +5,8 @@ import { useDispatch, useSelector } from "react-redux";
 import { fetchTasks, deleteTask, updateTask, setTaskStatusLocal } from "@/redux/slices/tasksSlice";
 import { fetchClients } from "@/redux/slices/clientsSlice";
 import { fetchTeamMembers } from "@/redux/slices/teamSlice";
+import { getSocket } from "@/lib/socket";
+import { invalidateCache as invalidateLocalCache } from "@/utils/cache";
 import AddTaskModal from "@/components/tasks/AddTaskModal";
 import TaskViewModal from "@/components/tasks/TaskViewModal";
 import TasksToolbar from "@/components/tasks/TasksToolbar";
@@ -74,6 +76,31 @@ export default function TasksPageShell() {
   // Re-fetch tasks on mount and whenever a filter changes.
   useEffect(() => {
     dispatch(fetchTasks(currentFilters));
+  }, [dispatch, currentFilters]);
+
+  // Live updates: the Tasks board is the surface most likely to have
+  // several people editing at once, so it gets an active refetch (using
+  // *its own* current filters, not a generic one) rather than just relying
+  // on RealtimeBridge's global cache-drop and waiting for the next natural
+  // navigation. invalidateLocalCache is called here too (not just relying
+  // on RealtimeBridge's own call for the same event) so this refetch is
+  // guaranteed to hit the network instead of replaying the stale cached
+  // response for these exact filters within its TTL window.
+  useEffect(() => {
+    const socket = getSocket();
+    if (!socket) return;
+
+    const handleChange = ({ resource } = {}) => {
+      // Server-side broadcasts use the short resource name passed to
+      // cacheRoute()/invalidateCache() in taskRoutes.js ("tasks"), not the
+      // longer client-side thunk type-prefix ("tasks/fetchTasks").
+      if (resource !== "tasks") return;
+      invalidateLocalCache(resource);
+      dispatch(fetchTasks(currentFilters));
+    };
+
+    socket.on("data:changed", handleChange);
+    return () => socket.off("data:changed", handleChange);
   }, [dispatch, currentFilters]);
 
   const handleDelete = async (task) => {

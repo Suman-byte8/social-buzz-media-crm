@@ -11,6 +11,7 @@
 // instances) the moment REDIS_URL is set — no code changes needed either
 // way.
 import Redis from "ioredis";
+import { broadcast } from "./realtime.js";
 
 const CACHE_PREFIX = "crm:cache:v1:";
 
@@ -104,7 +105,10 @@ export const setCache = async (key, value, ttlSeconds) => {
 
 // Deletes every cached entry whose key starts with `prefix` (e.g. the
 // route path "clients") — call after a mutation so the next read is
-// forced fresh instead of serving stale cached data.
+// forced fresh instead of serving stale cached data. Also pushes a live
+// "this changed" event to every connected browser (see realtime.js) —
+// every one of this function's many call sites across the route files
+// gets a live-update push for free, with no per-route socket code needed.
 export const invalidateCache = async (prefix) => {
   const target = CACHE_PREFIX + prefix;
   if (redisReady) {
@@ -123,4 +127,6 @@ export const invalidateCache = async (prefix) => {
   // earlier read fell back to memory, that stale memory entry needs
   // clearing too even once Redis is the primary store again.
   memoryInvalidate(prefix);
+
+  broadcast("data:changed", { resource: prefix });
 };
