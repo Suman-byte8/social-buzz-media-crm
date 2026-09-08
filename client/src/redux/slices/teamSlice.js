@@ -1,4 +1,6 @@
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
+import { createCachedThunk } from "@/redux/cachedThunk";
+import { invalidateCache } from "@/utils/cache";
 import {
   fetchTeamMembers as fetchTeamMembersApi,
   fetchTeamMemberById as fetchTeamMemberByIdApi,
@@ -9,16 +11,12 @@ import {
   uploadTeamMemberResume as uploadTeamMemberResumeApi,
 } from "@/services/teamService";
 
-export const fetchTeamMembers = createAsyncThunk(
-  "team/fetchTeamMembers",
-  async (_, { rejectWithValue }) => {
-    try {
-      return await fetchTeamMembersApi();
-    } catch (error) {
-      return rejectWithValue(error.message || "Failed to fetch team members");
-    }
-  }
-);
+// The team roster is one of the most-fetched, least-changed datasets in
+// the app (every task/client/invoice view needs it for names/avatars) —
+// a longer TTL than most other resources.
+export const fetchTeamMembers = createCachedThunk("team/fetchTeamMembers", fetchTeamMembersApi, {
+  ttlMs: 10 * 60 * 1000,
+});
 
 export const fetchTeamMemberById = createAsyncThunk(
   "team/fetchTeamMemberById",
@@ -35,7 +33,9 @@ export const createTeamMember = createAsyncThunk(
   "team/createTeamMember",
   async (memberData, { rejectWithValue }) => {
     try {
-      return await createTeamMemberApi(memberData);
+      const result = await createTeamMemberApi(memberData);
+      invalidateCache("team/fetchTeamMembers");
+      return result;
     } catch (error) {
       return rejectWithValue(error.message || "Failed to create team member");
     }
@@ -46,7 +46,9 @@ export const updateTeamMember = createAsyncThunk(
   "team/updateTeamMember",
   async ({ id, memberData }, { rejectWithValue }) => {
     try {
-      return await updateTeamMemberApi(id, memberData);
+      const result = await updateTeamMemberApi(id, memberData);
+      invalidateCache("team/fetchTeamMembers");
+      return result;
     } catch (error) {
       return rejectWithValue(error.message || "Failed to update team member");
     }
@@ -58,6 +60,7 @@ export const deleteTeamMember = createAsyncThunk(
   async (id, { rejectWithValue }) => {
     try {
       await deleteTeamMemberApi(id);
+      invalidateCache("team/fetchTeamMembers");
       return id;
     } catch (error) {
       return rejectWithValue(error.message || "Failed to delete team member");
@@ -69,7 +72,9 @@ export const uploadTeamMemberAvatar = createAsyncThunk(
   "team/uploadAvatar",
   async ({ id, file }, { rejectWithValue }) => {
     try {
-      return await uploadTeamMemberAvatarApi(id, file);
+      const result = await uploadTeamMemberAvatarApi(id, file);
+      invalidateCache("team/fetchTeamMembers");
+      return result;
     } catch (error) {
       return rejectWithValue(error.message || "Failed to upload profile image");
     }
@@ -80,7 +85,9 @@ export const uploadTeamMemberResume = createAsyncThunk(
   "team/uploadResume",
   async ({ id, file }, { rejectWithValue }) => {
     try {
-      return await uploadTeamMemberResumeApi(id, file);
+      const result = await uploadTeamMemberResumeApi(id, file);
+      invalidateCache("team/fetchTeamMembers");
+      return result;
     } catch (error) {
       return rejectWithValue(error.message || "Failed to upload resume");
     }

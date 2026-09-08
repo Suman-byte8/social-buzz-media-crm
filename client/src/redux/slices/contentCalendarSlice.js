@@ -1,4 +1,6 @@
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
+import { createCachedThunk } from "@/redux/cachedThunk";
+import { invalidateCache } from "@/utils/cache";
 import {
   fetchContentCalendarEntries as fetchContentCalendarEntriesApi,
   createContentCalendarEntry as createContentCalendarEntryApi,
@@ -12,6 +14,11 @@ import {
   saveClientSheetUrl as saveClientSheetUrlApi,
 } from "@/services/contentCalendarService";
 
+// Deliberately NOT cached: this reads directly from the client's live
+// Google Sheet, and the whole point of the feature is reflecting edits
+// made there moments ago — our own invalidateCache() has no way to know
+// when the external sheet changes, so caching it would just mean stale
+// "live" data for the TTL window.
 export const fetchLiveCalendar = createAsyncThunk(
   "contentCalendar/fetchLiveCalendar",
   async ({ clientId, sheetUrl }, { rejectWithValue }) => {
@@ -34,22 +41,19 @@ export const saveClientSheetUrl = createAsyncThunk(
   }
 );
 
-export const fetchContentCalendarEntries = createAsyncThunk(
+export const fetchContentCalendarEntries = createCachedThunk(
   "contentCalendar/fetchEntries",
-  async (params = {}, { rejectWithValue }) => {
-    try {
-      return await fetchContentCalendarEntriesApi(params);
-    } catch (error) {
-      return rejectWithValue(error.message || "Failed to fetch content calendar entries");
-    }
-  }
+  fetchContentCalendarEntriesApi,
+  { ttlMs: 3 * 60 * 1000 }
 );
 
 export const syncGoogleSheet = createAsyncThunk(
   "contentCalendar/syncGoogleSheet",
   async ({ clientId, sheetUrl, clearExisting }, { rejectWithValue }) => {
     try {
-      return await syncGoogleSheetApi({ clientId, sheetUrl, clearExisting });
+      const result = await syncGoogleSheetApi({ clientId, sheetUrl, clearExisting });
+      invalidateCache("contentCalendar/fetchEntries");
+      return result;
     } catch (error) {
       return rejectWithValue(error.message || "Failed to sync Google Sheet");
     }
@@ -60,7 +64,9 @@ export const importCalendarFile = createAsyncThunk(
   "contentCalendar/importCalendarFile",
   async ({ clientId, file, clearExisting }, { rejectWithValue }) => {
     try {
-      return await importCalendarFileApi({ clientId, file, clearExisting });
+      const result = await importCalendarFileApi({ clientId, file, clearExisting });
+      invalidateCache("contentCalendar/fetchEntries");
+      return result;
     } catch (error) {
       return rejectWithValue(error.message || "Failed to import calendar file");
     }
@@ -82,7 +88,9 @@ export const createContentCalendarEntry = createAsyncThunk(
   "contentCalendar/createEntry",
   async (data, { rejectWithValue }) => {
     try {
-      return await createContentCalendarEntryApi(data);
+      const result = await createContentCalendarEntryApi(data);
+      invalidateCache("contentCalendar/fetchEntries");
+      return result;
     } catch (error) {
       return rejectWithValue(error.message || "Failed to create entry");
     }
@@ -93,7 +101,9 @@ export const updateContentCalendarEntry = createAsyncThunk(
   "contentCalendar/updateEntry",
   async ({ id, data }, { rejectWithValue }) => {
     try {
-      return await updateContentCalendarEntryApi(id, data);
+      const result = await updateContentCalendarEntryApi(id, data);
+      invalidateCache("contentCalendar/fetchEntries");
+      return result;
     } catch (error) {
       return rejectWithValue(error.message || "Failed to update entry");
     }
@@ -105,6 +115,7 @@ export const deleteContentCalendarEntry = createAsyncThunk(
   async (id, { rejectWithValue }) => {
     try {
       await deleteContentCalendarEntryApi(id);
+      invalidateCache("contentCalendar/fetchEntries");
       return id;
     } catch (error) {
       return rejectWithValue(error.message || "Failed to delete entry");
@@ -116,7 +127,9 @@ export const uploadCreatives = createAsyncThunk(
   "contentCalendar/uploadCreatives",
   async ({ entryId, files }, { rejectWithValue }) => {
     try {
-      return await uploadCreativesApi(entryId, files);
+      const result = await uploadCreativesApi(entryId, files);
+      invalidateCache("contentCalendar/fetchEntries");
+      return result;
     } catch (error) {
       return rejectWithValue(error.message || "Failed to upload creatives");
     }
@@ -128,6 +141,7 @@ export const deleteCreative = createAsyncThunk(
   async ({ entryId, fileId }, { rejectWithValue }) => {
     try {
       await deleteCreativeApi(entryId, fileId);
+      invalidateCache("contentCalendar/fetchEntries");
       return { entryId, fileId };
     } catch (error) {
       return rejectWithValue(error.message || "Failed to remove creative");

@@ -1,4 +1,6 @@
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
+import { createCachedThunk } from "@/redux/cachedThunk";
+import { invalidateCache } from "@/utils/cache";
 import {
   fetchMiscTasks as fetchMiscTasksApi,
   saveMiscTask as saveMiscTaskApi,
@@ -6,22 +8,15 @@ import {
   deleteMiscTask as deleteMiscTaskApi,
 } from "@/services/miscTaskService";
 
-export const fetchMiscTasks = createAsyncThunk(
-  "miscTasks/fetch",
-  async (params, { rejectWithValue }) => {
-    try {
-      return await fetchMiscTasksApi(params);
-    } catch (error) {
-      return rejectWithValue(error.message || "Failed to fetch tasks");
-    }
-  }
-);
+export const fetchMiscTasks = createCachedThunk("miscTasks/fetch", fetchMiscTasksApi, { ttlMs: 3 * 60 * 1000 });
 
 export const saveMiscTask = createAsyncThunk(
   "miscTasks/save",
   async (formData, { rejectWithValue }) => {
     try {
-      return await saveMiscTaskApi(formData);
+      const result = await saveMiscTaskApi(formData);
+      invalidateCache("miscTasks/fetch");
+      return result;
     } catch (error) {
       return rejectWithValue(error.message || "Failed to save task");
     }
@@ -32,7 +27,9 @@ export const updateMiscTask = createAsyncThunk(
   "miscTasks/update",
   async ({ id, updateData }, { rejectWithValue }) => {
     try {
-      return await updateMiscTaskApi(id, updateData);
+      const result = await updateMiscTaskApi(id, updateData);
+      invalidateCache("miscTasks/fetch");
+      return result;
     } catch (error) {
       return rejectWithValue(error.message || "Failed to update task");
     }
@@ -44,6 +41,7 @@ export const deleteMiscTask = createAsyncThunk(
   async (id, { rejectWithValue }) => {
     try {
       await deleteMiscTaskApi(id);
+      invalidateCache("miscTasks/fetch");
       return id;
     } catch (error) {
       return rejectWithValue(error.message || "Failed to delete task");

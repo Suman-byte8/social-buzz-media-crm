@@ -1,4 +1,6 @@
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
+import { createCachedThunk } from "@/redux/cachedThunk";
+import { invalidateCache } from "@/utils/cache";
 import {
   fetchLeads as fetchLeadsApi,
   fetchLeadMetrics as fetchLeadMetricsApi,
@@ -8,33 +10,26 @@ import {
   convertLead as convertLeadApi,
 } from "@/services/leadService";
 
-export const fetchLeads = createAsyncThunk(
-  "leads/fetchLeads",
-  async (params = {}, { rejectWithValue }) => {
-    try {
-      return await fetchLeadsApi(params);
-    } catch (error) {
-      return rejectWithValue(error.message || "Failed to fetch leads");
-    }
-  }
-);
+const LEADS_TTL_MS = 3 * 60 * 1000;
 
-export const fetchLeadMetrics = createAsyncThunk(
-  "leads/fetchLeadMetrics",
-  async (_, { rejectWithValue }) => {
-    try {
-      return await fetchLeadMetricsApi();
-    } catch (error) {
-      return rejectWithValue(error.message || "Failed to fetch lead metrics");
-    }
-  }
-);
+const invalidateLeadCaches = () => {
+  invalidateCache("leads/fetchLeads");
+  invalidateCache("leads/fetchLeadMetrics");
+};
+
+export const fetchLeads = createCachedThunk("leads/fetchLeads", fetchLeadsApi, { ttlMs: LEADS_TTL_MS });
+
+export const fetchLeadMetrics = createCachedThunk("leads/fetchLeadMetrics", fetchLeadMetricsApi, {
+  ttlMs: LEADS_TTL_MS,
+});
 
 export const createLead = createAsyncThunk(
   "leads/createLead",
   async (leadData, { rejectWithValue }) => {
     try {
-      return await createLeadApi(leadData);
+      const result = await createLeadApi(leadData);
+      invalidateLeadCaches();
+      return result;
     } catch (error) {
       return rejectWithValue(error.message || "Failed to create lead");
     }
@@ -45,7 +40,9 @@ export const updateLead = createAsyncThunk(
   "leads/updateLead",
   async ({ id, leadData }, { rejectWithValue }) => {
     try {
-      return await updateLeadApi(id, leadData);
+      const result = await updateLeadApi(id, leadData);
+      invalidateLeadCaches();
+      return result;
     } catch (error) {
       return rejectWithValue(error.message || "Failed to update lead");
     }
@@ -57,6 +54,7 @@ export const deleteLead = createAsyncThunk(
   async (id, { rejectWithValue }) => {
     try {
       await deleteLeadApi(id);
+      invalidateLeadCaches();
       return id;
     } catch (error) {
       return rejectWithValue(error.message || "Failed to delete lead");
@@ -68,7 +66,12 @@ export const convertLead = createAsyncThunk(
   "leads/convertLead",
   async (id, { rejectWithValue }) => {
     try {
-      return await convertLeadApi(id);
+      const result = await convertLeadApi(id);
+      invalidateLeadCaches();
+      // Converting a lead creates a new client, so the clients cache needs
+      // to drop too or the new client won't show up until it expires.
+      invalidateCache("clients/fetchClients");
+      return result;
     } catch (error) {
       return rejectWithValue(error.message || "Failed to convert lead");
     }

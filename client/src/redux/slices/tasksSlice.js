@@ -1,4 +1,6 @@
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
+import { createCachedThunk } from "@/redux/cachedThunk";
+import { invalidateCache } from "@/utils/cache";
 import {
   fetchTasks as fetchTasksApi,
   fetchTasksByAssignee as fetchTasksByAssigneeApi,
@@ -8,44 +10,37 @@ import {
   deleteTask as deleteTaskApi,
 } from "@/services/taskService";
 
-export const fetchTasks = createAsyncThunk(
-  "tasks/fetchTasks",
-  async (params = {}, { rejectWithValue }) => {
-    try {
-      return await fetchTasksApi(params);
-    } catch (error) {
-      return rejectWithValue(error.message || "Failed to fetch tasks");
-    }
-  }
-);
+// Tasks change more often than clients/team, so a shorter TTL — still
+// enough to collapse redundant fetches from rapid tab-switching/re-renders
+// without serving noticeably stale board state.
+const TASKS_TTL_MS = 2 * 60 * 1000;
 
-export const fetchTasksByAssignee = createAsyncThunk(
-  "tasks/fetchTasksByAssignee",
-  async (assigneeId, { rejectWithValue }) => {
-    try {
-      return await fetchTasksByAssigneeApi(assigneeId);
-    } catch (error) {
-      return rejectWithValue(error.message || "Failed to fetch tasks");
-    }
-  }
-);
+export const fetchTasks = createCachedThunk("tasks/fetchTasks", fetchTasksApi, { ttlMs: TASKS_TTL_MS });
 
-export const fetchTasksByClient = createAsyncThunk(
-  "tasks/fetchTasksByClient",
-  async (clientId, { rejectWithValue }) => {
-    try {
-      return await fetchTasksByClientApi(clientId);
-    } catch (error) {
-      return rejectWithValue(error.message || "Failed to fetch tasks");
-    }
-  }
-);
+export const fetchTasksByAssignee = createCachedThunk("tasks/fetchTasksByAssignee", fetchTasksByAssigneeApi, {
+  ttlMs: TASKS_TTL_MS,
+});
+
+export const fetchTasksByClient = createCachedThunk("tasks/fetchTasksByClient", fetchTasksByClientApi, {
+  ttlMs: TASKS_TTL_MS,
+});
+
+// A task's status/assignees/client can shift which cached list it belongs
+// in, so a mutation invalidates all three task caches rather than trying
+// to guess which ones it affected.
+const invalidateTaskCaches = () => {
+  invalidateCache("tasks/fetchTasks");
+  invalidateCache("tasks/fetchTasksByAssignee");
+  invalidateCache("tasks/fetchTasksByClient");
+};
 
 export const createTask = createAsyncThunk(
   "tasks/createTask",
   async (taskData, { rejectWithValue }) => {
     try {
-      return await createTaskApi(taskData);
+      const result = await createTaskApi(taskData);
+      invalidateTaskCaches();
+      return result;
     } catch (error) {
       return rejectWithValue(error.message || "Failed to create task");
     }
@@ -56,7 +51,9 @@ export const updateTask = createAsyncThunk(
   "tasks/updateTask",
   async ({ id, taskData }, { rejectWithValue }) => {
     try {
-      return await updateTaskApi(id, taskData);
+      const result = await updateTaskApi(id, taskData);
+      invalidateTaskCaches();
+      return result;
     } catch (error) {
       return rejectWithValue(error.message || "Failed to update task");
     }
@@ -68,6 +65,7 @@ export const deleteTask = createAsyncThunk(
   async (id, { rejectWithValue }) => {
     try {
       await deleteTaskApi(id);
+      invalidateTaskCaches();
       return id;
     } catch (error) {
       return rejectWithValue(error.message || "Failed to delete task");

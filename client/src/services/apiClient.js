@@ -1,4 +1,5 @@
 import { getFromStorage, removeFromStorage } from "@/utils/storage";
+import { clearAllCache } from "@/utils/cache";
 
 export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
 
@@ -66,6 +67,7 @@ export const apiClient = async (endpoint, options = {}) => {
     if (response.status === 401) {
       removeFromStorage("auth_token");
       removeFromStorage("auth_user");
+      clearAllCache();
       if (typeof window !== "undefined" && window.location.pathname !== "/login") {
         window.location.href = "/login";
       }

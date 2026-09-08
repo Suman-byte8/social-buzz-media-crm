@@ -1,4 +1,6 @@
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
+import { createCachedThunk } from "@/redux/cachedThunk";
+import { invalidateCache } from "@/utils/cache";
 import {
   fetchClients as fetchClientsApi,
   fetchClientById as fetchClientByIdApi,
@@ -9,16 +11,12 @@ import {
   uploadClientLogo as uploadClientLogoApi,
 } from "@/services/clientService";
 
-export const fetchClients = createAsyncThunk(
-  "clients/fetchClients",
-  async (params = {}, { rejectWithValue }) => {
-    try {
-      return await fetchClientsApi(params);
-    } catch (error) {
-      return rejectWithValue(error.message || "Failed to fetch clients");
-    }
-  }
-);
+// Clients change far less often than they're read — nearly every page
+// (Team, Tasks, Invoices, Content Calendar, Dashboard, Agreements, each
+// client profile) independently calls fetchClients({limit:100}) on mount.
+// A 5-minute cache turns that from "one DB hit per page visit" into
+// "one DB hit per 5 minutes across the whole app".
+export const fetchClients = createCachedThunk("clients/fetchClients", fetchClientsApi, { ttlMs: 5 * 60 * 1000 });
 
 export const fetchClientById = createAsyncThunk(
   "clients/fetchClientById",
@@ -35,7 +33,9 @@ export const createClient = createAsyncThunk(
   "clients/createClient",
   async (clientData, { rejectWithValue }) => {
     try {
-      return await createClientApi(clientData);
+      const result = await createClientApi(clientData);
+      invalidateCache("clients/fetchClients");
+      return result;
     } catch (error) {
       return rejectWithValue(error.message || "Failed to create client");
     }
@@ -46,7 +46,9 @@ export const updateClient = createAsyncThunk(
   "clients/updateClient",
   async ({ id, clientData }, { rejectWithValue }) => {
     try {
-      return await updateClientApi(id, clientData);
+      const result = await updateClientApi(id, clientData);
+      invalidateCache("clients/fetchClients");
+      return result;
     } catch (error) {
       return rejectWithValue(error.message || "Failed to update client");
     }
@@ -57,7 +59,9 @@ export const uploadClientLogo = createAsyncThunk(
   "clients/uploadLogo",
   async ({ id, file }, { rejectWithValue }) => {
     try {
-      return await uploadClientLogoApi(id, file);
+      const result = await uploadClientLogoApi(id, file);
+      invalidateCache("clients/fetchClients");
+      return result;
     } catch (error) {
       return rejectWithValue(error.message || "Failed to upload logo");
     }
@@ -69,6 +73,7 @@ export const deleteClient = createAsyncThunk(
   async (id, { rejectWithValue }) => {
     try {
       await deleteClientApi(id);
+      invalidateCache("clients/fetchClients");
       return id;
     } catch (error) {
       return rejectWithValue(error.message || "Failed to delete client");
