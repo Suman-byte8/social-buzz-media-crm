@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { parseArrayField } from "@/services/teamService";
 import { updateTeamMember, uploadTeamMemberAvatar, uploadTeamMemberResume } from "@/redux/slices/teamSlice";
@@ -48,6 +49,9 @@ export default function EditMemberModal({ isOpen, onClose, onSuccess, member }) 
 
   const [newWorkInput, setNewWorkInput] = useState("");
   const [clientsOpen, setClientsOpen] = useState(false);
+  const [clientsMenuPosition, setClientsMenuPosition] = useState(null);
+  const clientsButtonRef = useRef(null);
+  const clientsMenuRef = useRef(null);
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
   const [avatarError, setAvatarError] = useState("");
@@ -125,6 +129,34 @@ export default function EditMemberModal({ isOpen, onClose, onSuccess, member }) 
       document.body.style.overflow = "";
     };
   }, [isOpen, dispatch]);
+
+  // Portal-rendered dropdown, same reasoning as LeadRowMenu.js: this
+  // button lives inside the modal's overflow-y-auto body, which clips an
+  // inline absolutely-positioned menu instead of letting it float over
+  // the rest of the form — that's what was cropping/blocking scroll on
+  // the client picker.
+  const updateClientsMenuPosition = useCallback(() => {
+    if (!clientsButtonRef.current) return;
+    const rect = clientsButtonRef.current.getBoundingClientRect();
+    setClientsMenuPosition({ top: rect.bottom + 4, left: rect.left, width: rect.width });
+  }, []);
+
+  useEffect(() => {
+    if (!clientsOpen) return;
+    updateClientsMenuPosition();
+    const handleClickOutside = (e) => {
+      if (clientsButtonRef.current?.contains(e.target) || clientsMenuRef.current?.contains(e.target)) return;
+      setClientsOpen(false);
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    window.addEventListener("resize", updateClientsMenuPosition);
+    window.addEventListener("scroll", updateClientsMenuPosition, true);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      window.removeEventListener("resize", updateClientsMenuPosition);
+      window.removeEventListener("scroll", updateClientsMenuPosition, true);
+    };
+  }, [clientsOpen, updateClientsMenuPosition]);
 
   if (!isOpen) return null;
 
@@ -737,6 +769,7 @@ export default function EditMemberModal({ isOpen, onClose, onSuccess, member }) 
               </div>
 
               <button
+                ref={clientsButtonRef}
                 type="button"
                 onClick={() => setClientsOpen((prev) => !prev)}
                 className="w-full px-4 py-2 border border-[#E5E5E7] rounded-lg bg-white text-left text-sm flex items-center justify-between gap-2 focus:ring-1 focus:ring-primary focus:border-primary"
@@ -747,10 +780,20 @@ export default function EditMemberModal({ isOpen, onClose, onSuccess, member }) 
                 </span>
               </button>
 
-              {clientsOpen && (
-                <>
-                  <div className="fixed inset-0 z-10" onClick={() => setClientsOpen(false)} />
-                  <div className="absolute z-20 mt-1 w-full bg-white border border-[#E5E5E7] rounded-lg shadow-lg max-h-56 overflow-y-auto">
+              {clientsOpen &&
+                clientsMenuPosition &&
+                typeof document !== "undefined" &&
+                createPortal(
+                  <div
+                    ref={clientsMenuRef}
+                    style={{
+                      position: "fixed",
+                      top: clientsMenuPosition.top,
+                      left: clientsMenuPosition.left,
+                      width: clientsMenuPosition.width,
+                    }}
+                    className="z-50 bg-white border border-[#E5E5E7] rounded-lg shadow-lg max-h-56 overflow-y-auto"
+                  >
                     {allClients.length === 0 ? (
                       <p className="px-4 py-3 text-xs text-gray-400 italic">No clients found</p>
                     ) : (
@@ -776,9 +819,9 @@ export default function EditMemberModal({ isOpen, onClose, onSuccess, member }) 
                         );
                       })
                     )}
-                  </div>
-                </>
-              )}
+                  </div>,
+                  document.body
+                )}
             </div>
           </div>
 

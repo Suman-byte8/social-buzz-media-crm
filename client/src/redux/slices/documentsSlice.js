@@ -8,6 +8,7 @@ import {
   fetchInvoiceDocuments as fetchInvoiceDocumentsApi,
   fetchBrandKitFiles as fetchBrandKitFilesApi,
   uploadBrandKitFile as uploadBrandKitFileApi,
+  uploadBrandKitFilesBulk as uploadBrandKitFilesBulkApi,
   fetchAgreements as fetchAgreementsApi,
   uploadAgreement as uploadAgreementApi,
   updateAgreement as updateAgreementApi,
@@ -131,6 +132,17 @@ export const uploadBrandKit = createAsyncThunk(
       return await uploadBrandKitFileApi(formData);
     } catch (error) {
       return rejectWithValue(error.message || "Failed to upload file");
+    }
+  }
+);
+
+export const uploadBrandKitBulk = createAsyncThunk(
+  "documents/uploadBrandKitBulk",
+  async (formData, { rejectWithValue }) => {
+    try {
+      return await uploadBrandKitFilesBulkApi(formData);
+    } catch (error) {
+      return rejectWithValue(error.message || "Failed to upload files");
     }
   }
 );
@@ -307,11 +319,29 @@ const documentsSlice = createSlice({
       })
       .addCase(uploadBrandKit.fulfilled, (state, action) => {
         const doc = action.payload?.data || action.payload;
-        if (doc) state.brandKit.push(doc);
+        // Guard against a duplicate id ever landing in the list — e.g. a
+        // fast double-click firing handleUpload twice before the disabled
+        // state commits, or this racing a fetchBrandKit that already
+        // picked up the same freshly-created row. React keys the gallery
+        // by file.id, so two entries sharing one would throw a duplicate-
+        // key warning and duplicate the card on screen.
+        if (doc && !state.brandKit.some((f) => f.id === doc.id)) {
+          state.brandKit.push(doc);
+        }
         state.successMessage = "File uploaded successfully";
       })
       .addCase(uploadBrandKit.rejected, (state, action) => {
         state.error = action.payload || "Failed to upload file";
+      })
+      .addCase(uploadBrandKitBulk.fulfilled, (state, action) => {
+        const docs = action.payload?.data || [];
+        const existingIds = new Set(state.brandKit.map((f) => f.id));
+        const newDocs = docs.filter((d) => !existingIds.has(d.id));
+        state.brandKit.push(...newDocs);
+        state.successMessage = action.payload?.message || "Files uploaded successfully";
+      })
+      .addCase(uploadBrandKitBulk.rejected, (state, action) => {
+        state.error = action.payload || "Failed to upload files";
       })
       .addCase(deleteBrandKit.fulfilled, (state, action) => {
         state.brandKit = state.brandKit.filter((f) => f.id !== action.payload);

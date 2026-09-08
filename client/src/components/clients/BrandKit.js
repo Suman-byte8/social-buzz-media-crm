@@ -2,13 +2,12 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { fetchBrandKit, uploadBrandKit, deleteBrandKit } from "@/redux/slices/documentsSlice";
+import { fetchBrandKit, uploadBrandKitBulk, deleteBrandKit } from "@/redux/slices/documentsSlice";
 import { getAssetUrl } from "@/services/apiClient";
-
-const MAX_FILE_SIZE = 10 * 1024 * 1024;
 
 const formatSize = (bytes) => {
   if (!bytes) return "N/A";
+  if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   return `${(bytes / 1024).toFixed(0)} KB`;
 };
 
@@ -19,9 +18,15 @@ export default function BrandKit({ client, clientId }) {
   const fileInputRef = useRef(null);
 
   const [description, setDescription] = useState("");
-  const [selectedFile, setSelectedFile] = useState(null);
+  const [selectedFiles, setSelectedFiles] = useState([]);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
+  const [brokenThumbs, setBrokenThumbs] = useState({});
+  // Synchronous guard, separate from the `uploading` state: a fast
+  // double-click can fire handleUpload a second time before React commits
+  // the disabled state to the button, dispatching two uploads of the same
+  // files and creating duplicate Document rows in Drive/the DB.
+  const uploadingRef = useRef(false);
 
   useEffect(() => {
     if (clientId) {
@@ -30,48 +35,43 @@ export default function BrandKit({ client, clientId }) {
   }, [dispatch, clientId]);
 
   const handleFileChange = (e) => {
-    const file = e.target.files[0];
     setError("");
-    if (!file) {
-      setSelectedFile(null);
-      return;
-    }
-    if (!file.type.startsWith("image/") && file.type !== "application/pdf") {
-      setError("Only image or PDF files are allowed");
-      e.target.value = "";
-      setSelectedFile(null);
-      return;
-    }
-    if (file.size > MAX_FILE_SIZE) {
-      setError("File size must be less than 10MB");
-      e.target.value = "";
-      setSelectedFile(null);
-      return;
-    }
-    setSelectedFile(file);
+    setSelectedFiles(Array.from(e.target.files || []));
+  };
+
+  const removeSelectedFile = (index) => {
+    setSelectedFiles((prev) => prev.filter((_, i) => i !== index));
   };
 
   const handleUpload = async () => {
-    if (!selectedFile) {
-      setError("Please select a file");
+    if (selectedFiles.length === 0) {
+      setError("Please select at least one file");
       return;
     }
+    if (uploadingRef.current) return;
+    uploadingRef.current = true;
     setUploading(true);
     setError("");
     try {
       const formData = new FormData();
-      formData.append("file", selectedFile);
+      selectedFiles.forEach((file) => formData.append("files", file));
       formData.append("clientId", clientId);
       formData.append("documentType", "brand_kit");
       if (description.trim()) formData.append("description", description.trim());
 
-      await dispatch(uploadBrandKit(formData)).unwrap();
-      setSelectedFile(null);
+      const result = await dispatch(uploadBrandKitBulk(formData)).unwrap();
+      if (result?.failed?.length > 0) {
+        setError(
+          `${result.failed.length} file(s) failed to upload: ${result.failed.map((f) => f.fileName).join(", ")}`
+        );
+      }
+      setSelectedFiles([]);
       setDescription("");
       if (fileInputRef.current) fileInputRef.current.value = "";
     } catch (err) {
-      setError((typeof err === "string" ? err : err?.message) || "Failed to upload file");
+      setError((typeof err === "string" ? err : err?.message) || "Failed to upload files");
     } finally {
+      uploadingRef.current = false;
       setUploading(false);
     }
   };
@@ -102,7 +102,7 @@ export default function BrandKit({ client, clientId }) {
             <input
               ref={fileInputRef}
               type="file"
-              accept="image/*,.pdf"
+              multiple
               onChange={handleFileChange}
               disabled={uploading}
               className="flex-1 text-body-sm text-on-surface-variant file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-surface-container file:text-on-surface file:font-label-sm file:cursor-pointer"
@@ -117,17 +117,45 @@ export default function BrandKit({ client, clientId }) {
             />
             <button
               onClick={handleUpload}
-              disabled={uploading || !selectedFile}
+              disabled={uploading || selectedFiles.length === 0}
               className="shrink-0 px-5 py-2.5 bg-primary hover:bg-surface-tint text-on-primary rounded-lg font-label-md text-label-md transition-colors flex items-center justify-center gap-2 shadow-sm disabled:opacity-50"
             >
               <span className="material-symbols-outlined text-[18px]">
                 {uploading ? "progress_activity" : "upload"}
               </span>
-              {uploading ? "Uploading..." : "Upload File"}
+              {uploading
+                ? "Uploading..."
+                : selectedFiles.length > 1
+                ? `Upload ${selectedFiles.length} Files`
+                : "Upload File"}
             </button>
           </div>
+
+          {selectedFiles.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 mt-3">
+              {selectedFiles.map((file, idx) => (
+                <span
+                  key={`${file.name}-${idx}`}
+                  className="inline-flex items-center gap-1 pl-2.5 pr-1 py-1 bg-surface-container rounded-full text-label-sm font-label-sm text-on-surface"
+                >
+                  {file.name}
+                  <button
+                    type="button"
+                    onClick={() => removeSelectedFile(idx)}
+                    disabled={uploading}
+                    className="p-0.5 rounded-full hover:bg-red-100 hover:text-red-600 transition-colors"
+                    title="Remove"
+                  >
+                    <span className="material-symbols-outlined text-[14px]">close</span>
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
+
           <p className="font-label-sm text-label-sm text-on-surface-variant mt-2">
-            Images or PDF, up to 10MB. Files upload to the client&apos;s Drive folder, in the Brand Kit subfolder.
+            Select as many files as you need, any format or size — they upload straight to the client&apos;s
+            Drive folder, in the Brand Kit subfolder.
           </p>
           {error && <p className="text-red-600 font-body-sm text-body-sm mt-2">{error}</p>}
         </div>
@@ -146,9 +174,10 @@ export default function BrandKit({ client, clientId }) {
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-3">
             {brandKit.map((file) => {
               const isImage = file.fileType?.startsWith("image/");
+              const thumbBroken = brokenThumbs[file.id];
               // Proxied through our own backend (which fetches the bytes via
               // an authenticated Drive API call) rather than linking straight
               // to Drive's googleUserContentLink — that direct-hotlink URL
@@ -157,40 +186,42 @@ export default function BrandKit({ client, clientId }) {
               // already applied to agency logos via logo-proxy).
               const fileUrl = getAssetUrl(`/api/documents/${file.id}/stream`);
               return (
-                <div key={file.id} className="bg-white rounded-xl border border-outline-variant shadow-sm overflow-hidden group">
+                <div key={file.id} className="bg-white rounded-lg border border-outline-variant shadow-sm overflow-hidden group">
                   <a
                     href={fileUrl}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="block aspect-square bg-surface-container-lowest flex items-center justify-center overflow-hidden"
                   >
-                    {isImage ? (
+                    {isImage && !thumbBroken ? (
                       <img
                         src={fileUrl}
                         alt={file.fileName}
+                        loading="lazy"
                         className="w-full h-full object-cover"
+                        onError={() => setBrokenThumbs((prev) => ({ ...prev, [file.id]: true }))}
                       />
                     ) : (
-                      <span className="material-symbols-outlined text-[48px] text-on-surface-variant">description</span>
+                      <span className="material-symbols-outlined text-[28px] text-on-surface-variant">description</span>
                     )}
                   </a>
-                  <div className="p-3">
-                    <p className="font-body-sm text-body-sm font-medium text-on-background truncate" title={file.fileName}>
+                  <div className="p-2">
+                    <p className="font-label-sm text-label-sm font-medium text-on-background truncate" title={file.fileName}>
                       {file.fileName}
                     </p>
                     {file.description && (
-                      <p className="font-label-sm text-label-sm text-tertiary truncate" title={file.description}>
+                      <p className="text-[10.5px] text-tertiary truncate" title={file.description}>
                         {file.description}
                       </p>
                     )}
-                    <div className="flex items-center justify-between mt-2">
-                      <span className="font-label-sm text-label-sm text-on-surface-variant">{formatSize(file.fileSize)}</span>
+                    <div className="flex items-center justify-between mt-1.5">
+                      <span className="text-[10.5px] text-on-surface-variant">{formatSize(file.fileSize)}</span>
                       <button
                         onClick={() => handleDelete(file.id)}
                         className="p-1 text-on-surface-variant hover:text-red-600 hover:bg-red-50 rounded transition-colors"
                         title="Delete"
                       >
-                        <span className="material-symbols-outlined text-[18px]">delete</span>
+                        <span className="material-symbols-outlined text-[16px]">delete</span>
                       </button>
                     </div>
                   </div>

@@ -20,18 +20,16 @@ const upload = multer({
   },
 });
 
-// Broader upload for media-capable document types (currently just brand kit assets):
-// logos, color palette images, and other brand imagery, plus PDF brand guidelines.
+// Broader upload for media-capable document types (currently just brand kit
+// assets): any file type/size the Brand Kit wants to store — logos, brand
+// guideline PDFs, video, zipped asset packs, fonts, whatever the client hands
+// over. No fileFilter (any mimetype is accepted). The size cap is generous
+// rather than unbounded because multer buffers the whole upload in process
+// memory before it's streamed to Drive — an actually-unbounded limit would
+// let one huge upload crash the server for everyone.
 const mediaUpload = multer({
   storage: storage,
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
-  fileFilter: (req, file, cb) => {
-    if (file.mimetype.startsWith("image/") || file.mimetype === "application/pdf") {
-      cb(null, true);
-    } else {
-      cb(new Error("Only image or PDF files are allowed"), false);
-    }
-  },
+  limits: { fileSize: 200 * 1024 * 1024, files: 20 }, // 200MB per file, up to 20 files per request
 });
 
 // Agreements and Proposals are admin-only (hidden from team members).
@@ -277,6 +275,81 @@ router.post("/documents/upload-media", mediaUpload.single("file"), async (req, r
   }
 });
 
+// Bulk variant of the above — same folder/document logic, but accepts
+// several files in one request (e.g. selecting a whole batch of brand
+// assets at once). Uploaded one at a time rather than in parallel so a
+// large batch doesn't fire a burst of simultaneous Drive API calls; a
+// per-file failure is recorded and skipped instead of aborting the whole
+// batch, so one bad file doesn't lose the files that already succeeded.
+router.post("/documents/upload-media-bulk", mediaUpload.array("files", 20), async (req, res) => {
+  try {
+    const { clientId, description, documentType } = req.body;
+
+    if (!req.files || req.files.length === 0) {
+      return res.status(400).json({ success: false, message: "No files provided" });
+    }
+    if (!clientId) {
+      return res.status(400).json({ success: false, message: "clientId is required" });
+    }
+
+    const { Document, Client } = req.app.locals.models;
+
+    const clientRecord = await Client.findByPk(parseInt(clientId));
+    if (!clientRecord) {
+      return res.status(404).json({ success: false, message: "Client not found" });
+    }
+
+    const clientFolder = await getOrCreateClientFolder(clientRecord.name, clientRecord.id);
+    const subfolderName = documentType === "brand_kit" ? "Brand Kit" : "Other";
+    const subfolder = await getOrCreateClientSubfolder(clientFolder.folderId, subfolderName);
+
+    const uploaded = [];
+    const failed = [];
+
+    for (const file of req.files) {
+      try {
+        const driveResult = await uploadFileToDrive(file.buffer, file.originalname, file.mimetype, subfolder.folderId);
+
+        const document = await Document.create({
+          fileName: file.originalname,
+          fileType: file.mimetype,
+          fileSize: file.size,
+          fileId: driveResult.fileId,
+          driveLink: driveResult.googleUserContentLink,
+          webViewLink: driveResult.webViewLink,
+          googleUserContentLink: driveResult.googleUserContentLink,
+          folderId: subfolder.folderId,
+          clientId: parseInt(clientId),
+          description: description || null,
+          documentType: documentType || "other",
+        });
+
+        uploaded.push(document);
+      } catch (fileError) {
+        console.error(`Error uploading file "${file.originalname}":`, fileError);
+        failed.push({ fileName: file.originalname, error: fileError.message });
+      }
+    }
+
+    res.status(201).json({
+      success: true,
+      message:
+        failed.length > 0
+          ? `${uploaded.length} file(s) uploaded, ${failed.length} failed`
+          : "Files uploaded successfully",
+      data: uploaded,
+      failed,
+    });
+  } catch (error) {
+    console.error("Error bulk uploading media documents:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message || "Failed to upload files",
+      error: error.message,
+    });
+  }
+});
+
 // `page`/`limit` are optional — omitting them preserves the historical
 // "return everything" behavior existing callers rely on.
 router.get("/documents", async (req, res) => {
@@ -420,6 +493,13 @@ router.get("/documents/:id/stream", async (req, res) => {
     // route is already in PUBLIC_ASSET_PATHS (no auth), so relaxing it to
     // allow framing doesn't expose anything new.
     res.setHeader("Content-Security-Policy", "frame-ancestors *");
+    // A given document's fileId is never mutated in place (re-uploads
+    // create a new Document/fileId), so letting the browser cache the
+    // response is safe. Without this, a grid of many thumbnails re-fetches
+    // every one of them on every visit, competing for the browser's ~6
+    // concurrent connections per origin — later thumbnails just sit and
+    // wait instead of appearing.
+    res.setHeader("Cache-Control", "public, max-age=86400, immutable");
     res.send(cached.buffer);
   } catch (error) {
     console.error("Error streaming document:", error);

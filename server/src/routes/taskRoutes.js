@@ -277,10 +277,16 @@ router.put("/tasks/:id", async (req, res) => {
       description: description !== undefined ? description : task.description,
       status: status ?? task.status,
       priority: priority ?? task.priority,
-      clientId: clientId !== undefined ? parseInt(clientId) : task.clientId,
-      dueDate: dueDate !== undefined ? new Date(dueDate) : task.dueDate,
+      // clientId/dueDate/completedAt are legitimately cleared by sending
+      // `null` (e.g. an internal task with no client, or a cleared due
+      // date) — treating that the same as "field omitted" and running it
+      // through parseInt()/new Date() produced NaN / epoch dates, and
+      // Postgres rejects NaN for an INTEGER column outright, which is what
+      // made every update to a client-less task fail with a 500.
+      clientId: clientId !== undefined ? (clientId === null || clientId === "" ? null : parseInt(clientId)) : task.clientId,
+      dueDate: dueDate !== undefined ? (dueDate ? new Date(dueDate) : null) : task.dueDate,
       completedAt: completedAt !== undefined
-        ? new Date(completedAt)
+        ? (completedAt ? new Date(completedAt) : null)
         : status === "completed" && task.status !== "completed"
         ? new Date()
         : status !== "completed"
@@ -290,8 +296,14 @@ router.put("/tasks/:id", async (req, res) => {
 
     await task.update(updateData);
 
+    // Same NaN-into-INTEGER-column hazard as clientId above: filter out
+    // anything that doesn't parse to a real number before it ever reaches
+    // TaskAssignee.bulkCreate, whose teamMemberId column is NOT NULL and
+    // part of a composite primary key — Postgres rejects NaN outright.
     const assigneesProvided = assignees !== undefined && Array.isArray(assignees);
-    const newAssigneeIds = assigneesProvided ? assignees.map((id) => parseInt(id)) : oldAssigneeIds;
+    const newAssigneeIds = assigneesProvided
+      ? [...new Set(assignees.map((id) => parseInt(id)).filter((id) => Number.isInteger(id)))]
+      : oldAssigneeIds;
 
     if (assigneesProvided) {
       await TaskAssignee.destroy({ where: { taskId: task.id } });
@@ -318,6 +330,7 @@ router.put("/tasks/:id", async (req, res) => {
       data: { ...task.toJSON(), assignees: newAssigneeIds },
     });
   } catch (error) {
+    console.error("Error updating task:", error);
     res.status(500).json({
       success: false,
       message: "Error updating task",

@@ -88,6 +88,14 @@ export const uploadBrandKitFile = async (formData) => {
   return response;
 };
 
+export const uploadBrandKitFilesBulk = async (formData) => {
+  const response = await apiClient("/documents/upload-media-bulk", {
+    method: "POST",
+    body: formData,
+  });
+  return response;
+};
+
 // ── Agreements ───────────────────────────────────────────────────────────
 
 export const fetchAgreements = async (clientId) => {
