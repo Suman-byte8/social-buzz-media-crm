@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import Link from "next/link";
 import { useDispatch, useSelector } from "react-redux";
 import ProposalTab from "@/components/clients/ProposalTab";
 import Overview from "@/components/clients/Overview";
@@ -71,6 +72,16 @@ export default function ClientDetailContent({ activeTab, setActiveTab, client = 
 
   return (
     <main className="flex-1 p-container-margin flex flex-col gap-stack-lg max-w-[1600px] w-full mx-auto">
+      {/* Sits above the header so it's present no matter which tab is
+          active — every tab renders through this one shared component. */}
+      <Link
+        href="/clients"
+        className="inline-flex items-center gap-1.5 text-secondary hover:text-primary transition-colors font-label-md text-label-md w-fit"
+      >
+        <span className="material-symbols-outlined text-[18px]">arrow_back</span>
+        Back to Clients
+      </Link>
+
       {/* Client Header Section */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-stack-md bg-surface p-card-padding rounded-xl border border-outline-variant shadow-sm">
         <div className="flex items-center gap-stack-md">
