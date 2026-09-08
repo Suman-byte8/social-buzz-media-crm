@@ -54,7 +54,7 @@ export default function MiscTaskTable({
 
   return (
     <div className="bg-white rounded-b-xl border border-outline-variant shadow-card overflow-hidden overflow-x-auto">
-      <table className="w-full min-w-[960px] text-left border-collapse">
+      <table className="w-full min-w-[1140px] text-left border-collapse">
         <thead>
           <tr className="bg-[#FAFAFA] border-b border-[#F0F0F0]">
             <th className="py-3 px-4 font-label-sm text-label-sm text-secondary uppercase tracking-wider">Client</th>
@@ -64,6 +64,7 @@ export default function MiscTaskTable({
             <th className="py-3 px-4 font-label-sm text-label-sm text-secondary uppercase tracking-wider">Assigned To</th>
             <th className="py-3 px-4 font-label-sm text-label-sm text-secondary uppercase tracking-wider">Status</th>
             <th className="py-3 px-4 font-label-sm text-label-sm text-secondary uppercase tracking-wider">File</th>
+            <th className="py-3 px-4 font-label-sm text-label-sm text-secondary uppercase tracking-wider">Notes</th>
             <th className="py-3 px-4 font-label-sm text-label-sm text-secondary uppercase tracking-wider text-right">Actions</th>
           </tr>
         </thead>
@@ -88,14 +89,14 @@ export default function MiscTaskTable({
 
           {loading ? (
             <tr>
-              <td colSpan={8} className="py-12 text-center text-secondary">
+              <td colSpan={9} className="py-12 text-center text-secondary">
                 <span className="animate-spin material-symbols-outlined align-middle mr-2">progress_activity</span>
                 Loading tasks...
               </td>
             </tr>
           ) : tasks.length === 0 && !hasDrafts ? (
             <tr>
-              <td colSpan={8} className="py-12 text-center text-secondary">
+              <td colSpan={9} className="py-12 text-center text-secondary">
                 <span className="material-symbols-outlined text-[40px] block mb-1.5 mx-auto">widgets</span>
                 No miscellaneous tasks found.
               </td>
@@ -148,6 +149,13 @@ export default function MiscTaskTable({
                       </a>
                     ) : (
                       <span className="text-secondary">—</span>
+                    )}
+                  </td>
+                  <td className="py-4 px-4 text-secondary max-w-[200px]">
+                    {task.notes ? (
+                      <span className="block truncate" title={task.notes}>{task.notes}</span>
+                    ) : (
+                      <span>—</span>
                     )}
                   </td>
                   <td className="py-4 px-4 text-right">

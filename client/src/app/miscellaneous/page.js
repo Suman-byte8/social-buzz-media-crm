@@ -23,6 +23,7 @@ const blankDraft = () => ({
   deliveryDate: "",
   status: "pending",
   assignedTo: "",
+  notes: "",
   stagedFile: null,
 });
 
@@ -121,6 +122,7 @@ export default function MiscellaneousPage() {
     fd.append("deliveryDate", draft.deliveryDate || "");
     fd.append("status", draft.status);
     fd.append("assignedTo", draft.assignedTo || "");
+    fd.append("notes", draft.notes || "");
     if (draft.stagedFile) fd.append("file", draft.stagedFile);
     return fd;
   };
@@ -157,6 +159,7 @@ export default function MiscellaneousPage() {
       deliveryDate: task.deliveryDate || "",
       status: task.status,
       assignedTo: task.assignedTo || "",
+      notes: task.notes || "",
     });
     setEditStagedFile(null);
     setEditError("");
@@ -191,6 +194,7 @@ export default function MiscellaneousPage() {
         fd.append("deliveryDate", editValues.deliveryDate || "");
         fd.append("status", editValues.status);
         fd.append("assignedTo", editValues.assignedTo || "");
+        fd.append("notes", editValues.notes || "");
         await dispatch(saveMiscTask(fd)).unwrap();
       } else {
         await dispatch(updateMiscTask({ id: editingId, updateData: editValues })).unwrap();

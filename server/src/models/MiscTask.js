@@ -18,6 +18,7 @@ const miscTaskModel = (sequelize) => {
         defaultValue: "pending",
       },
       assignedTo: { type: DataTypes.INTEGER, allowNull: true },
+      notes: { type: DataTypes.TEXT, allowNull: true },
       fileName: { type: DataTypes.STRING, allowNull: true },
       fileType: { type: DataTypes.STRING, allowNull: true },
       fileSize: { type: DataTypes.INTEGER, allowNull: true },

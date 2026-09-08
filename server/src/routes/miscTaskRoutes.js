@@ -66,7 +66,7 @@ router.get("/misc-tasks", async (req, res) => {
 // POST /api/misc-tasks/upload - create, or update (with optional new file) when `id` is present
 router.post("/misc-tasks/upload", upload.single("file"), async (req, res) => {
   try {
-    const { id, clientId, typeOfWork, assignedDate, deliveryDate, status, assignedTo } = req.body;
+    const { id, clientId, typeOfWork, assignedDate, deliveryDate, status, assignedTo, notes } = req.body;
     const { MiscTask, Client } = req.app.locals.models;
 
     if (typeOfWork && !TYPE_OF_WORK_VALUES.includes(typeOfWork)) {
@@ -89,6 +89,7 @@ router.post("/misc-tasks/upload", upload.single("file"), async (req, res) => {
         deliveryDate: deliveryDate || existing.deliveryDate,
         status: status || existing.status,
         assignedTo: assignedTo ? parseInt(assignedTo) : existing.assignedTo,
+        notes: notes !== undefined ? (notes || null) : existing.notes,
       };
 
       if (req.file) {
@@ -153,6 +154,7 @@ router.post("/misc-tasks/upload", upload.single("file"), async (req, res) => {
       deliveryDate: deliveryDate || null,
       status: status || "pending",
       assignedTo: assignedTo ? parseInt(assignedTo) : null,
+      notes: notes || null,
       ...fileFields,
     });
 
@@ -167,7 +169,7 @@ router.post("/misc-tasks/upload", upload.single("file"), async (req, res) => {
 router.put("/misc-tasks/:id", async (req, res) => {
   try {
     const { MiscTask } = req.app.locals.models;
-    const { clientId, typeOfWork, assignedDate, deliveryDate, status, assignedTo } = req.body;
+    const { clientId, typeOfWork, assignedDate, deliveryDate, status, assignedTo, notes } = req.body;
 
     const miscTask = await MiscTask.findByPk(req.params.id);
     if (!miscTask) {
@@ -188,6 +190,7 @@ router.put("/misc-tasks/:id", async (req, res) => {
       deliveryDate: deliveryDate !== undefined ? deliveryDate : miscTask.deliveryDate,
       status: status || miscTask.status,
       assignedTo: assignedTo !== undefined ? (assignedTo ? parseInt(assignedTo) : null) : miscTask.assignedTo,
+      notes: notes !== undefined ? (notes || null) : miscTask.notes,
     });
 
     res.json({ success: true, message: "Task updated successfully", data: miscTask });

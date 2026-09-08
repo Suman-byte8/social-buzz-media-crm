@@ -141,6 +141,16 @@ export default function MiscTaskRowEditor({
           }}
         />
       </td>
+      <td className="py-2 px-2 align-top min-w-[160px]">
+        <textarea
+          value={values.notes || ""}
+          onChange={(e) => onChange("notes", e.target.value)}
+          className={`${inputClass} resize-none`}
+          rows={2}
+          placeholder="Add notes..."
+          disabled={saving}
+        />
+      </td>
       <td className="py-2 px-2 align-top text-right">
         <div className="flex flex-col items-end gap-1">
           <div className="flex items-center justify-end gap-1">
