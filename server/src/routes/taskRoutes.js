@@ -1,5 +1,7 @@
 import express from "express";
 import { Op } from "sequelize";
+import { cacheRoute } from "../middleware/cacheRoute.js";
+import { invalidateCache } from "../utils/serverCache.js";
 
 const router = express.Router();
 
@@ -90,6 +92,7 @@ router.post("/tasks", async (req, res) => {
       }
     }
 
+    await invalidateCache("tasks");
     res.status(201).json({
       success: true,
       message: "Task created successfully",
@@ -105,7 +108,7 @@ router.post("/tasks", async (req, res) => {
   }
 });
 
-router.get("/tasks", async (req, res) => {
+router.get("/tasks", cacheRoute("tasks", 30), async (req, res) => {
   try {
     const { Task, Client, TeamMember, TaskAssignee } = req.app.locals.models;
     const {
@@ -324,6 +327,11 @@ router.put("/tasks/:id", async (req, res) => {
       }
     }
 
+    // syncTeamMemberWorks/removeTaskFromTeamMember above may have edited
+    // assignedWorks on affected TeamMember rows.
+    await invalidateCache("tasks");
+    if (assigneesProvided) await invalidateCache("team");
+
     res.json({
       success: true,
       message: "Task updated successfully",
@@ -352,10 +360,12 @@ router.delete("/tasks/:id", async (req, res) => {
     for (const link of links) {
       await removeTaskFromTeamMember(TeamMember, link.teamMemberId, task.title);
     }
+    if (links.length > 0) await invalidateCache("team");
 
     // task_assignees rows for this task cascade-delete automatically
     // (ON DELETE CASCADE — see scripts/migrate-task-assignees.js).
     await task.destroy();
+    await invalidateCache("tasks");
     res.json({ success: true, message: "Task deleted successfully" });
   } catch (error) {
     res.status(500).json({

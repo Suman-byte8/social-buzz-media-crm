@@ -5,6 +5,8 @@ import {
   getOrCreateTeamMembersFolder,
   getOrCreateClientSubfolder,
 } from "../utils/googleDrive.js";
+import { cacheRoute } from "../middleware/cacheRoute.js";
+import { invalidateCache } from "../utils/serverCache.js";
 
 const router = express.Router();
 
@@ -116,6 +118,7 @@ router.post("/team-members", async (req, res) => {
     };
 
     const teamMember = await TeamMember.create(memberData);
+    await invalidateCache("team");
 
     res.status(201).json({
       success: true,
@@ -137,7 +140,7 @@ router.post("/team-members", async (req, res) => {
 // "return everything" behavior existing callers rely on; passing them
 // opts into paginated results plus a `pagination` block, same shape as
 // the clients/tasks endpoints.
-router.get("/team-members", async (req, res) => {
+router.get("/team-members", cacheRoute("team", 120), async (req, res) => {
   try {
     const { TeamMember } = req.app.locals.models;
     const { page, limit } = req.query;
@@ -287,6 +290,7 @@ router.put("/team-members/:id", async (req, res) => {
     };
 
     await teamMember.update(updateData);
+    await invalidateCache("team");
 
     res.json({
       success: true,
@@ -322,6 +326,7 @@ router.post("/team-members/:id/upload-avatar", avatarUpload.single("avatar"), as
     const driveResult = await uploadFileToDrive(req.file.buffer, req.file.originalname, req.file.mimetype, memberFolder.folderId);
 
     await teamMember.update({ avatar: driveResult.proxyLink });
+    await invalidateCache("team");
 
     res.json({ success: true, message: "Profile image uploaded successfully", data: teamMember });
   } catch (error) {
@@ -347,6 +352,7 @@ router.post("/team-members/:id/upload-resume", resumeUpload.single("resume"), as
     const driveResult = await uploadFileToDrive(req.file.buffer, req.file.originalname, req.file.mimetype, memberFolder.folderId);
 
     await teamMember.update({ resume: driveResult.proxyLink });
+    await invalidateCache("team");
 
     res.json({ success: true, message: "Resume uploaded successfully", data: teamMember });
   } catch (error) {
@@ -367,6 +373,7 @@ router.delete("/team-members/:id", async (req, res) => {
     }
 
     await teamMember.destroy();
+    await invalidateCache("team");
     res.json({ success: true, message: "Team member deleted successfully" });
   } catch (error) {
     res.status(500).json({
