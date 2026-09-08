@@ -4,6 +4,7 @@ import React, { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchClients, exportClients, deleteClient, clearMessages } from "@/redux/slices/clientsSlice";
 import { fetchTeamMembers } from "@/services/teamService";
+import { saveToStorage, getFromStorage } from "@/utils/storage";
 import ClientsToolbar from "@/components/clients/ClientsToolbar";
 import ClientsFilters from "@/components/clients/ClientsFilters";
 import ClientsTable from "@/components/clients/ClientsTable";
@@ -21,18 +22,35 @@ export default function ClientsPage() {
   const [managedBy, setManagedBy] = useState("");
   const [healthMin, setHealthMin] = useState("");
   const [healthMax, setHealthMax] = useState("");
-  const [page, setPage] = useState(1);
+  // Starts at 1 unconditionally (not read from storage in the initializer)
+  // so the very first client render matches the statically-exported HTML —
+  // the real remembered page is restored right after, in an effect that
+  // only runs post-mount. See AuthContext.jsx for the same pattern.
+  const [page, setPageState] = useState(1);
+  const [pageRestored, setPageRestored] = useState(false);
   const [limit] = useState(10);
   const [showAddModal, setShowAddModal] = useState(false);
   const [sortBy, setSortBy] = useState("createdAt");
   const [sortOrder, setSortOrder] = useState("DESC");
   const [editingClient, setEditingClient] = useState(null);
 
+  useEffect(() => {
+    const storedPage = getFromStorage("clients_page");
+    if (Number.isInteger(storedPage) && storedPage > 0) setPageState(storedPage);
+    setPageRestored(true);
+  }, []);
+
+  const setPage = (nextPage) => {
+    setPageState(nextPage);
+    saveToStorage("clients_page", nextPage);
+  };
+
   const queryParams = { page, limit, search, sortBy, sortOrder, industry, managedBy, healthMin, healthMax };
 
   useEffect(() => {
+    if (!pageRestored) return;
     dispatch(fetchClients(queryParams));
-  }, [dispatch, page, limit, search, sortBy, sortOrder, industry, managedBy, healthMin, healthMax]);
+  }, [dispatch, pageRestored, page, limit, search, sortBy, sortOrder, industry, managedBy, healthMin, healthMax]);
 
   useEffect(() => {
     fetchTeamMembers()
@@ -89,8 +107,20 @@ export default function ClientsPage() {
   };
 
   const handleModalSuccess = () => {
+    const wasNewClient = !editingClient;
     handleCloseModal();
-    dispatch(fetchClients({ ...queryParams, page: 1 }));
+    if (wasNewClient) {
+      // New clients sort to the top (default sort is createdAt DESC), so
+      // jump to page 1 to actually show it. Editing an existing client
+      // shouldn't move the user off the page they were on. Set state/storage
+      // and dispatch directly (rather than via setPage + relying on the
+      // page-effect) so this still fetches even when already on page 1.
+      setPageState(1);
+      saveToStorage("clients_page", 1);
+      dispatch(fetchClients({ ...queryParams, page: 1 }));
+    } else {
+      dispatch(fetchClients(queryParams));
+    }
   };
 
   const handleSort = (column) => {
