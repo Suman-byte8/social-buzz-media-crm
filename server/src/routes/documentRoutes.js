@@ -4,6 +4,8 @@ import { Op } from "sequelize";
 import { uploadFileToDrive, getFileBufferFromDrive, getOrCreateClientFolder, getOrCreateClientSubfolder, trashFileInDrive } from "../utils/googleDrive.js";
 import { getCachedFile, setCachedFile } from "../utils/fileCache.js";
 import { sendMail } from "../utils/mailer.js";
+import { cacheRoute } from "../middleware/cacheRoute.js";
+import { invalidateCache } from "../utils/serverCache.js";
 
 const router = express.Router();
 
@@ -85,6 +87,7 @@ router.post("/agreements/upload", requireAdminForAgreements, upload.single("file
           status: status || existingAgreement.status,
           description: description !== undefined ? description : existingAgreement.description,
         });
+        await invalidateCache("documents");
         return res.json({ success: true, message: "Agreement updated successfully", data: existingAgreement });
       }
 
@@ -111,6 +114,7 @@ router.post("/agreements/upload", requireAdminForAgreements, upload.single("file
         status: status || existingAgreement.status,
       });
 
+      await invalidateCache("documents");
       return res.json({ success: true, message: "Agreement updated successfully", data: updated });
     }
 
@@ -142,6 +146,7 @@ router.post("/agreements/upload", requireAdminForAgreements, upload.single("file
       status: status || "active",
     });
 
+    await invalidateCache("documents");
     res.status(201).json({
       success: true,
       message: "Agreement uploaded successfully",
@@ -210,6 +215,7 @@ router.post("/documents/upload", upload.single("file"), async (req, res) => {
       documentType: documentType || "other",
     });
 
+    await invalidateCache("documents");
     res.status(201).json({
       success: true,
       message: "Document uploaded successfully",
@@ -269,6 +275,7 @@ router.post("/documents/upload-media", mediaUpload.single("file"), async (req, r
       documentType: documentType || "other",
     });
 
+    await invalidateCache("documents");
     res.status(201).json({
       success: true,
       message: "File uploaded successfully",
@@ -340,6 +347,7 @@ router.post("/documents/upload-media-bulk", mediaUpload.array("files", 20), asyn
       }
     }
 
+    if (uploaded.length > 0) await invalidateCache("documents");
     res.status(201).json({
       success: true,
       message:
@@ -361,7 +369,7 @@ router.post("/documents/upload-media-bulk", mediaUpload.array("files", 20), asyn
 
 // `page`/`limit` are optional — omitting them preserves the historical
 // "return everything" behavior existing callers rely on.
-router.get("/documents", async (req, res) => {
+router.get("/documents", cacheRoute("documents", 120), async (req, res) => {
   try {
     const { Document } = req.app.locals.models;
     const { clientId, documentType, page, limit } = req.query;
@@ -459,6 +467,7 @@ router.delete("/documents/:id", async (req, res) => {
     }
 
     await document.destroy();
+    await invalidateCache("documents");
     res.json({ success: true, message: "Document deleted successfully" });
   } catch (error) {
     res.status(500).json({
@@ -576,20 +585,46 @@ router.post("/documents/:id/email", async (req, res) => {
 });
 
 // Agreement-specific routes
-router.get("/agreements", requireAdminForAgreements, async (req, res) => {
+// `page`/`limit` are optional — omitting them preserves the historical
+// "return everything" behavior existing callers rely on (e.g. a client
+// profile's Agreement tab, which wants its one client's full list).
+router.get("/agreements", requireAdminForAgreements, cacheRoute("documents", 120), async (req, res) => {
   try {
     const { Document } = req.app.locals.models;
-    const { clientId, status } = req.query;
+    const { clientId, status, search, page, limit } = req.query;
 
     const where = { documentType: "agreement" };
     if (clientId) where.clientId = parseInt(clientId);
     if (status) where.status = status;
+    if (search) {
+      where[Op.or] = [
+        { fileName: { [Op.iLike]: `%${search}%` } },
+        { description: { [Op.iLike]: `%${search}%` } },
+      ];
+    }
 
-    const agreements = await Document.findAll({
-      where,
-      order: [["createdAt", "DESC"]],
-    });
+    const queryOptions = { where, order: [["createdAt", "DESC"]] };
 
+    if (limit) {
+      const parsedLimit = parseInt(limit);
+      const parsedPage = parseInt(page) || 1;
+      queryOptions.limit = parsedLimit;
+      queryOptions.offset = (parsedPage - 1) * parsedLimit;
+
+      const { count, rows } = await Document.findAndCountAll(queryOptions);
+      return res.json({
+        success: true,
+        data: rows,
+        pagination: {
+          total: count,
+          page: parsedPage,
+          limit: parsedLimit,
+          totalPages: Math.ceil(count / parsedLimit),
+        },
+      });
+    }
+
+    const agreements = await Document.findAll(queryOptions);
     res.json({ success: true, data: agreements });
   } catch (error) {
     res.status(500).json({
@@ -641,6 +676,7 @@ router.put("/agreements/:id", requireAdminForAgreements, async (req, res) => {
     }
 
     await agreement.update(updateData);
+    await invalidateCache("documents");
 
     res.json({ success: true, message: "Agreement updated successfully", data: agreement });
   } catch (error) {
@@ -673,6 +709,7 @@ router.delete("/agreements/:id", requireAdminForAgreements, async (req, res) => 
     }
 
     await agreement.destroy();
+    await invalidateCache("documents");
     res.json({ success: true, message: "Agreement deleted successfully" });
   } catch (error) {
     res.status(500).json({

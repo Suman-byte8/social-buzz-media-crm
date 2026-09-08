@@ -1,4 +1,6 @@
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
+import { createCachedThunk } from "@/redux/cachedThunk";
+import { invalidateCache } from "@/utils/cache";
 import {
   fetchLeads as fetchLeadsApi,
   fetchLeadMetrics as fetchLeadMetricsApi,
@@ -8,33 +10,26 @@ import {
   convertLead as convertLeadApi,
 } from "@/services/leadService";
 
-export const fetchLeads = createAsyncThunk(
-  "leads/fetchLeads",
-  async (params = {}, { rejectWithValue }) => {
-    try {
-      return await fetchLeadsApi(params);
-    } catch (error) {
-      return rejectWithValue(error.message || "Failed to fetch leads");
-    }
-  }
-);
+const LEADS_TTL_MS = 3 * 60 * 1000;
 
-export const fetchLeadMetrics = createAsyncThunk(
-  "leads/fetchLeadMetrics",
-  async (_, { rejectWithValue }) => {
-    try {
-      return await fetchLeadMetricsApi();
-    } catch (error) {
-      return rejectWithValue(error.message || "Failed to fetch lead metrics");
-    }
-  }
-);
+const invalidateLeadCaches = () => {
+  invalidateCache("leads/fetchLeads");
+  invalidateCache("leads/fetchLeadMetrics");
+};
+
+export const fetchLeads = createCachedThunk("leads/fetchLeads", fetchLeadsApi, { ttlMs: LEADS_TTL_MS });
+
+export const fetchLeadMetrics = createCachedThunk("leads/fetchLeadMetrics", fetchLeadMetricsApi, {
+  ttlMs: LEADS_TTL_MS,
+});
 
 export const createLead = createAsyncThunk(
   "leads/createLead",
   async (leadData, { rejectWithValue }) => {
     try {
-      return await createLeadApi(leadData);
+      const result = await createLeadApi(leadData);
+      invalidateLeadCaches();
+      return result;
     } catch (error) {
       return rejectWithValue(error.message || "Failed to create lead");
     }
@@ -45,7 +40,9 @@ export const updateLead = createAsyncThunk(
   "leads/updateLead",
   async ({ id, leadData }, { rejectWithValue }) => {
     try {
-      return await updateLeadApi(id, leadData);
+      const result = await updateLeadApi(id, leadData);
+      invalidateLeadCaches();
+      return result;
     } catch (error) {
       return rejectWithValue(error.message || "Failed to update lead");
     }
@@ -57,6 +54,7 @@ export const deleteLead = createAsyncThunk(
   async (id, { rejectWithValue }) => {
     try {
       await deleteLeadApi(id);
+      invalidateLeadCaches();
       return id;
     } catch (error) {
       return rejectWithValue(error.message || "Failed to delete lead");
@@ -68,7 +66,12 @@ export const convertLead = createAsyncThunk(
   "leads/convertLead",
   async (id, { rejectWithValue }) => {
     try {
-      return await convertLeadApi(id);
+      const result = await convertLeadApi(id);
+      invalidateLeadCaches();
+      // Converting a lead creates a new client, so the clients cache needs
+      // to drop too or the new client won't show up until it expires.
+      invalidateCache("clients/fetchClients");
+      return result;
     } catch (error) {
       return rejectWithValue(error.message || "Failed to convert lead");
     }
@@ -85,6 +88,8 @@ const initialState = {
   totalItems: 0,
   metrics: { totalLeads: 0, hotProspects: 0, followUpDue: 0, lostThisMonth: 0, newThisMonth: 0 },
   loadingMetrics: false,
+  // Keyed by id — see deleteLead/convertLead's optimistic-update reducers.
+  pendingRemovalSnapshots: {},
 };
 
 const leadsSlice = createSlice({
@@ -137,20 +142,50 @@ const leadsSlice = createSlice({
       .addCase(updateLead.rejected, (state, action) => {
         state.error = action.payload || "Failed to update lead";
       })
+      .addCase(deleteLead.pending, (state, action) => {
+        state.error = null;
+        const id = action.meta.arg;
+        const idx = state.leads.findIndex((l) => l.id === id);
+        if (idx !== -1) {
+          state.pendingRemovalSnapshots[id] = { item: state.leads[idx], index: idx };
+          state.leads.splice(idx, 1);
+        }
+      })
       .addCase(deleteLead.fulfilled, (state, action) => {
-        state.leads = state.leads.filter((l) => l.id !== action.payload);
+        delete state.pendingRemovalSnapshots[action.payload];
         state.successMessage = "Lead deleted successfully";
         state.error = null;
       })
       .addCase(deleteLead.rejected, (state, action) => {
+        const id = action.meta.arg;
+        const snapshot = state.pendingRemovalSnapshots[id];
+        if (snapshot) {
+          state.leads.splice(Math.min(snapshot.index, state.leads.length), 0, snapshot.item);
+          delete state.pendingRemovalSnapshots[id];
+        }
         state.error = action.payload || "Failed to delete lead";
       })
+      .addCase(convertLead.pending, (state, action) => {
+        state.error = null;
+        const id = action.meta.arg;
+        const idx = state.leads.findIndex((l) => l.id === id);
+        if (idx !== -1) {
+          state.pendingRemovalSnapshots[id] = { item: state.leads[idx], index: idx };
+          state.leads.splice(idx, 1);
+        }
+      })
       .addCase(convertLead.fulfilled, (state, action) => {
-        state.leads = state.leads.filter((l) => l.id !== action.meta.arg);
+        delete state.pendingRemovalSnapshots[action.meta.arg];
         state.successMessage = "Lead converted to client successfully";
         state.error = null;
       })
       .addCase(convertLead.rejected, (state, action) => {
+        const id = action.meta.arg;
+        const snapshot = state.pendingRemovalSnapshots[id];
+        if (snapshot) {
+          state.leads.splice(Math.min(snapshot.index, state.leads.length), 0, snapshot.item);
+          delete state.pendingRemovalSnapshots[id];
+        }
         state.error = action.payload || "Failed to convert lead";
       });
   },

@@ -117,9 +117,21 @@ export const uploadClientFilesBulk = async (formData) => {
 
 // ── Agreements ───────────────────────────────────────────────────────────
 
-export const fetchAgreements = async (clientId) => {
-  const queryString = clientId ? `?clientId=${clientId}` : '';
-  const response = await apiClient(`/agreements${queryString}`);
+// Accepts either a bare clientId (existing callers — e.g. a client
+// profile's Agreement tab wanting its one client's full, unpaginated
+// list) or a params object ({ clientId, status, search, page, limit } —
+// the admin Agreements page's paginated/searchable view).
+export const fetchAgreements = async (paramsOrClientId) => {
+  const params =
+    paramsOrClientId && typeof paramsOrClientId === "object" ? paramsOrClientId : { clientId: paramsOrClientId };
+  const query = new URLSearchParams();
+  if (params.clientId) query.append("clientId", params.clientId);
+  if (params.status) query.append("status", params.status);
+  if (params.search) query.append("search", params.search);
+  if (params.page) query.append("page", params.page);
+  if (params.limit) query.append("limit", params.limit);
+  const queryString = query.toString();
+  const response = await apiClient(`/agreements${queryString ? `?${queryString}` : ""}`);
   return response;
 };
 

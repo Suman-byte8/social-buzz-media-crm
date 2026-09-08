@@ -1,4 +1,6 @@
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
+import { createCachedThunk } from "@/redux/cachedThunk";
+import { invalidateCache } from "@/utils/cache";
 import {
   fetchMeetingNotes as fetchMeetingNotesApi,
   createMeetingNote as createMeetingNoteApi,
@@ -6,22 +8,17 @@ import {
   deleteMeetingNote as deleteMeetingNoteApi,
 } from "@/services/meetingNoteService";
 
-export const fetchMeetingNotes = createAsyncThunk(
-  "meetingNotes/fetchAll",
-  async (clientId, { rejectWithValue }) => {
-    try {
-      return await fetchMeetingNotesApi(clientId);
-    } catch (error) {
-      return rejectWithValue(error.message || "Failed to fetch meeting notes");
-    }
-  }
-);
+export const fetchMeetingNotes = createCachedThunk("meetingNotes/fetchAll", fetchMeetingNotesApi, {
+  ttlMs: 5 * 60 * 1000,
+});
 
 export const createMeetingNote = createAsyncThunk(
   "meetingNotes/create",
   async (meetingData, { rejectWithValue }) => {
     try {
-      return await createMeetingNoteApi(meetingData);
+      const result = await createMeetingNoteApi(meetingData);
+      invalidateCache("meetingNotes/fetchAll");
+      return result;
     } catch (error) {
       return rejectWithValue(error.message || "Failed to create meeting note");
     }
@@ -32,7 +29,9 @@ export const updateMeetingNote = createAsyncThunk(
   "meetingNotes/update",
   async ({ id, updateData }, { rejectWithValue }) => {
     try {
-      return await updateMeetingNoteApi(id, updateData);
+      const result = await updateMeetingNoteApi(id, updateData);
+      invalidateCache("meetingNotes/fetchAll");
+      return result;
     } catch (error) {
       return rejectWithValue(error.message || "Failed to update meeting note");
     }
@@ -44,6 +43,7 @@ export const deleteMeetingNote = createAsyncThunk(
   async (id, { rejectWithValue }) => {
     try {
       await deleteMeetingNoteApi(id);
+      invalidateCache("meetingNotes/fetchAll");
       return id;
     } catch (error) {
       return rejectWithValue(error.message || "Failed to delete meeting note");

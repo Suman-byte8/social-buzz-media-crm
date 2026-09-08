@@ -3,6 +3,8 @@ import multer from 'multer';
 import { Op } from 'sequelize';
 import { encryptText, decryptText } from '../utils/encryption.js';
 import { uploadFileToDrive, getOrCreateClientFolder } from '../utils/googleDrive.js';
+import { cacheRoute } from '../middleware/cacheRoute.js';
+import { invalidateCache } from '../utils/serverCache.js';
 
 const router = express.Router();
 
@@ -146,6 +148,7 @@ router.post('/clients', async (req, res) => {
     }
 
     const client = await Client.create(clientData);
+    await invalidateCache('clients');
     res.status(201).json({ success: true, message: 'Client created successfully', data: redactForRole(formatArrayFields(client.toJSON()), req.user?.role) });
   } catch (error) {
     console.error('Error creating client:', error);
@@ -154,7 +157,7 @@ router.post('/clients', async (req, res) => {
 });
 
 // GET /api/clients - Get all clients with pagination, search, sort
-router.get('/clients', async (req, res) => {
+router.get('/clients', cacheRoute('clients', 60), async (req, res) => {
   try {
     const { Client } = req.app.locals.models;
     const {
@@ -315,6 +318,7 @@ router.post('/clients/:id/upload-logo', logoUpload.single('logo'), async (req, r
     const driveResult = await uploadFileToDrive(req.file.buffer, req.file.originalname, req.file.mimetype, clientFolder.folderId);
 
     await client.update({ logo: driveResult.proxyLink });
+    await invalidateCache('clients');
 
     res.json({ success: true, message: 'Logo uploaded successfully', data: redactForRole(formatArrayFields(client.toJSON()), req.user?.role) });
   } catch (error) {
@@ -335,6 +339,7 @@ router.put('/clients/:id', async (req, res) => {
     const updateData = prepareClientUpdateData(req.body);
     if (req.user?.role !== 'admin') delete updateData.invoices;
     await client.update(updateData);
+    await invalidateCache('clients');
 
     res.json({ success: true, message: 'Client updated successfully', data: redactForRole(formatArrayFields(client.toJSON()), req.user?.role) });
   } catch (error) {
@@ -376,6 +381,9 @@ router.delete('/clients/:id', async (req, res) => {
     }
 
     await client.destroy();
+    await invalidateCache('clients');
+    // The loop above may have edited team members' clientHandling lists.
+    if (membersWithHandling.length > 0) await invalidateCache('team');
     res.json({ success: true, message: 'Client deleted successfully' });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Error deleting client', error: error.message });

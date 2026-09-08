@@ -1,4 +1,6 @@
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
+import { createCachedThunk } from "@/redux/cachedThunk";
+import { invalidateCache } from "@/utils/cache";
 import {
   fetchDocumentsByClient as fetchDocumentsByClientApi,
   uploadDocument as uploadDocumentApi,
@@ -17,24 +19,23 @@ import {
   deleteAgreement as deleteAgreementApi,
 } from "@/services/documentService";
 
+// Files/documents change rarely relative to how often each client-profile
+// tab re-fetches them on mount — a generous TTL across the board here.
+const DOCS_TTL_MS = 8 * 60 * 1000;
+
 // ── Documents ────────────────────────────────────────────────────────────
 
-export const fetchDocumentsByClient = createAsyncThunk(
-  "documents/fetchByClient",
-  async (clientId, { rejectWithValue }) => {
-    try {
-      return await fetchDocumentsByClientApi(clientId);
-    } catch (error) {
-      return rejectWithValue(error.message || "Failed to fetch documents");
-    }
-  }
-);
+export const fetchDocumentsByClient = createCachedThunk("documents/fetchByClient", fetchDocumentsByClientApi, {
+  ttlMs: DOCS_TTL_MS,
+});
 
 export const uploadDocument = createAsyncThunk(
   "documents/upload",
   async ({ file, clientId, description }, { rejectWithValue }) => {
     try {
-      return await uploadDocumentApi(file, clientId, description);
+      const result = await uploadDocumentApi(file, clientId, description);
+      invalidateCache("documents/fetchByClient");
+      return result;
     } catch (error) {
       return rejectWithValue(error.message || "Failed to upload document");
     }
@@ -46,6 +47,7 @@ export const deleteDocument = createAsyncThunk(
   async (id, { rejectWithValue }) => {
     try {
       await deleteDocumentApi(id);
+      invalidateCache("documents/fetchByClient");
       return id;
     } catch (error) {
       return rejectWithValue(error.message || "Failed to delete document");
@@ -55,22 +57,17 @@ export const deleteDocument = createAsyncThunk(
 
 // ── Proposals ────────────────────────────────────────────────────────────
 
-export const fetchProposals = createAsyncThunk(
-  "documents/fetchProposals",
-  async (clientId, { rejectWithValue }) => {
-    try {
-      return await fetchProposalsApi(clientId);
-    } catch (error) {
-      return rejectWithValue(error.message || "Failed to fetch proposals");
-    }
-  }
-);
+export const fetchProposals = createCachedThunk("documents/fetchProposals", fetchProposalsApi, {
+  ttlMs: DOCS_TTL_MS,
+});
 
 export const uploadProposal = createAsyncThunk(
   "documents/uploadProposal",
   async (formData, { rejectWithValue }) => {
     try {
-      return await uploadProposalApi(formData);
+      const result = await uploadProposalApi(formData);
+      invalidateCache("documents/fetchProposals");
+      return result;
     } catch (error) {
       return rejectWithValue(error.message || "Failed to upload proposal");
     }
@@ -82,6 +79,7 @@ export const deleteProposal = createAsyncThunk(
   async (id, { rejectWithValue }) => {
     try {
       await deleteDocumentApi(id);
+      invalidateCache("documents/fetchProposals");
       return id;
     } catch (error) {
       return rejectWithValue(error.message || "Failed to delete proposal");
@@ -91,22 +89,16 @@ export const deleteProposal = createAsyncThunk(
 
 // ── Invoice Documents ────────────────────────────────────────────────────
 
-export const fetchInvoiceDocuments = createAsyncThunk(
-  "documents/fetchInvoiceDocuments",
-  async (clientId, { rejectWithValue }) => {
-    try {
-      return await fetchInvoiceDocumentsApi(clientId);
-    } catch (error) {
-      return rejectWithValue(error.message || "Failed to fetch invoices");
-    }
-  }
-);
+export const fetchInvoiceDocuments = createCachedThunk("documents/fetchInvoiceDocuments", fetchInvoiceDocumentsApi, {
+  ttlMs: DOCS_TTL_MS,
+});
 
 export const deleteInvoiceDocument = createAsyncThunk(
   "documents/deleteInvoiceDocument",
   async (id, { rejectWithValue }) => {
     try {
       await deleteDocumentApi(id);
+      invalidateCache("documents/fetchInvoiceDocuments");
       return id;
     } catch (error) {
       return rejectWithValue(error.message || "Failed to delete invoice");
@@ -116,22 +108,17 @@ export const deleteInvoiceDocument = createAsyncThunk(
 
 // ── Brand Kit ────────────────────────────────────────────────────────────
 
-export const fetchBrandKit = createAsyncThunk(
-  "documents/fetchBrandKit",
-  async (clientId, { rejectWithValue }) => {
-    try {
-      return await fetchBrandKitFilesApi(clientId);
-    } catch (error) {
-      return rejectWithValue(error.message || "Failed to fetch brand kit files");
-    }
-  }
-);
+export const fetchBrandKit = createCachedThunk("documents/fetchBrandKit", fetchBrandKitFilesApi, {
+  ttlMs: DOCS_TTL_MS,
+});
 
 export const uploadBrandKit = createAsyncThunk(
   "documents/uploadBrandKit",
   async (formData, { rejectWithValue }) => {
     try {
-      return await uploadBrandKitFileApi(formData);
+      const result = await uploadBrandKitFileApi(formData);
+      invalidateCache("documents/fetchBrandKit");
+      return result;
     } catch (error) {
       return rejectWithValue(error.message || "Failed to upload file");
     }
@@ -142,7 +129,9 @@ export const uploadBrandKitBulk = createAsyncThunk(
   "documents/uploadBrandKitBulk",
   async (formData, { rejectWithValue }) => {
     try {
-      return await uploadBrandKitFilesBulkApi(formData);
+      const result = await uploadBrandKitFilesBulkApi(formData);
+      invalidateCache("documents/fetchBrandKit");
+      return result;
     } catch (error) {
       return rejectWithValue(error.message || "Failed to upload files");
     }
@@ -154,6 +143,7 @@ export const deleteBrandKit = createAsyncThunk(
   async (id, { rejectWithValue }) => {
     try {
       await deleteDocumentApi(id);
+      invalidateCache("documents/fetchBrandKit");
       return id;
     } catch (error) {
       return rejectWithValue(error.message || "Failed to delete file");
@@ -166,16 +156,13 @@ export const deleteBrandKit = createAsyncThunk(
 // with a documentType so any future per-client file tab can reuse this
 // instead of adding another dedicated set of thunks/state.
 
-export const fetchClientFiles = createAsyncThunk(
+export const fetchClientFiles = createCachedThunk(
   "documents/fetchClientFiles",
-  async ({ clientId, documentType }, { rejectWithValue }) => {
-    try {
-      const response = await fetchClientFilesByTypeApi({ clientId, documentType });
-      return { documentType, ...response };
-    } catch (error) {
-      return rejectWithValue(error.message || "Failed to fetch files");
-    }
-  }
+  async ({ clientId, documentType }) => {
+    const response = await fetchClientFilesByTypeApi({ clientId, documentType });
+    return { documentType, ...response };
+  },
+  { ttlMs: DOCS_TTL_MS, getCacheKey: ({ clientId, documentType }) => `${documentType}:${clientId}` }
 );
 
 export const uploadClientFiles = createAsyncThunk(
@@ -183,6 +170,7 @@ export const uploadClientFiles = createAsyncThunk(
   async ({ formData, documentType }, { rejectWithValue }) => {
     try {
       const response = await uploadClientFilesBulkApi(formData);
+      invalidateCache(`documents/fetchClientFiles:${documentType}`);
       return { documentType, ...response };
     } catch (error) {
       return rejectWithValue(error.message || "Failed to upload files");
@@ -195,6 +183,7 @@ export const deleteClientFile = createAsyncThunk(
   async ({ id, documentType }, { rejectWithValue }) => {
     try {
       await deleteDocumentApi(id);
+      invalidateCache(`documents/fetchClientFiles:${documentType}`);
       return { id, documentType };
     } catch (error) {
       return rejectWithValue(error.message || "Failed to delete file");
@@ -204,22 +193,17 @@ export const deleteClientFile = createAsyncThunk(
 
 // ── Agreements ───────────────────────────────────────────────────────────
 
-export const fetchAgreements = createAsyncThunk(
-  "documents/fetchAgreements",
-  async (clientId, { rejectWithValue }) => {
-    try {
-      return await fetchAgreementsApi(clientId);
-    } catch (error) {
-      return rejectWithValue(error.message || "Failed to fetch agreements");
-    }
-  }
-);
+export const fetchAgreements = createCachedThunk("documents/fetchAgreements", fetchAgreementsApi, {
+  ttlMs: DOCS_TTL_MS,
+});
 
 export const uploadAgreement = createAsyncThunk(
   "documents/uploadAgreement",
   async (formData, { rejectWithValue }) => {
     try {
-      return await uploadAgreementApi(formData);
+      const result = await uploadAgreementApi(formData);
+      invalidateCache("documents/fetchAgreements");
+      return result;
     } catch (error) {
       return rejectWithValue(error.message || "Failed to upload agreement");
     }
@@ -230,7 +214,9 @@ export const updateAgreement = createAsyncThunk(
   "documents/updateAgreement",
   async ({ id, updateData }, { rejectWithValue }) => {
     try {
-      return await updateAgreementApi(id, updateData);
+      const result = await updateAgreementApi(id, updateData);
+      invalidateCache("documents/fetchAgreements");
+      return result;
     } catch (error) {
       return rejectWithValue(error.message || "Failed to update agreement");
     }
@@ -242,6 +228,7 @@ export const deleteAgreement = createAsyncThunk(
   async (id, { rejectWithValue }) => {
     try {
       await deleteAgreementApi(id);
+      invalidateCache("documents/fetchAgreements");
       return id;
     } catch (error) {
       return rejectWithValue(error.message || "Failed to delete agreement");
@@ -258,6 +245,13 @@ const initialState = {
   // "Client Files" thunks above.
   filesByType: {},
   agreements: [],
+  // Only populated when fetchAgreements is called with page/limit (the
+  // admin Agreements page) — callers that fetch a single client's full
+  // list (e.g. the client profile's Agreement tab) leave these at their
+  // defaults.
+  agreementsTotalPages: 1,
+  agreementsCurrentPage: 1,
+  agreementsTotalItems: 0,
   loading: false,
   loadingProposals: false,
   loadingInvoiceDocuments: false,
@@ -440,6 +434,9 @@ const documentsSlice = createSlice({
       .addCase(fetchAgreements.fulfilled, (state, action) => {
         state.loadingAgreements = false;
         state.agreements = action.payload.data || [];
+        state.agreementsTotalPages = action.payload.pagination?.totalPages || 1;
+        state.agreementsCurrentPage = action.payload.pagination?.page || 1;
+        state.agreementsTotalItems = action.payload.pagination?.total || action.payload.data?.length || 0;
       })
       .addCase(fetchAgreements.rejected, (state, action) => {
         state.loadingAgreements = false;
