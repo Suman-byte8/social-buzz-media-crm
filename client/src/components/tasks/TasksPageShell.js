@@ -6,6 +6,7 @@ import { fetchTasks, deleteTask, updateTask, setTaskStatusLocal } from "@/redux/
 import { fetchClients } from "@/redux/slices/clientsSlice";
 import { fetchTeamMembers } from "@/redux/slices/teamSlice";
 import AddTaskModal from "@/components/tasks/AddTaskModal";
+import TaskViewModal from "@/components/tasks/TaskViewModal";
 import TasksToolbar from "@/components/tasks/TasksToolbar";
 import TasksFilters from "@/components/tasks/TasksFilters";
 import TasksBoard from "@/components/tasks/TasksBoard";
@@ -28,6 +29,7 @@ export default function TasksPageShell() {
   const [monthFilter, setMonthFilter] = useState("");
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingTask, setEditingTask] = useState(null);
+  const [viewingTask, setViewingTask] = useState(null);
 
   // Seed filters from URL query params (e.g. deep-linked from a team member's profile).
   useEffect(() => {
@@ -75,12 +77,14 @@ export default function TasksPageShell() {
   }, [dispatch, currentFilters]);
 
   const handleDelete = async (task) => {
-    if (!confirm(`Delete task "${task.title}"?`)) return;
+    if (!confirm(`Delete task "${task.title}"?`)) return false;
     try {
       await dispatch(deleteTask(task.id)).unwrap();
+      return true;
     } catch (error) {
       console.error("Error deleting task:", error);
       alert("Failed to delete task.");
+      return false;
     }
   };
 
@@ -95,12 +99,22 @@ export default function TasksPageShell() {
     }
   };
 
-  const handleEdit = (task) => setEditingTask(task);
+  const handleEdit = (task) => {
+    setViewingTask(null);
+    setEditingTask(task);
+  };
+
+  const handleView = (task) => setViewingTask(task);
 
   const handleSuccess = () => {
     setShowAddModal(false);
     setEditingTask(null);
     dispatch(fetchTasks(currentFilters));
+  };
+
+  const handleDeleteFromView = async (task) => {
+    const deleted = await handleDelete(task);
+    if (deleted) setViewingTask(null);
   };
 
   const tasksByColumn = useMemo(() => {
@@ -150,7 +164,17 @@ export default function TasksPageShell() {
         onStatusChange={handleStatusChange}
         onEdit={handleEdit}
         onDelete={handleDelete}
+        onView={handleView}
       />
+
+      {viewingTask && (
+        <TaskViewModal
+          task={viewingTask}
+          onClose={() => setViewingTask(null)}
+          onEdit={handleEdit}
+          onDelete={handleDeleteFromView}
+        />
+      )}
 
       <AddTaskModal
         isOpen={showAddModal}

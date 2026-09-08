@@ -25,16 +25,22 @@ const formatDate = (dateStr) => {
   return { text: date.toLocaleDateString("en-US", { month: "short", day: "numeric" }), overdue: false };
 };
 
-export default function TaskCard({ task, onStatusChange, onEdit, onDelete }) {
+export default function TaskCard({ task, onStatusChange, onEdit, onDelete, onView }) {
   const taskAssignees = task.assigneeDetails || [];
   const due = formatDate(task.dueDate);
   const borderClass = PRIORITY_BORDER[task.priority] || PRIORITY_BORDER.medium;
 
   return (
-    <div className={`bg-white rounded-lg border border-l-4 ${borderClass} border-outline-variant p-3 shadow-sm hover:shadow-md transition-shadow group`}>
+    <div
+      onClick={() => onView?.(task)}
+      className={`bg-white rounded-lg border border-l-4 ${borderClass} border-outline-variant p-3 shadow-sm hover:shadow-md transition-shadow group cursor-pointer`}
+    >
       <div className="flex items-start justify-between gap-2 mb-2">
         <StatusBadge status={PRIORITY_LABEL[task.priority] || task.priority} color={PRIORITY_COLOR[task.priority] || "blue"} />
-        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+        <div
+          onClick={(e) => e.stopPropagation()}
+          className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity"
+        >
           {task.status !== "todo" && (
             <button
               onClick={() => onStatusChange(task, "todo")}

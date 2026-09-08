@@ -10,7 +10,7 @@ const COLUMNS = [
   { id: "completed", title: "Completed", icon: "task_alt" },
 ];
 
-export default function TasksBoard({ tasksByColumn, loading, hasAnyTasks, onStatusChange, onEdit, onDelete }) {
+export default function TasksBoard({ tasksByColumn, loading, hasAnyTasks, onStatusChange, onEdit, onDelete, onView }) {
   if (loading) {
     return (
       <div className="py-16 text-center text-on-surface-variant">
@@ -49,7 +49,7 @@ export default function TasksBoard({ tasksByColumn, loading, hasAnyTasks, onStat
                 <p className="text-xs text-gray-400 text-center py-6">No tasks here.</p>
               ) : (
                 columnTasks.map((task) => (
-                  <TaskCard key={task.id} task={task} onStatusChange={onStatusChange} onEdit={onEdit} onDelete={onDelete} />
+                  <TaskCard key={task.id} task={task} onStatusChange={onStatusChange} onEdit={onEdit} onDelete={onDelete} onView={onView} />
                 ))
               )}
             </div>
