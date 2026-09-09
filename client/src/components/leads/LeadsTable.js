@@ -3,6 +3,7 @@
 import React from "react";
 import LeadRowMenu from "./LeadRowMenu";
 import LeadRowEditor from "./LeadRowEditor";
+import LeadDocumentsPopover from "./LeadDocumentsPopover";
 
 const AVATAR_PALETTE = [
   { bg: "bg-indigo-50", border: "border-indigo-100", text: "text-indigo-700" },
@@ -173,6 +174,7 @@ export default function LeadsTable({
                       >
                         <span className="material-symbols-outlined" style={{ fontSize: 18 }}>event</span>
                       </button>
+                      <LeadDocumentsPopover lead={lead} />
                       <LeadRowMenu
                         onEdit={() => onEdit(lead)}
                         onConvert={() => onConvert(lead)}

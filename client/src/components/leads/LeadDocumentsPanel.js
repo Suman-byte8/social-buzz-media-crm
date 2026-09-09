@@ -16,7 +16,7 @@ const formatSize = (bytes) => {
 // (ClientFilesTab.js) but keyed by leadId and restricted to PDFs — proposals
 // and agreements shared with a lead before it converts to a client. Files
 // upload straight into a per-lead Drive subfolder (see documentRoutes.js).
-export default function LeadDocumentsPanel({ lead }) {
+export default function LeadDocumentsPanel({ lead, embedded = false }) {
   const dispatch = useDispatch();
   const leadId = lead?.id;
   const files = useSelector((state) => state.documents.filesByLeadId[leadId] || []);
@@ -104,10 +104,10 @@ export default function LeadDocumentsPanel({ lead }) {
   };
 
   return (
-    <div className="border-t border-gray-200 pt-4 mt-1">
-      <p className="block font-label-sm text-label-sm text-secondary mb-2">Documents (proposals, agreements)</p>
+    <div className={embedded ? "" : "border-t border-gray-200 pt-4 mt-1"}>
+      {!embedded && <p className="block font-label-sm text-label-sm text-secondary mb-2">Documents (proposals, agreements)</p>}
 
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+      <div className={`flex items-stretch gap-2 ${embedded ? "flex-col" : "flex-col sm:flex-row sm:items-center"}`}>
         <input
           ref={fileInputRef}
           type="file"
