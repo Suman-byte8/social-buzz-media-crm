@@ -13,8 +13,8 @@ export default function TasksFilters({
   onClientChange,
   assigneeFilter,
   onAssigneeChange,
-  monthFilter,
-  onMonthChange,
+  assignedDateFilter,
+  onAssignedDateChange,
   clients,
   teamMembers,
 }) {
@@ -95,17 +95,17 @@ export default function TasksFilters({
           calendar_month
         </span>
         <input
-          type="month"
-          value={monthFilter}
-          onChange={(e) => onMonthChange(e.target.value)}
-          title="Filter by due month"
+          type="date"
+          value={assignedDateFilter}
+          onChange={(e) => onAssignedDateChange(e.target.value)}
+          title="Filter by the date a task was assigned"
           className="bg-gray-50 border border-outline-variant text-on-surface rounded-lg pl-9 pr-8 py-2 text-sm focus:ring-1 focus:ring-primary focus:border-primary outline-none"
         />
-        {monthFilter && (
+        {assignedDateFilter && (
           <button
             type="button"
-            onClick={() => onMonthChange("")}
-            title="Clear month filter"
+            onClick={() => onAssignedDateChange("")}
+            title="Clear date filter"
             className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 cursor-pointer"
           >
             <span className="material-symbols-outlined text-[16px]">close</span>

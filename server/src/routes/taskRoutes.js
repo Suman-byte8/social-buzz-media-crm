@@ -137,7 +137,7 @@ router.get("/tasks", cacheRoute("tasks", 30), async (req, res) => {
       priority,
       clientId,
       assigneeId,
-      month,
+      assignedDate,
     } = req.query;
 
     const offset = (page - 1) * limit;
@@ -172,11 +172,15 @@ router.get("/tasks", cacheRoute("tasks", 30), async (req, res) => {
       where.id = { [Op.in]: matchingTaskIds.length > 0 ? matchingTaskIds : [-1] };
     }
 
-    if (month && /^\d{4}-\d{2}$/.test(month)) {
-      const [year, monthNum] = month.split("-").map(Number);
-      const rangeStart = new Date(Date.UTC(year, monthNum - 1, 1));
-      const rangeEnd = new Date(Date.UTC(year, monthNum, 1));
-      where.dueDate = { [Op.gte]: rangeStart, [Op.lt]: rangeEnd };
+    // Filters by when the task was assigned (createdAt) rather than its due
+    // date — tasks aren't given a separate "assigned at" timestamp; they're
+    // created together with their assignees in one shot (see POST /tasks
+    // below), so createdAt already is the assigned date.
+    if (assignedDate && /^\d{4}-\d{2}-\d{2}$/.test(assignedDate)) {
+      const [year, monthNum, day] = assignedDate.split("-").map(Number);
+      const rangeStart = new Date(Date.UTC(year, monthNum - 1, day));
+      const rangeEnd = new Date(Date.UTC(year, monthNum - 1, day + 1));
+      where.createdAt = { [Op.gte]: rangeStart, [Op.lt]: rangeEnd };
     }
 
     const { count, rows } = await Task.findAndCountAll({
