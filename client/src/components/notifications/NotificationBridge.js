@@ -49,13 +49,23 @@ export default function NotificationBridge() {
       console.log("[notifications] received:", title, message);
       if (!title) return;
 
-      if (typeof window !== "undefined" && "Notification" in window && Notification.permission === "granted") {
-        const n = new Notification(title, { body: message });
-        n.onclick = () => {
-          window.focus();
-          if (taskId) router.push("/tasks");
-        };
+      if (typeof window === "undefined" || !("Notification" in window)) return;
+
+      console.log("[notifications] Notification.permission at receive time:", Notification.permission);
+      if (Notification.permission !== "granted") {
+        console.warn(
+          "[notifications] Not shown — permission is",
+          Notification.permission,
+          "- open the site-info icon in the address bar (left of the URL) and set Notifications to Allow."
+        );
+        return;
       }
+
+      const n = new Notification(title, { body: message });
+      n.onclick = () => {
+        window.focus();
+        if (taskId) router.push("/tasks");
+      };
     };
 
     socket.on("connect", handleConnect);
