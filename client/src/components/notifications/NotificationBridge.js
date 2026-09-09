@@ -69,8 +69,14 @@ export default function NotificationBridge() {
   }, [isAuthenticated, router]);
 
   const handleEnable = async () => {
-    const result = await Notification.requestPermission();
-    setPermission(result);
+    console.log("[notifications] Enable clicked, current permission:", Notification.permission);
+    try {
+      const result = await Notification.requestPermission();
+      console.log("[notifications] requestPermission resolved:", result);
+      setPermission(result);
+    } catch (err) {
+      console.error("[notifications] requestPermission threw:", err);
+    }
     setDismissed(true);
     sessionStorage.setItem(DISMISS_KEY, "1");
   };
@@ -89,14 +95,16 @@ export default function NotificationBridge() {
       </p>
       <div className="flex items-center justify-end gap-2">
         <button
+          type="button"
           onClick={handleDismiss}
-          className="px-3 py-1.5 text-label-sm font-label-sm text-on-surface-variant hover:bg-gray-100 rounded"
+          className="px-3 py-1.5 text-label-sm font-label-sm text-on-surface-variant hover:bg-gray-100 rounded cursor-pointer"
         >
           Not now
         </button>
         <button
+          type="button"
           onClick={handleEnable}
-          className="px-3 py-1.5 text-label-sm font-label-sm bg-primary text-white rounded hover:bg-primary/90"
+          className="px-3 py-1.5 text-label-sm font-label-sm bg-primary text-white rounded hover:bg-primary/90 cursor-pointer"
         >
           Enable
         </button>
