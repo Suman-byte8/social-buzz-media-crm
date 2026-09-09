@@ -24,13 +24,15 @@ const STATUS_SELECT_CLASS = {
   completed: "bg-emerald-50 text-emerald-700 border-emerald-100",
 };
 
-const formatDueDate = (dateStr) => {
+const formatDueDate = (dateStr, status) => {
   if (!dateStr) return { text: "—", overdue: false };
   const date = new Date(dateStr);
   const now = new Date();
   const diffDays = Math.ceil((date - now) / (1000 * 60 * 60 * 24));
 
-  if (diffDays < 0) return { text: `${Math.abs(diffDays)}d overdue`, overdue: true };
+  // A completed task is never "overdue" — it's done, regardless of when
+  // its due date was relative to today.
+  if (diffDays < 0 && status !== "completed") return { text: `${Math.abs(diffDays)}d overdue`, overdue: true };
   if (diffDays === 0) return { text: "Today", overdue: false };
   if (diffDays === 1) return { text: "Tomorrow", overdue: false };
   return { text: date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }), overdue: false };
@@ -85,7 +87,7 @@ export default function TasksTable({ tasks, loading, hasAnyTasks, sortBy, sortOr
           ) : (
             tasks.map((task) => {
               const assignees = task.assigneeDetails || [];
-              const due = formatDueDate(task.dueDate);
+              const due = formatDueDate(task.dueDate, task.status);
               return (
                 <tr
                   key={task.id}
