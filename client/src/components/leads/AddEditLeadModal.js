@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { useDispatch } from "react-redux";
 import { updateLead } from "@/redux/slices/leadsSlice";
+import LeadDocumentsPanel from "@/components/leads/LeadDocumentsPanel";
 
 const SOURCE_OPTIONS = ["LinkedIn", "Website Organic", "Referral", "Cold Outreach", "Other"];
 const STATUS_OPTIONS = [
@@ -202,6 +203,8 @@ function LeadForm({ lead, onClose, onSuccess }) {
           placeholder="Additional context about this lead"
         />
       </div>
+
+      <LeadDocumentsPanel lead={lead} />
 
       <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
         <button type="button" onClick={onClose} disabled={loading} className="px-4 py-2 rounded-lg border border-outline-variant text-secondary font-label-md text-label-md hover:bg-gray-50 transition-colors disabled:opacity-50">

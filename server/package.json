@@ -16,6 +16,7 @@
     "migrate:client-columns": "node scripts/add-client-columns.js",
     "migrate:document-type-values": "node scripts/add-document-type-values.js",
     "migrate:misc-task-notes": "node scripts/add-misc-task-notes-column.js",
+    "migrate:lead-documents": "node scripts/add-lead-documents-column.js",
     "seed:users": "node scripts/seed-users.js"
   },
   "dependencies": {

@@ -13,6 +13,8 @@ import {
   uploadBrandKitFilesBulk as uploadBrandKitFilesBulkApi,
   fetchClientFilesByType as fetchClientFilesByTypeApi,
   uploadClientFilesBulk as uploadClientFilesBulkApi,
+  fetchLeadDocuments as fetchLeadDocumentsApi,
+  uploadLeadDocumentsBulk as uploadLeadDocumentsBulkApi,
   fetchAgreements as fetchAgreementsApi,
   uploadAgreement as uploadAgreementApi,
   updateAgreement as updateAgreementApi,
@@ -191,6 +193,49 @@ export const deleteClientFile = createAsyncThunk(
   }
 );
 
+// ── Lead Documents (proposals/agreements shared before conversion) ─────────
+// Keyed by leadId (not documentType, unlike Client Files above) — every
+// lead shares the single "lead" documentType, so keying by type alone would
+// bleed one lead's files into another's list. Not cached (createCachedThunk)
+// since a lead's file list is small and freshness after upload/delete
+// matters more than shaving a round-trip.
+
+export const fetchLeadDocuments = createAsyncThunk(
+  "documents/fetchLeadDocuments",
+  async (leadId, { rejectWithValue }) => {
+    try {
+      const response = await fetchLeadDocumentsApi(leadId);
+      return { leadId, ...response };
+    } catch (error) {
+      return rejectWithValue(error.message || "Failed to fetch documents");
+    }
+  }
+);
+
+export const uploadLeadDocuments = createAsyncThunk(
+  "documents/uploadLeadDocuments",
+  async ({ formData, leadId }, { rejectWithValue }) => {
+    try {
+      const response = await uploadLeadDocumentsBulkApi(formData);
+      return { leadId, ...response };
+    } catch (error) {
+      return rejectWithValue(error.message || "Failed to upload files");
+    }
+  }
+);
+
+export const deleteLeadDocument = createAsyncThunk(
+  "documents/deleteLeadDocument",
+  async ({ id, leadId }, { rejectWithValue }) => {
+    try {
+      await deleteDocumentApi(id);
+      return { id, leadId };
+    } catch (error) {
+      return rejectWithValue(error.message || "Failed to delete file");
+    }
+  }
+);
+
 // ── Agreements ───────────────────────────────────────────────────────────
 
 export const fetchAgreements = createCachedThunk("documents/fetchAgreements", fetchAgreementsApi, {
@@ -244,6 +289,9 @@ const initialState = {
   // Keyed by documentType (e.g. "creative", "strategy") — see the
   // "Client Files" thunks above.
   filesByType: {},
+  // Keyed by leadId — see the Lead Documents thunks above.
+  filesByLeadId: {},
+  loadingByLeadId: {},
   agreements: [],
   // Only populated when fetchAgreements is called with page/limit (the
   // admin Agreements page) — callers that fetch a single client's full
@@ -425,6 +473,40 @@ const documentsSlice = createSlice({
         state.successMessage = "File deleted successfully";
       })
       .addCase(deleteClientFile.rejected, (state, action) => {
+        state.error = action.payload || "Failed to delete file";
+      })
+      .addCase(fetchLeadDocuments.pending, (state, action) => {
+        state.loadingByLeadId[action.meta.arg] = true;
+        state.error = null;
+      })
+      .addCase(fetchLeadDocuments.fulfilled, (state, action) => {
+        const { leadId, data } = action.payload;
+        state.loadingByLeadId[leadId] = false;
+        state.filesByLeadId[leadId] = data || [];
+      })
+      .addCase(fetchLeadDocuments.rejected, (state, action) => {
+        state.loadingByLeadId[action.meta.arg] = false;
+        state.error = action.payload || "Failed to fetch documents";
+      })
+      .addCase(uploadLeadDocuments.fulfilled, (state, action) => {
+        const { leadId, data = [], message } = action.payload;
+        if (!state.filesByLeadId[leadId]) state.filesByLeadId[leadId] = [];
+        const existingIds = new Set(state.filesByLeadId[leadId].map((f) => f.id));
+        const newDocs = data.filter((d) => !existingIds.has(d.id));
+        state.filesByLeadId[leadId].push(...newDocs);
+        state.successMessage = message || "Files uploaded successfully";
+      })
+      .addCase(uploadLeadDocuments.rejected, (state, action) => {
+        state.error = action.payload || "Failed to upload files";
+      })
+      .addCase(deleteLeadDocument.fulfilled, (state, action) => {
+        const { id, leadId } = action.payload;
+        if (state.filesByLeadId[leadId]) {
+          state.filesByLeadId[leadId] = state.filesByLeadId[leadId].filter((f) => f.id !== id);
+        }
+        state.successMessage = "File deleted successfully";
+      })
+      .addCase(deleteLeadDocument.rejected, (state, action) => {
         state.error = action.payload || "Failed to delete file";
       })
       .addCase(fetchAgreements.pending, (state) => {

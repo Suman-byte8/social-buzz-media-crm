@@ -60,6 +60,9 @@ export const initModels = (sequelize) => {
   Task.hasMany(Notification, { foreignKey: "taskId", as: "notifications", constraints: false });
   Notification.belongsTo(Task, { foreignKey: "taskId", as: "task", constraints: false });
 
+  Lead.hasMany(Document, { foreignKey: "leadId", as: "documents", constraints: false });
+  Document.belongsTo(Lead, { foreignKey: "leadId", as: "lead", constraints: false });
+
   return {
     Client,
     TeamMember,

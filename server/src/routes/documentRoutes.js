@@ -1,7 +1,7 @@
 import express from "express";
 import multer from "multer";
 import { Op } from "sequelize";
-import { uploadFileToDrive, getFileBufferFromDrive, getOrCreateClientFolder, getOrCreateClientSubfolder, trashFileInDrive } from "../utils/googleDrive.js";
+import { uploadFileToDrive, getFileBufferFromDrive, getOrCreateClientFolder, getOrCreateClientSubfolder, getOrCreateLeadsFolder, trashFileInDrive } from "../utils/googleDrive.js";
 import { getCachedFile, setCachedFile } from "../utils/fileCache.js";
 import { sendMail } from "../utils/mailer.js";
 import { cacheRoute } from "../middleware/cacheRoute.js";
@@ -43,6 +43,22 @@ const requireAdminForAgreements = (req, res, next) => {
   }
   next();
 };
+
+// Lead documents (proposals/agreements shared before a lead becomes a
+// client) — PDF-only, like Agreements, but multiple files per upload like
+// the media-capable routes below. Kept smaller than the media size cap
+// since these are always documents, never images/video.
+const leadUpload = multer({
+  storage: storage,
+  limits: { fileSize: 5 * 1024 * 1024, files: 10 }, // 5MB per PDF, up to 10 files per request
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype === "application/pdf" || file.originalname?.toLowerCase().endsWith(".pdf")) {
+      cb(null, true);
+    } else {
+      cb(new Error("Only PDF files are allowed!"), false);
+    }
+  },
+});
 
 // Maps a documentType to the Drive subfolder its files land in, for the
 // media-capable upload routes (brand kit, creatives, strategy).
@@ -368,16 +384,92 @@ router.post("/documents/upload-media-bulk", mediaUpload.array("files", 20), asyn
   }
 });
 
+// Bulk PDF upload for a lead — proposals/agreements shared with a company
+// before they convert to a client. Same one-at-a-time-with-per-file-failure
+// approach as upload-media-bulk above, into a per-lead Drive subfolder
+// under a shared "Leads" folder rather than a client folder.
+router.post("/documents/upload-lead-bulk", leadUpload.array("files", 10), async (req, res) => {
+  try {
+    const { leadId, description } = req.body;
+
+    if (!req.files || req.files.length === 0) {
+      return res.status(400).json({ success: false, message: "No PDF files provided" });
+    }
+    if (!leadId) {
+      return res.status(400).json({ success: false, message: "leadId is required" });
+    }
+
+    const { Document, Lead } = req.app.locals.models;
+
+    const leadRecord = await Lead.findByPk(parseInt(leadId));
+    if (!leadRecord) {
+      return res.status(404).json({ success: false, message: "Lead not found" });
+    }
+
+    const leadsFolder = await getOrCreateLeadsFolder();
+    const leadFolder = await getOrCreateClientSubfolder(leadsFolder.folderId, `${leadRecord.companyName} - Documents`);
+
+    const uploaded = [];
+    const failed = [];
+
+    for (const file of req.files) {
+      try {
+        const driveResult = await uploadFileToDrive(file.buffer, file.originalname, file.mimetype, leadFolder.folderId);
+
+        const document = await Document.create({
+          fileName: file.originalname,
+          fileType: file.mimetype,
+          fileSize: file.size,
+          fileId: driveResult.fileId,
+          driveLink: driveResult.googleUserContentLink,
+          webViewLink: driveResult.webViewLink,
+          googleUserContentLink: driveResult.googleUserContentLink,
+          folderId: leadFolder.folderId,
+          leadId: parseInt(leadId),
+          description: description || null,
+          documentType: "lead",
+        });
+
+        uploaded.push(document);
+      } catch (fileError) {
+        console.error(`Error uploading file "${file.originalname}":`, fileError);
+        failed.push({ fileName: file.originalname, error: fileError.message });
+      }
+    }
+
+    if (uploaded.length > 0) await invalidateCache("documents");
+    res.status(201).json({
+      success: true,
+      message:
+        failed.length > 0
+          ? `${uploaded.length} file(s) uploaded, ${failed.length} failed`
+          : "Files uploaded successfully",
+      data: uploaded,
+      failed,
+    });
+  } catch (error) {
+    console.error("Error bulk uploading lead documents:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message || "Failed to upload files",
+      error: error.message,
+    });
+  }
+});
+
 // `page`/`limit` are optional — omitting them preserves the historical
 // "return everything" behavior existing callers rely on.
 router.get("/documents", cacheRoute("documents", 120), async (req, res) => {
   try {
     const { Document } = req.app.locals.models;
-    const { clientId, documentType, page, limit } = req.query;
+    const { clientId, leadId, documentType, page, limit } = req.query;
 
     const where = {};
     if (clientId) {
       where.clientId = parseInt(clientId);
+    }
+    if (leadId) {
+      where.leadId = parseInt(leadId);
     }
     if (documentType) {
       where.documentType = documentType;

@@ -268,6 +268,25 @@ export const getOrCreateTeamMembersFolder = async () => {
   return folder;
 };
 
+// A single shared "Leads" folder (not per-client — leads aren't clients
+// yet), one subfolder per lead, same nesting pattern as
+// getOrCreateTeamMembersFolder/getOrCreateClientSubfolder above. Holds
+// proposals/agreements shared with a lead before they convert.
+export const getOrCreateLeadsFolder = async () => {
+  const folderName = "Leads";
+  const key = folderCacheKey(folderName, null);
+  if (folderCache.has(key)) return folderCache.get(key);
+
+  let folder = await findFolderInDrive(folderName);
+
+  if (!folder) {
+    folder = await createFolderInDrive(folderName);
+  }
+
+  folderCache.set(key, folder);
+  return folder;
+};
+
 export const getOrCreateClientSubfolder = async (parentFolderId, subfolderName) => {
   const key = folderCacheKey(subfolderName, parentFolderId);
   if (folderCache.has(key)) return folderCache.get(key);

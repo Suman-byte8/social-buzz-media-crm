@@ -14,11 +14,15 @@ const documentModel = (sequelize) => {
       googleUserContentLink: { type: DataTypes.STRING, allowNull: true },
       folderId: { type: DataTypes.STRING, allowNull: true },
       clientId: { type: DataTypes.INTEGER, allowNull: true },
+      // Soft reference (no FK constraint, see models/index.js) — a lead can
+      // be deleted (e.g. converted to a client) without losing the
+      // proposals/agreements that were shared with it.
+      leadId: { type: DataTypes.INTEGER, allowNull: true },
       uploadedBy: { type: DataTypes.STRING, allowNull: true },
       description: { type: DataTypes.TEXT, allowNull: true },
       // Agreement-specific fields
       documentType: {
-        type: DataTypes.ENUM("agreement", "proposal", "invoice", "report", "content_calendar", "brand_kit", "creative", "strategy", "other"),
+        type: DataTypes.ENUM("agreement", "proposal", "invoice", "report", "content_calendar", "brand_kit", "creative", "strategy", "lead", "other"),
         allowNull: true,
         defaultValue: "other",
       },
@@ -44,6 +48,7 @@ const documentModel = (sequelize) => {
       tableName: "documents",
       indexes: [
         { fields: ["clientId"] },
+        { fields: ["leadId"] },
         { fields: ["documentType"] },
         { fields: ["status"] },
       ],

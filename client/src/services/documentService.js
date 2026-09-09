@@ -115,6 +115,22 @@ export const uploadClientFilesBulk = async (formData) => {
   return response;
 };
 
+// ── Lead Documents (proposals/agreements shared before conversion) ─────────
+
+export const fetchLeadDocuments = async (leadId) => {
+  const params = new URLSearchParams({ leadId, documentType: "lead" });
+  const response = await apiClient(`/documents?${params.toString()}`);
+  return response;
+};
+
+export const uploadLeadDocumentsBulk = async (formData) => {
+  const response = await apiClient("/documents/upload-lead-bulk", {
+    method: "POST",
+    body: formData,
+  });
+  return response;
+};
+
 // ── Agreements ───────────────────────────────────────────────────────────
 
 // Accepts either a bare clientId (existing callers — e.g. a client
