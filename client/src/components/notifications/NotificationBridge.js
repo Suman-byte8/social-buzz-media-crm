@@ -1,48 +1,136 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import { useDispatch } from "react-redux";
 import { useRouter } from "next/navigation";
 import { getSocket } from "@/lib/socket";
 import { useAuth } from "@/app/login/context/AuthContext";
+import { receiveLiveNotification, fetchUnreadCount } from "@/redux/slices/notificationsSlice";
 
-// Renders nothing — mounted once in AppLayout so it's alive on every
-// authenticated page. Connects the live-update socket and, whenever a task
-// gets assigned (see server/src/routes/taskRoutes.js), shows a native
-// browser notification — which (unlike an in-page toast) still appears
-// even if this tab is unfocused, in the background, or the CRM is open in
-// a different browser/PC under the same shared login. It does NOT persist
-// notifications or work while the browser itself is fully closed — see
-// the "hold this" conversation this was scoped from.
+const DISMISS_KEY = "crm_notif_prompt_dismissed";
+
+// Mounted once in AppLayout so it's alive on every authenticated page.
+// Connects the live-update socket and, whenever a task gets assigned (see
+// server/src/routes/taskRoutes.js), shows a native browser notification —
+// which (unlike an in-page toast) still appears even if this tab is
+// unfocused, in the background, or the CRM is open in a different
+// browser/PC under the same shared login. Does NOT persist notifications
+// or work while the browser itself is fully closed (out of scope).
+//
+// Browsers require Notification.requestPermission() to be called from a
+// real user gesture (a click) — calling it automatically on load is
+// silently ignored by Chrome and others, leaving permission stuck at
+// "default" forever with no prompt ever shown. So instead of requesting on
+// mount, this renders a small dismissible prompt whose button click is
+// the actual gesture.
 export default function NotificationBridge() {
   const { isAuthenticated } = useAuth();
   const router = useRouter();
+  const dispatch = useDispatch();
+  const [permission, setPermission] = useState("default");
+  const [dismissed, setDismissed] = useState(true);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !("Notification" in window)) return;
+    setPermission(Notification.permission);
+    setDismissed(sessionStorage.getItem(DISMISS_KEY) === "1");
+  }, []);
 
   useEffect(() => {
     if (!isAuthenticated) return;
-    if (typeof window === "undefined" || !("Notification" in window)) return;
-
-    if (Notification.permission === "default") {
-      Notification.requestPermission();
-    }
+    dispatch(fetchUnreadCount());
 
     const socket = getSocket();
-    if (!socket) return;
+    if (!socket) {
+      console.warn("[notifications] No socket — not authenticated yet?");
+      return;
+    }
 
-    const handleNotification = ({ title, message, taskId } = {}) => {
+    const handleConnect = () => console.log("[notifications] socket connected:", socket.id);
+    const handleConnectError = (err) => console.error("[notifications] socket connect_error:", err.message);
+
+    const handleNotification = (payload = {}) => {
+      const { title, message, taskId } = payload;
+      console.log("[notifications] received:", title, message);
       if (!title) return;
 
-      if (Notification.permission === "granted") {
-        const n = new Notification(title, { body: message });
-        n.onclick = () => {
-          window.focus();
-          if (taskId) router.push("/tasks");
-        };
+      dispatch(receiveLiveNotification(payload));
+
+      if (typeof window === "undefined" || !("Notification" in window)) return;
+
+      console.log("[notifications] Notification.permission at receive time:", Notification.permission);
+      if (Notification.permission !== "granted") {
+        console.warn(
+          "[notifications] Not shown — permission is",
+          Notification.permission,
+          "- open the site-info icon in the address bar (left of the URL) and set Notifications to Allow."
+        );
+        return;
       }
+
+      const n = new Notification(title, { body: message });
+      n.onclick = () => {
+        window.focus();
+        if (taskId) router.push("/tasks");
+      };
     };
 
+    socket.on("connect", handleConnect);
+    socket.on("connect_error", handleConnectError);
     socket.on("notification", handleNotification);
-    return () => socket.off("notification", handleNotification);
-  }, [isAuthenticated, router]);
+    return () => {
+      socket.off("connect", handleConnect);
+      socket.off("connect_error", handleConnectError);
+      socket.off("notification", handleNotification);
+    };
+  }, [isAuthenticated, router, dispatch]);
 
-  return null;
+  const handleEnable = () => {
+    console.log("[notifications] Enable clicked, current permission:", Notification.permission);
+    // Dismiss immediately rather than waiting on the promise below — the
+    // browser's own permission dialog (which the requestPermission() call
+    // triggers) is what the user actually interacts with next, and it can
+    // render as a small icon in the address bar rather than an obvious
+    // popup, so keeping our own card up "waiting" just looks broken.
+    setDismissed(true);
+    sessionStorage.setItem(DISMISS_KEY, "1");
+
+    Notification.requestPermission()
+      .then((result) => {
+        console.log("[notifications] requestPermission resolved:", result);
+        setPermission(result);
+      })
+      .catch((err) => console.error("[notifications] requestPermission threw:", err));
+  };
+
+  const handleDismiss = () => {
+    setDismissed(true);
+    sessionStorage.setItem(DISMISS_KEY, "1");
+  };
+
+  if (!isAuthenticated || permission !== "default" || dismissed) return null;
+
+  return (
+    <div className="fixed bottom-4 right-4 z-50 bg-white border border-outline-variant rounded-lg shadow-lg p-4 max-w-xs flex flex-col gap-2">
+      <p className="text-body-sm font-body-sm text-on-surface">
+        Enable notifications to get a live alert when a task is assigned, even while this tab is in the background.
+      </p>
+      <div className="flex items-center justify-end gap-2">
+        <button
+          type="button"
+          onClick={handleDismiss}
+          className="px-3 py-1.5 text-label-sm font-label-sm text-on-surface-variant hover:bg-gray-100 rounded cursor-pointer"
+        >
+          Not now
+        </button>
+        <button
+          type="button"
+          onClick={handleEnable}
+          className="px-3 py-1.5 text-label-sm font-label-sm bg-primary text-white rounded hover:bg-primary/90 cursor-pointer"
+        >
+          Enable
+        </button>
+      </div>
+    </div>
+  );
 }

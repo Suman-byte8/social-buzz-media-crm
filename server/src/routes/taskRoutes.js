@@ -26,6 +26,16 @@ const syncTeamMemberWorks = async (TeamMember, teamMemberId, taskTitle) => {
   });
 };
 
+// Persists the notification (so it survives reload / shows up on the
+// Notifications page) and pushes it live over the socket in the same
+// shape the list endpoint returns (id + the task's current status/title/
+// dueDate), so a live-received item renders with the right status color
+// immediately instead of looking unstyled until the next re-fetch.
+const createAndNotify = async (Notification, { type, title, message, taskId, task }) => {
+  const notification = await Notification.create({ type, title, message, taskId });
+  notify({ ...notification.toJSON(), task: task || null });
+};
+
 const removeTaskFromTeamMember = async (TeamMember, teamMemberId, taskTitle) => {
   const member = await TeamMember.findByPk(teamMemberId);
   if (!member) return;
@@ -50,7 +60,7 @@ const removeTaskFromTeamMember = async (TeamMember, teamMemberId, taskTitle) => 
 
 router.post("/tasks", async (req, res) => {
   try {
-    const { Task, TeamMember, TaskAssignee } = req.app.locals.models;
+    const { Task, TeamMember, TaskAssignee, Notification } = req.app.locals.models;
     const {
       title,
       description,
@@ -91,11 +101,12 @@ router.post("/tasks", async (req, res) => {
       for (const assigneeId of validIds) {
         await syncTeamMemberWorks(TeamMember, assigneeId, title);
       }
-      notify({
+      await createAndNotify(Notification, {
         type: "task_assigned",
         title: "New task assigned",
         message: `"${title}" was assigned to ${validAssignees.map((a) => a.name).join(", ")}`,
         taskId: task.id,
+        task: { id: task.id, title: task.title, status: task.status, dueDate: task.dueDate },
       });
     }
 
@@ -270,7 +281,7 @@ router.get("/tasks/:id", async (req, res) => {
 
 router.put("/tasks/:id", async (req, res) => {
   try {
-    const { Task, TeamMember, TaskAssignee } = req.app.locals.models;
+    const { Task, TeamMember, TaskAssignee, Notification } = req.app.locals.models;
     const task = await Task.findByPk(req.params.id);
 
     if (!task) {
@@ -338,11 +349,12 @@ router.put("/tasks/:id", async (req, res) => {
         where: { id: { [Op.in]: addedAssigneeIds } },
         attributes: ["name"],
       });
-      notify({
+      await createAndNotify(Notification, {
         type: "task_assigned",
         title: "Task assigned",
         message: `"${task.title}" was assigned to ${addedMembers.map((a) => a.name).join(", ")}`,
         taskId: task.id,
+        task: { id: task.id, title: task.title, status: task.status, dueDate: task.dueDate },
       });
     }
 

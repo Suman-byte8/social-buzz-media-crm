@@ -132,6 +132,7 @@ import meetingNoteRoutes from "./src/routes/meetingNoteRoutes.js";
 import contentCalendarRoutes from "./src/routes/contentCalendarRoutes.js";
 import miscTaskRoutes from "./src/routes/miscTaskRoutes.js";
 import leadRoutes from "./src/routes/leadRoutes.js";
+import notificationRoutes from "./src/routes/notificationRoutes.js";
 import authRoutes from "./src/routes/authRoutes.js";
 import { startKeepAlivePing } from "./src/utils/keepAlive.js";
 import { authenticate } from "./src/middleware/auth.js";
@@ -164,6 +165,7 @@ app.use("/api", meetingNoteRoutes);
 app.use("/api", contentCalendarRoutes);
 app.use("/api", miscTaskRoutes);
 app.use("/api", leadRoutes);
+app.use("/api", notificationRoutes);
 
 app.get("/", (req, res) => {
   res.json({

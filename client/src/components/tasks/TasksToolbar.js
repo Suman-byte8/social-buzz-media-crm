@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import NotificationBell from "@/components/notifications/NotificationBell";
 
 const STAT_CHIPS = [
   { key: "totalTasks", label: "Total" },
@@ -27,6 +28,8 @@ export default function TasksToolbar({ stats, onNewTask }) {
             </div>
           ))}
         </div>
+
+        <NotificationBell />
 
         <button
           onClick={onNewTask}
