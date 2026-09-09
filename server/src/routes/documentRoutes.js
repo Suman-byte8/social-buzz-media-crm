@@ -50,6 +50,7 @@ const MEDIA_SUBFOLDER_BY_TYPE = {
   brand_kit: "Brand Kit",
   creative: "Creatives",
   strategy: "Strategy",
+  report: "Reports",
 };
 const mediaSubfolderName = (documentType) => MEDIA_SUBFOLDER_BY_TYPE[documentType] || "Other";
 

@@ -11,7 +11,6 @@ import ClientFilesTab from "@/components/clients/ClientFilesTab";
 import AdsTab from "@/components/clients/AdsTab";
 import MetaAdsTab from "@/components/clients/MetaAdsTab";
 import SocialMedia from "@/components/clients/SocialMedia";
-import Reports from "@/components/clients/Reports";
 import Invoices from "@/components/clients/Invoices";
 import Notes from "@/components/clients/Notes";
 import Renewal from "@/components/clients/Renewal";
@@ -223,7 +222,14 @@ export default function ClientDetailContent({ activeTab, setActiveTab, client = 
       ) : activeTab === "social" ? (
         <SocialMedia client={client} />
       ) : activeTab === "reports" ? (
-        <Reports client={client} />
+        <ClientFilesTab
+          client={client}
+          clientId={clientId}
+          documentType="report"
+          title="Reports"
+          icon="bar_chart"
+          uploadHint="Performance reports — PDFs, spreadsheets, decks, and more"
+        />
       ) : activeTab === "invoices" && isAdmin ? (
         <Invoices client={client} clientId={clientId} />
       ) : activeTab === "agreement" && isAdmin ? (
