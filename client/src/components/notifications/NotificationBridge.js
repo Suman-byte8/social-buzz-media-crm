@@ -68,17 +68,22 @@ export default function NotificationBridge() {
     };
   }, [isAuthenticated, router]);
 
-  const handleEnable = async () => {
+  const handleEnable = () => {
     console.log("[notifications] Enable clicked, current permission:", Notification.permission);
-    try {
-      const result = await Notification.requestPermission();
-      console.log("[notifications] requestPermission resolved:", result);
-      setPermission(result);
-    } catch (err) {
-      console.error("[notifications] requestPermission threw:", err);
-    }
+    // Dismiss immediately rather than waiting on the promise below — the
+    // browser's own permission dialog (which the requestPermission() call
+    // triggers) is what the user actually interacts with next, and it can
+    // render as a small icon in the address bar rather than an obvious
+    // popup, so keeping our own card up "waiting" just looks broken.
     setDismissed(true);
     sessionStorage.setItem(DISMISS_KEY, "1");
+
+    Notification.requestPermission()
+      .then((result) => {
+        console.log("[notifications] requestPermission resolved:", result);
+        setPermission(result);
+      })
+      .catch((err) => console.error("[notifications] requestPermission threw:", err));
   };
 
   const handleDismiss = () => {
