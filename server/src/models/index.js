@@ -10,6 +10,7 @@ import miscTaskModel from "./MiscTask.js";
 import userModel from "./User.js";
 import taskAssigneeModel from "./TaskAssignee.js";
 import leadModel from "./Lead.js";
+import notificationModel from "./Notification.js";
 
 export const initModels = (sequelize) => {
   const Client = clientModel(sequelize, DataTypes);
@@ -23,6 +24,7 @@ export const initModels = (sequelize) => {
   const User = userModel(sequelize, DataTypes);
   const TaskAssignee = taskAssigneeModel(sequelize, DataTypes);
   const Lead = leadModel(sequelize, DataTypes);
+  const Notification = notificationModel(sequelize, DataTypes);
 
   Client.hasMany(Document, { foreignKey: "clientId", as: "documents" });
   Document.belongsTo(Client, { foreignKey: "clientId", as: "client" });
@@ -55,5 +57,21 @@ export const initModels = (sequelize) => {
     otherKey: "taskId",
   });
 
-  return { Client, TeamMember, AgencySetting, Document, Task, MeetingNote, ContentCalendarEntry, MiscTask, User, TaskAssignee, Lead };
+  Task.hasMany(Notification, { foreignKey: "taskId", as: "notifications", constraints: false });
+  Notification.belongsTo(Task, { foreignKey: "taskId", as: "task", constraints: false });
+
+  return {
+    Client,
+    TeamMember,
+    AgencySetting,
+    Document,
+    Task,
+    MeetingNote,
+    ContentCalendarEntry,
+    MiscTask,
+    User,
+    TaskAssignee,
+    Lead,
+    Notification,
+  };
 };

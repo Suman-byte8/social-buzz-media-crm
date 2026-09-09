@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useDispatch } from "react-redux";
 import { useRouter } from "next/navigation";
 import { getSocket } from "@/lib/socket";
 import { useAuth } from "@/app/login/context/AuthContext";
+import { receiveLiveNotification, fetchUnreadCount } from "@/redux/slices/notificationsSlice";
 
 const DISMISS_KEY = "crm_notif_prompt_dismissed";
 
@@ -24,6 +26,7 @@ const DISMISS_KEY = "crm_notif_prompt_dismissed";
 export default function NotificationBridge() {
   const { isAuthenticated } = useAuth();
   const router = useRouter();
+  const dispatch = useDispatch();
   const [permission, setPermission] = useState("default");
   const [dismissed, setDismissed] = useState(true);
 
@@ -35,6 +38,7 @@ export default function NotificationBridge() {
 
   useEffect(() => {
     if (!isAuthenticated) return;
+    dispatch(fetchUnreadCount());
 
     const socket = getSocket();
     if (!socket) {
@@ -45,9 +49,12 @@ export default function NotificationBridge() {
     const handleConnect = () => console.log("[notifications] socket connected:", socket.id);
     const handleConnectError = (err) => console.error("[notifications] socket connect_error:", err.message);
 
-    const handleNotification = ({ title, message, taskId } = {}) => {
+    const handleNotification = (payload = {}) => {
+      const { title, message, taskId } = payload;
       console.log("[notifications] received:", title, message);
       if (!title) return;
+
+      dispatch(receiveLiveNotification(payload));
 
       if (typeof window === "undefined" || !("Notification" in window)) return;
 
@@ -76,7 +83,7 @@ export default function NotificationBridge() {
       socket.off("connect_error", handleConnectError);
       socket.off("notification", handleNotification);
     };
-  }, [isAuthenticated, router]);
+  }, [isAuthenticated, router, dispatch]);
 
   const handleEnable = () => {
     console.log("[notifications] Enable clicked, current permission:", Notification.permission);
