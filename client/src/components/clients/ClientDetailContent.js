@@ -8,6 +8,7 @@ import Overview from "@/components/clients/Overview";
 import Credentials from "@/components/clients/Credentials";
 import BrandKit from "@/components/clients/BrandKit";
 import ClientFilesTab from "@/components/clients/ClientFilesTab";
+import StrategyTab from "@/components/clients/StrategyTab";
 import AdsTab from "@/components/clients/AdsTab";
 import MetaAdsTab from "@/components/clients/MetaAdsTab";
 import SocialMedia from "@/components/clients/SocialMedia";
@@ -207,14 +208,7 @@ export default function ClientDetailContent({ activeTab, setActiveTab, client = 
           uploadHint="Creative assets — designs, videos, drafts, and more"
         />
       ) : activeTab === "strategy" ? (
-        <ClientFilesTab
-          client={client}
-          clientId={clientId}
-          documentType="strategy"
-          title="Strategy"
-          icon="lightbulb"
-          uploadHint="Strategy documents — plans, decks, research, and more"
-        />
+        <StrategyTab client={client} clientId={clientId} />
       ) : activeTab === "google_ads" ? (
         <AdsTab client={client} />
       ) : activeTab === "meta_ads" ? (

@@ -8,11 +8,20 @@ const documentModel = (sequelize) => {
       fileName: { type: DataTypes.STRING, allowNull: false },
       fileType: { type: DataTypes.STRING, allowNull: true },
       fileSize: { type: DataTypes.INTEGER, allowNull: true },
-      fileId: { type: DataTypes.STRING, allowNull: false },
+      // Nullable: a "link" entry (see linkUrl/linkType below) points at an
+      // external Google Sheet/Doc instead of a file actually stored in
+      // Drive, so it has no fileId of its own.
+      fileId: { type: DataTypes.STRING, allowNull: true },
       driveLink: { type: DataTypes.STRING, allowNull: true },
       webViewLink: { type: DataTypes.STRING, allowNull: true },
       googleUserContentLink: { type: DataTypes.STRING, allowNull: true },
       folderId: { type: DataTypes.STRING, allowNull: true },
+      // A shared external link (e.g. the client's Strategy Google Sheet/Doc)
+      // instead of an uploaded file — mutually exclusive with fileId in
+      // practice, though not enforced at the DB level. linkType is only set
+      // alongside linkUrl.
+      linkUrl: { type: DataTypes.STRING, allowNull: true },
+      linkType: { type: DataTypes.STRING, allowNull: true },
       clientId: { type: DataTypes.INTEGER, allowNull: true },
       // Soft reference (no FK constraint, see models/index.js) — a lead can
       // be deleted (e.g. converted to a client) without losing the

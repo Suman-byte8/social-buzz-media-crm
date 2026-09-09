@@ -115,6 +115,16 @@ export const uploadClientFilesBulk = async (formData) => {
   return response;
 };
 
+// Adds a shared Google Sheet/Doc link (no file upload) — used by the
+// Strategy tab alongside its regular file uploads.
+export const addClientFileLink = async ({ clientId, documentType, linkType, linkUrl, label, description }) => {
+  const response = await apiClient("/documents/link", {
+    method: "POST",
+    body: { clientId, documentType, linkType, linkUrl, label, description },
+  });
+  return response;
+};
+
 // ── Lead Documents (proposals/agreements shared before conversion) ─────────
 
 export const fetchLeadDocuments = async (leadId) => {

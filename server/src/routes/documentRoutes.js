@@ -384,6 +384,54 @@ router.post("/documents/upload-media-bulk", mediaUpload.array("files", 20), asyn
   }
 });
 
+// Google Sheet/Doc "link" documents (currently: the client Strategy tab) —
+// no file is uploaded to Drive; this just records the shared URL so it
+// shows up alongside real uploads in the same list. See Document.js for
+// why fileId is nullable and what linkUrl/linkType mean.
+const GOOGLE_LINK_TYPES = ["google_sheet", "google_doc"];
+const GOOGLE_LINK_URL_PATTERN = /^https:\/\/(docs|drive)\.google\.com\//i;
+
+router.post("/documents/link", async (req, res) => {
+  try {
+    const { clientId, documentType, linkType, linkUrl, label, description } = req.body;
+
+    if (!clientId) {
+      return res.status(400).json({ success: false, message: "clientId is required" });
+    }
+    if (!GOOGLE_LINK_TYPES.includes(linkType)) {
+      return res.status(400).json({ success: false, message: "linkType must be google_sheet or google_doc" });
+    }
+    if (!linkUrl || !GOOGLE_LINK_URL_PATTERN.test(linkUrl.trim())) {
+      return res.status(400).json({ success: false, message: "Please provide a valid Google Sheets/Docs link" });
+    }
+
+    const { Document, Client } = req.app.locals.models;
+    const clientRecord = await Client.findByPk(parseInt(clientId));
+    if (!clientRecord) {
+      return res.status(404).json({ success: false, message: "Client not found" });
+    }
+
+    const document = await Document.create({
+      fileName: label?.trim() || (linkType === "google_sheet" ? "Google Sheet" : "Google Doc"),
+      linkUrl: linkUrl.trim(),
+      linkType,
+      clientId: parseInt(clientId),
+      description: description || null,
+      documentType: documentType || "other",
+    });
+
+    await invalidateCache("documents");
+    res.status(201).json({ success: true, message: "Link added successfully", data: document });
+  } catch (error) {
+    console.error("Error adding document link:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message || "Failed to add link",
+      error: error.message,
+    });
+  }
+});
+
 // Bulk PDF upload for a lead — proposals/agreements shared with a company
 // before they convert to a client. Same one-at-a-time-with-per-file-failure
 // approach as upload-media-bulk above, into a per-lead Drive subfolder
@@ -550,13 +598,17 @@ router.delete("/documents/:id", async (req, res) => {
       return res.status(403).json({ success: false, message: "Admin access required" });
     }
 
-    try {
-      await trashFileInDrive(document.fileId);
-    } catch (driveErr) {
-      // Best-effort: the file may already be missing/trashed in Drive, or
-      // the Drive API call could fail transiently — don't let that block
-      // removing the record itself.
-      console.warn("Could not trash document file in Drive:", driveErr.message);
+    // Link entries (Google Sheet/Doc — see documents/link above) have no
+    // fileId, since nothing was ever uploaded to Drive for them.
+    if (document.fileId) {
+      try {
+        await trashFileInDrive(document.fileId);
+      } catch (driveErr) {
+        // Best-effort: the file may already be missing/trashed in Drive, or
+        // the Drive API call could fail transiently — don't let that block
+        // removing the record itself.
+        console.warn("Could not trash document file in Drive:", driveErr.message);
+      }
     }
 
     await document.destroy();
@@ -578,6 +630,9 @@ router.get("/documents/:id/stream", async (req, res) => {
 
     if (!document) {
       return res.status(404).json({ success: false, message: "Document not found" });
+    }
+    if (!document.fileId) {
+      return res.status(400).json({ success: false, message: "This is a link, not an uploaded file — open linkUrl directly instead" });
     }
 
     let cached = getCachedFile(document.fileId);

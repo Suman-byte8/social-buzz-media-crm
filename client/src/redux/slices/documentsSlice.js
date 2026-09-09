@@ -13,6 +13,7 @@ import {
   uploadBrandKitFilesBulk as uploadBrandKitFilesBulkApi,
   fetchClientFilesByType as fetchClientFilesByTypeApi,
   uploadClientFilesBulk as uploadClientFilesBulkApi,
+  addClientFileLink as addClientFileLinkApi,
   fetchLeadDocuments as fetchLeadDocumentsApi,
   uploadLeadDocumentsBulk as uploadLeadDocumentsBulkApi,
   fetchAgreements as fetchAgreementsApi,
@@ -189,6 +190,22 @@ export const deleteClientFile = createAsyncThunk(
       return { id, documentType };
     } catch (error) {
       return rejectWithValue(error.message || "Failed to delete file");
+    }
+  }
+);
+
+// Adds a Google Sheet/Doc link into the same filesByType[documentType]
+// bucket as regular uploads (see the Strategy tab) — it's rendered by the
+// same list, just a different "kind" of entry (linkUrl set, no fileId).
+export const addClientFileLink = createAsyncThunk(
+  "documents/addClientFileLink",
+  async ({ clientId, documentType, linkType, linkUrl, label, description }, { rejectWithValue }) => {
+    try {
+      const response = await addClientFileLinkApi({ clientId, documentType, linkType, linkUrl, label, description });
+      invalidateCache(`documents/fetchClientFiles:${documentType}`);
+      return { documentType, ...response };
+    } catch (error) {
+      return rejectWithValue(error.message || "Failed to add link");
     }
   }
 );
@@ -474,6 +491,15 @@ const documentsSlice = createSlice({
       })
       .addCase(deleteClientFile.rejected, (state, action) => {
         state.error = action.payload || "Failed to delete file";
+      })
+      .addCase(addClientFileLink.fulfilled, (state, action) => {
+        const { documentType, data } = action.payload;
+        if (!state.filesByType[documentType]) state.filesByType[documentType] = [];
+        if (data) state.filesByType[documentType].unshift(data);
+        state.successMessage = "Link added successfully";
+      })
+      .addCase(addClientFileLink.rejected, (state, action) => {
+        state.error = action.payload || "Failed to add link";
       })
       .addCase(fetchLeadDocuments.pending, (state, action) => {
         state.loadingByLeadId[action.meta.arg] = true;
