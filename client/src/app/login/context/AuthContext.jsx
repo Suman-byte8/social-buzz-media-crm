@@ -3,6 +3,7 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import { saveToStorage, getFromStorage, removeFromStorage } from '@/utils/storage';
 import { clearAllCache } from '@/utils/cache';
+import { disconnectSocket } from '@/lib/socket';
 import { apiClient } from '@/services/apiClient';
 import { useRouter } from 'next/navigation';
 
@@ -59,6 +60,7 @@ export const AuthProvider = ({ children }) => {
     // Cached list data (clients, tasks, etc.) shouldn't linger into a
     // different login on a shared machine.
     clearAllCache();
+    disconnectSocket();
     setUser(null);
     setIsAuthenticated(false);
     router.push('/login');
