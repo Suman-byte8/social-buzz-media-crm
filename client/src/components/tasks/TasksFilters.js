@@ -91,11 +91,15 @@ export default function TasksFilters({
       </div>
 
       <div className="relative flex items-center">
+        <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-[18px] pointer-events-none">
+          calendar_month
+        </span>
         <input
           type="month"
           value={monthFilter}
           onChange={(e) => onMonthChange(e.target.value)}
-          className="bg-gray-50 border border-outline-variant text-on-surface rounded-lg pl-3 pr-8 py-2 text-sm focus:ring-1 focus:ring-primary focus:border-primary outline-none"
+          title="Filter by due month"
+          className="bg-gray-50 border border-outline-variant text-on-surface rounded-lg pl-9 pr-8 py-2 text-sm focus:ring-1 focus:ring-primary focus:border-primary outline-none"
         />
         {monthFilter && (
           <button

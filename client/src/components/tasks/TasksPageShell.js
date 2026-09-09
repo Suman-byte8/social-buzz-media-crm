@@ -31,8 +31,12 @@ export default function TasksPageShell() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingTask, setEditingTask] = useState(null);
   const [viewingTask, setViewingTask] = useState(null);
-  const [sortBy, setSortBy] = useState("dueDate");
-  const [sortOrder, setSortOrder] = useState("ASC");
+  // Defaults to latest-created-first (matches the server's own order —
+  // see taskRoutes.js's `order: [["createdAt", "DESC"]]` — so the list
+  // isn't silently re-ordered by this client-side sort until someone
+  // actually clicks a column header).
+  const [sortBy, setSortBy] = useState("createdAt");
+  const [sortOrder, setSortOrder] = useState("DESC");
 
   // Seed filters from URL query params (e.g. deep-linked from a team member's profile).
   useEffect(() => {
@@ -151,6 +155,12 @@ export default function TasksPageShell() {
         case "dueDate": {
           const aTime = a.dueDate ? new Date(a.dueDate).getTime() : Infinity;
           const bTime = b.dueDate ? new Date(b.dueDate).getTime() : Infinity;
+          cmp = aTime - bTime;
+          break;
+        }
+        case "createdAt": {
+          const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+          const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
           cmp = aTime - bTime;
           break;
         }
