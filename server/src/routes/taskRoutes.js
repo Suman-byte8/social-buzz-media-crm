@@ -2,6 +2,7 @@ import express from "express";
 import { Op } from "sequelize";
 import { cacheRoute } from "../middleware/cacheRoute.js";
 import { invalidateCache } from "../utils/serverCache.js";
+import { notify } from "../utils/realtime.js";
 
 const router = express.Router();
 
@@ -64,17 +65,17 @@ router.post("/tasks", async (req, res) => {
       return res.status(400).json({ success: false, message: "Task title is required" });
     }
 
-    let validIds = [];
+    let validAssignees = [];
     if (assignees && Array.isArray(assignees) && assignees.length > 0) {
-      const validAssignees = await TeamMember.findAll({
+      validAssignees = await TeamMember.findAll({
         where: { id: { [Op.in]: assignees } },
-        attributes: ["id"],
+        attributes: ["id", "name"],
       });
-      validIds = validAssignees.map((a) => a.id);
-      if (validIds.length !== assignees.length) {
+      if (validAssignees.length !== assignees.length) {
         return res.status(400).json({ success: false, message: "One or more assignee IDs are invalid" });
       }
     }
+    const validIds = validAssignees.map((a) => a.id);
 
     const task = await Task.create({
       title,
@@ -90,6 +91,12 @@ router.post("/tasks", async (req, res) => {
       for (const assigneeId of validIds) {
         await syncTeamMemberWorks(TeamMember, assigneeId, title);
       }
+      notify({
+        type: "task_assigned",
+        title: "New task assigned",
+        message: `"${title}" was assigned to ${validAssignees.map((a) => a.name).join(", ")}`,
+        taskId: task.id,
+      });
     }
 
     await invalidateCache("tasks");
@@ -315,16 +322,28 @@ router.put("/tasks/:id", async (req, res) => {
       }
     }
 
-    for (const assigneeId of newAssigneeIds) {
-      if (!oldAssigneeIds.includes(assigneeId)) {
-        await syncTeamMemberWorks(TeamMember, assigneeId, task.title);
-      }
+    const addedAssigneeIds = newAssigneeIds.filter((id) => !oldAssigneeIds.includes(id));
+    for (const assigneeId of addedAssigneeIds) {
+      await syncTeamMemberWorks(TeamMember, assigneeId, task.title);
     }
 
     for (const oldId of oldAssigneeIds) {
       if (!newAssigneeIds.includes(oldId)) {
         await removeTaskFromTeamMember(TeamMember, oldId, task.title);
       }
+    }
+
+    if (addedAssigneeIds.length > 0) {
+      const addedMembers = await TeamMember.findAll({
+        where: { id: { [Op.in]: addedAssigneeIds } },
+        attributes: ["name"],
+      });
+      notify({
+        type: "task_assigned",
+        title: "Task assigned",
+        message: `"${task.title}" was assigned to ${addedMembers.map((a) => a.name).join(", ")}`,
+        taskId: task.id,
+      });
     }
 
     // syncTeamMemberWorks/removeTaskFromTeamMember above may have edited
