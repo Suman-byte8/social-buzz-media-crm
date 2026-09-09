@@ -97,6 +97,7 @@ export default function LeadRowEditor({ values, onChange, onSave, onCancel, savi
           disabled={saving}
         />
       </td>
+      <td className="p-2 align-top text-on-surface-variant text-xs">Save lead first</td>
       <td className="p-2 align-top text-right">
         <div className="flex flex-col items-end gap-1">
           <div className="flex items-center justify-end gap-1">

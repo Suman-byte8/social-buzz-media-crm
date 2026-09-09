@@ -3,7 +3,7 @@
 import React from "react";
 import LeadRowMenu from "./LeadRowMenu";
 import LeadRowEditor from "./LeadRowEditor";
-import LeadDocumentsPopover from "./LeadDocumentsPopover";
+import LeadDocumentsCell from "./LeadDocumentsCell";
 
 const AVATAR_PALETTE = [
   { bg: "bg-indigo-50", border: "border-indigo-100", text: "text-indigo-700" },
@@ -73,20 +73,21 @@ export default function LeadsTable({
             <th className="p-4 font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Status</th>
             <th className="p-4 font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Last Contact</th>
             <th className="p-4 font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Next Follow-up</th>
+            <th className="p-4 font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Documents</th>
             <th className="p-4 font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider text-right">Actions</th>
           </tr>
         </thead>
         <tbody className="text-body-sm">
           {loading ? (
             <tr>
-              <td colSpan={6} className="p-12 text-center text-on-surface-variant">
+              <td colSpan={7} className="p-12 text-center text-on-surface-variant">
                 <span className="animate-spin material-symbols-outlined align-middle mr-2">progress_activity</span>
                 Loading leads...
               </td>
             </tr>
           ) : leads.length === 0 && !hasDrafts ? (
             <tr>
-              <td colSpan={6} className="p-12 text-center text-on-surface-variant">
+              <td colSpan={7} className="p-12 text-center text-on-surface-variant">
                 <span className="material-symbols-outlined text-[40px] block mb-1.5 mx-auto">person_search</span>
                 No leads found
               </td>
@@ -149,6 +150,9 @@ export default function LeadsTable({
                       </span>
                     )}
                   </td>
+                  <td className="p-4 align-top">
+                    <LeadDocumentsCell lead={lead} />
+                  </td>
                   <td className="p-4 text-right">
                     <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                       <button
@@ -174,7 +178,6 @@ export default function LeadsTable({
                       >
                         <span className="material-symbols-outlined" style={{ fontSize: 18 }}>event</span>
                       </button>
-                      <LeadDocumentsPopover lead={lead} />
                       <LeadRowMenu
                         onEdit={() => onEdit(lead)}
                         onConvert={() => onConvert(lead)}
