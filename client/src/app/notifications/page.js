@@ -88,7 +88,7 @@ export default function NotificationsPage() {
   };
 
   return (
-    <main className="flex-1 p-6 lg:p-8 max-w-[900px] mx-auto w-full">
+    <main className="flex-1 p-6 lg:p-8 w-full">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
           <h1 className="font-display-lg text-display-lg text-on-surface">Notifications</h1>
