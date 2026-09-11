@@ -126,11 +126,11 @@ export default function TasksTable({ tasks, loading, hasAnyTasks, sortBy, sortOr
                   </td>
                   <td className="py-3 px-4">
                     {assignees.length > 0 ? (
-                      <div className="flex -space-x-1.5">
+                      <div className="flex -space-x-2">
                         {assignees.slice(0, 3).map((assignee) => (
                           <div
                             key={assignee.id}
-                            className="w-6 h-6 rounded-full bg-primary-container text-primary flex items-center justify-center text-[10px] font-bold border-2 border-white overflow-hidden"
+                            className="w-9 h-9 rounded-full bg-primary-container text-primary flex items-center justify-center text-xs font-bold border-2 border-white overflow-hidden shrink-0"
                             title={assignee.name}
                           >
                             {assignee.avatar ? (
@@ -141,7 +141,7 @@ export default function TasksTable({ tasks, loading, hasAnyTasks, sortBy, sortOr
                           </div>
                         ))}
                         {assignees.length > 3 && (
-                          <div className="w-6 h-6 rounded-full bg-gray-200 text-gray-600 flex items-center justify-center text-[10px] border-2 border-white">
+                          <div className="w-9 h-9 rounded-full bg-gray-200 text-gray-600 flex items-center justify-center text-xs border-2 border-white shrink-0">
                             +{assignees.length - 3}
                           </div>
                         )}

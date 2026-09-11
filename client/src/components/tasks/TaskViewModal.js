@@ -96,9 +96,9 @@ export default function TaskViewModal({ task, onClose, onEdit, onDelete }) {
                     return (
                       <span
                         key={assignee.id}
-                        className="inline-flex items-center gap-1.5 pl-1 pr-2.5 py-1 bg-primary-container/40 rounded-full text-label-sm font-label-sm text-on-surface"
+                        className="inline-flex items-center gap-2 pl-1 pr-3 py-1.5 bg-primary-container/40 rounded-full text-label-sm font-label-sm text-on-surface"
                       >
-                        <span className="w-5 h-5 rounded-full bg-primary-container text-primary flex items-center justify-center text-[9px] font-bold overflow-hidden shrink-0">
+                        <span className="w-7 h-7 rounded-full bg-primary-container text-primary flex items-center justify-center text-[11px] font-bold overflow-hidden shrink-0">
                           {assignee.avatar ? (
                             <img src={getAssetUrl(assignee.avatar)} alt={assignee.name} className="w-full h-full object-cover" />
                           ) : (
