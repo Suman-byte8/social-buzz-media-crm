@@ -68,6 +68,7 @@ router.post("/tasks", async (req, res) => {
       priority = "medium",
       clientId,
       assignees,
+      assignedById,
       dueDate,
     } = req.body;
 
@@ -93,6 +94,7 @@ router.post("/tasks", async (req, res) => {
       status: status || "todo",
       priority: priority || "medium",
       clientId: clientId ? parseInt(clientId) : null,
+      assignedById: assignedById ? parseInt(assignedById) : null,
       dueDate: dueDate ? new Date(dueDate) : null,
     });
 
@@ -197,7 +199,8 @@ router.get("/tasks", cacheRoute("tasks", 30), async (req, res) => {
     const assigneeLinks = await TaskAssignee.findAll({
       where: { taskId: { [Op.in]: taskIds.length > 0 ? taskIds : [-1] } },
     });
-    const memberIds = [...new Set(assigneeLinks.map((l) => l.teamMemberId))];
+    const assignedByIds = taskList.map((t) => t.assignedById).filter(Boolean);
+    const memberIds = [...new Set([...assigneeLinks.map((l) => l.teamMemberId), ...assignedByIds])];
     const teamMembers = await TeamMember.findAll({
       where: { id: { [Op.in]: memberIds.length > 0 ? memberIds : [-1] } },
       attributes: ["id", "name"],
@@ -218,6 +221,7 @@ router.get("/tasks", cacheRoute("tasks", 30), async (req, res) => {
         ...taskFields,
         assignees: assigneeIds,
         assigneeDetails: taskAssignees,
+        assignedByMember: t.assignedById ? teamMemberById.get(t.assignedById) || null : null,
         clientName: client ? client.name : null,
       };
     });
@@ -265,12 +269,17 @@ router.get("/tasks/:id", async (req, res) => {
         })
       : [];
 
+    const assignedByMember = taskFields.assignedById
+      ? await TeamMember.findByPk(taskFields.assignedById, { attributes: ["id", "name", "designation", "department"] })
+      : null;
+
     res.json({
       success: true,
       data: {
         ...taskFields,
         assignees: memberIds,
         assigneeDetails,
+        assignedByMember,
         client: client || null,
       },
     });
@@ -292,7 +301,7 @@ router.put("/tasks/:id", async (req, res) => {
       return res.status(404).json({ success: false, message: "Task not found" });
     }
 
-    const { title, description, status, priority, clientId, assignees, dueDate, completedAt } = req.body;
+    const { title, description, status, priority, clientId, assignees, assignedById, dueDate, completedAt } = req.body;
 
     const oldLinks = await TaskAssignee.findAll({ where: { taskId: task.id }, attributes: ["teamMemberId"] });
     const oldAssigneeIds = oldLinks.map((l) => l.teamMemberId);
@@ -309,6 +318,8 @@ router.put("/tasks/:id", async (req, res) => {
       // Postgres rejects NaN for an INTEGER column outright, which is what
       // made every update to a client-less task fail with a 500.
       clientId: clientId !== undefined ? (clientId === null || clientId === "" ? null : parseInt(clientId)) : task.clientId,
+      assignedById:
+        assignedById !== undefined ? (assignedById === null || assignedById === "" ? null : parseInt(assignedById)) : task.assignedById,
       dueDate: dueDate !== undefined ? (dueDate ? new Date(dueDate) : null) : task.dueDate,
       completedAt: completedAt !== undefined
         ? (completedAt ? new Date(completedAt) : null)

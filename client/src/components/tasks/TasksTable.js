@@ -9,6 +9,7 @@ const COLUMNS = [
   { key: "priority", label: "Priority" },
   { key: "status", label: "Status" },
   { key: "dueDate", label: "Due Date" },
+  { key: "assignedBy", label: "Assigned By" },
   { key: "assignees", label: "Assigned To" },
   { key: "actions", label: "Actions" },
 ];
@@ -47,7 +48,7 @@ export default function TasksTable({ tasks, loading, hasAnyTasks, sortBy, sortOr
         <thead className="bg-[#FAFAFA] border-b border-[#F0F0F0]">
           <tr>
             {COLUMNS.map((col) => {
-              const sortable = col.key !== "actions" && col.key !== "assignees";
+              const sortable = col.key !== "actions" && col.key !== "assignees" && col.key !== "assignedBy";
               return (
                 <th
                   key={col.key}
@@ -118,6 +119,9 @@ export default function TasksTable({ tasks, loading, hasAnyTasks, sortBy, sortOr
                   </td>
                   <td className="py-3 px-4 whitespace-nowrap">
                     <span className={due.overdue ? "text-red-600 font-medium" : "text-secondary"}>{due.text}</span>
+                  </td>
+                  <td className="py-3 px-4 text-secondary whitespace-nowrap">
+                    {task.assignedByMember?.name || "—"}
                   </td>
                   <td className="py-3 px-4">
                     {assignees.length > 0 ? (

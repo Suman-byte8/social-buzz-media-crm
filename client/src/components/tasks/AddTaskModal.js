@@ -15,6 +15,7 @@ export default function AddTaskModal({ isOpen, onClose, onSuccess, editTask = nu
   const [priority, setPriority] = useState("medium");
   const [clientId, setClientId] = useState("");
   const [assignees, setAssignees] = useState([]);
+  const [assignedById, setAssignedById] = useState("");
   const [dueDate, setDueDate] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -40,6 +41,7 @@ export default function AddTaskModal({ isOpen, onClose, onSuccess, editTask = nu
       setPriority(editTask.priority || "medium");
       setClientId(editTask.clientId || "");
       setAssignees(editTask.assignees || []);
+      setAssignedById(editTask.assignedById ? String(editTask.assignedById) : "");
       setDueDate(editTask.dueDate ? new Date(editTask.dueDate).toISOString().split("T")[0] : "");
     }
   }, [editTask, isEditMode]);
@@ -71,6 +73,7 @@ export default function AddTaskModal({ isOpen, onClose, onSuccess, editTask = nu
         priority,
         clientId: clientId ? parseInt(clientId) : null,
         assignees: assignees.map(Number),
+        assignedById: assignedById ? parseInt(assignedById) : null,
         dueDate: dueDate || null,
       };
 
@@ -99,6 +102,7 @@ export default function AddTaskModal({ isOpen, onClose, onSuccess, editTask = nu
       setPriority("medium");
       setClientId("");
       setAssignees([]);
+      setAssignedById("");
       setDueDate("");
       setError("");
       setSuccess("");
@@ -218,22 +222,43 @@ export default function AddTaskModal({ isOpen, onClose, onSuccess, editTask = nu
             </div>
           </div>
 
-          <div>
-            <label className="block font-label-sm text-label-sm text-gray-700 mb-1">
-              Related Client
-            </label>
-            <select
-              value={clientId}
-              onChange={(e) => setClientId(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg text-body-sm text-on-surface focus:ring-1 focus:ring-primary focus:border-primary outline-none"
-            >
-              <option value="">No specific client (Internal Task)</option>
-              {clients.map((client) => (
-                <option key={client.id} value={client.id}>
-                  {client.name}
-                </option>
-              ))}
-            </select>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block font-label-sm text-label-sm text-gray-700 mb-1">
+                Related Client
+              </label>
+              <select
+                value={clientId}
+                onChange={(e) => setClientId(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg text-body-sm text-on-surface focus:ring-1 focus:ring-primary focus:border-primary outline-none"
+              >
+                <option value="">No specific client (Internal Task)</option>
+                {clients.map((client) => (
+                  <option key={client.id} value={client.id}>
+                    {client.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block font-label-sm text-label-sm text-gray-700 mb-1">
+                Assigned By
+              </label>
+              <select
+                value={assignedById}
+                onChange={(e) => setAssignedById(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg text-body-sm text-on-surface focus:ring-1 focus:ring-primary focus:border-primary outline-none"
+              >
+                <option value="">Not specified</option>
+                {teamMembers.map((member) => (
+                  <option key={member.id} value={member.id}>
+                    {member.name}
+                  </option>
+                ))}
+              </select>
+              <p className="mt-1 font-label-sm text-label-sm text-tertiary">Who is handing out this task.</p>
+            </div>
           </div>
 
           <div>

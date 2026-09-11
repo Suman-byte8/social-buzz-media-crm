@@ -30,6 +30,11 @@ const taskModel = (sequelize) => {
         },
       },
       clientId: { type: DataTypes.INTEGER, allowNull: true },
+      // Who assigned the task (as opposed to TaskAssignee, who it's
+      // assigned TO) — a single person, soft reference to TeamMember (see
+      // models/index.js), so deleting that member later doesn't break the
+      // historical record on this task.
+      assignedById: { type: DataTypes.INTEGER, allowNull: true },
       // Deprecated: superseded by the TaskAssignee join table (see
       // models/TaskAssignee.js and scripts/migrate-task-assignees.js). No
       // longer read or written by the app — kept only as a rollback
@@ -52,6 +57,7 @@ const taskModel = (sequelize) => {
         { fields: ["clientId"] },
         { fields: ["status"] },
         { fields: ["priority"] },
+        { fields: ["assignedById"] },
       ],
     }
   );

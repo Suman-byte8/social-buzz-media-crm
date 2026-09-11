@@ -50,6 +50,7 @@ export const initModels = (sequelize) => {
     foreignKey: "taskId",
     otherKey: "teamMemberId",
   });
+  Task.belongsTo(TeamMember, { foreignKey: "assignedById", as: "assignedByMember", constraints: false });
   TeamMember.belongsToMany(Task, {
     through: TaskAssignee,
     as: "assignedTasks",

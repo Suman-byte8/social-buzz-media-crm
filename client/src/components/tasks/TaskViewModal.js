@@ -81,6 +81,10 @@ export default function TaskViewModal({ task, onClose, onEdit, onDelete }) {
               </div>
             )}
             <div>
+              <p className="font-label-sm text-label-sm text-gray-500 mb-1">Assigned By</p>
+              <p className="text-body-sm text-gray-800">{task.assignedByMember?.name || "Not specified"}</p>
+            </div>
+            <div>
               <p className="font-label-sm text-label-sm text-gray-500 mb-1.5">Assigned To</p>
               {assignees.length > 0 ? (
                 <div className="flex flex-wrap gap-2">
