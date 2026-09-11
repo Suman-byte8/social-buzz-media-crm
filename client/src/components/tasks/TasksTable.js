@@ -2,6 +2,7 @@
 
 import React from "react";
 import StatusBadge from "@/components/ui/StatusBadge";
+import { getAssetUrl } from "@/services/apiClient";
 
 const COLUMNS = [
   { key: "title", label: "Task" },
@@ -129,10 +130,14 @@ export default function TasksTable({ tasks, loading, hasAnyTasks, sortBy, sortOr
                         {assignees.slice(0, 3).map((assignee) => (
                           <div
                             key={assignee.id}
-                            className="w-6 h-6 rounded-full bg-primary-container text-primary flex items-center justify-center text-[10px] font-bold border-2 border-white"
+                            className="w-6 h-6 rounded-full bg-primary-container text-primary flex items-center justify-center text-[10px] font-bold border-2 border-white overflow-hidden"
                             title={assignee.name}
                           >
-                            {initialsFor(assignee.name)}
+                            {assignee.avatar ? (
+                              <img src={getAssetUrl(assignee.avatar)} alt={assignee.name} className="w-full h-full object-cover" />
+                            ) : (
+                              initialsFor(assignee.name)
+                            )}
                           </div>
                         ))}
                         {assignees.length > 3 && (

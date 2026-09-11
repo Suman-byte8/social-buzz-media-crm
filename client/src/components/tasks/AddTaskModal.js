@@ -5,6 +5,7 @@ import { useDispatch, useSelector } from "react-redux";
 import { createTask, updateTask } from "@/redux/slices/tasksSlice";
 import { fetchClients } from "@/redux/slices/clientsSlice";
 import { fetchTeamMembers } from "@/redux/slices/teamSlice";
+import { getAssetUrl } from "@/services/apiClient";
 
 export default function AddTaskModal({ isOpen, onClose, onSuccess, editTask = null }) {
   const dispatch = useDispatch();
@@ -281,10 +282,14 @@ export default function AddTaskModal({ isOpen, onClose, onSuccess, editTask = nu
                         : "hover:bg-gray-50"
                     }`}
                   >
-                    <div className="w-8 h-8 rounded-full bg-primary-container flex items-center justify-center flex-shrink-0">
-                      <span className="font-label-md text-label-md text-primary font-bold">
-                        {initials}
-                      </span>
+                    <div className="w-8 h-8 rounded-full bg-primary-container flex items-center justify-center flex-shrink-0 overflow-hidden">
+                      {member.avatar ? (
+                        <img src={getAssetUrl(member.avatar)} alt={member.name} className="w-full h-full object-cover" />
+                      ) : (
+                        <span className="font-label-md text-label-md text-primary font-bold">
+                          {initials}
+                        </span>
+                      )}
                     </div>
                     <div className="flex-1">
                       <div className="font-body-md text-body-md text-on-surface">{member.name}</div>

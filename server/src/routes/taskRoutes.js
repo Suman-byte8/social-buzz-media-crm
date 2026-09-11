@@ -203,7 +203,7 @@ router.get("/tasks", cacheRoute("tasks", 30), async (req, res) => {
     const memberIds = [...new Set([...assigneeLinks.map((l) => l.teamMemberId), ...assignedByIds])];
     const teamMembers = await TeamMember.findAll({
       where: { id: { [Op.in]: memberIds.length > 0 ? memberIds : [-1] } },
-      attributes: ["id", "name"],
+      attributes: ["id", "name", "avatar"],
     });
     const teamMemberById = new Map(teamMembers.map((m) => [m.id, m]));
 
@@ -265,12 +265,14 @@ router.get("/tasks/:id", async (req, res) => {
     const assigneeDetails = memberIds.length > 0
       ? await TeamMember.findAll({
           where: { id: { [Op.in]: memberIds } },
-          attributes: ["id", "name", "designation", "department"],
+          attributes: ["id", "name", "designation", "department", "avatar"],
         })
       : [];
 
     const assignedByMember = taskFields.assignedById
-      ? await TeamMember.findByPk(taskFields.assignedById, { attributes: ["id", "name", "designation", "department"] })
+      ? await TeamMember.findByPk(taskFields.assignedById, {
+          attributes: ["id", "name", "designation", "department", "avatar"],
+        })
       : null;
 
     res.json({
