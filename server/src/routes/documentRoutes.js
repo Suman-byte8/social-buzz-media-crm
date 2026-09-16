@@ -44,20 +44,12 @@ const requireAdminForAgreements = (req, res, next) => {
   next();
 };
 
-// Lead documents (proposals/agreements shared before a lead becomes a
-// client) — PDF-only, like Agreements, but multiple files per upload like
-// the media-capable routes below. Kept smaller than the media size cap
-// since these are always documents, never images/video.
+// Lead documents (proposals/agreements/anything else shared before a lead
+// becomes a client) — any file type, multiple files per upload, same size
+// cap as the other media-capable routes below (mediaUpload).
 const leadUpload = multer({
   storage: storage,
-  limits: { fileSize: 5 * 1024 * 1024, files: 10 }, // 5MB per PDF, up to 10 files per request
-  fileFilter: (req, file, cb) => {
-    if (file.mimetype === "application/pdf" || file.originalname?.toLowerCase().endsWith(".pdf")) {
-      cb(null, true);
-    } else {
-      cb(new Error("Only PDF files are allowed!"), false);
-    }
-  },
+  limits: { fileSize: 200 * 1024 * 1024, files: 20 }, // 200MB per file, up to 20 files per request
 });
 
 // Maps a documentType to the Drive subfolder its files land in, for the
@@ -703,7 +695,7 @@ router.post("/documents/:id/email", async (req, res) => {
       const { buffer, contentType } = await getFileBufferFromDrive(document.fileId);
       console.log(`[documents/email] Drive fetch took ${Date.now() - driveStart}ms for file ${document.fileId}`);
       setCachedFile(document.fileId, buffer, contentType);
-      cached = { buffer };
+      cached = { buffer, contentType };
     }
 
     const mailStart = Date.now();
@@ -715,7 +707,11 @@ router.post("/documents/:id/email", async (req, res) => {
         {
           filename: document.fileName,
           content: cached.buffer,
-          contentType: "application/pdf",
+          // Was hardcoded to "application/pdf" — fine while every document
+          // type really was a PDF (agreements/invoices), but lead documents
+          // can now be any file type, so a photo or spreadsheet would have
+          // been mislabeled and could arrive corrupted/unopenable.
+          contentType: document.fileType || cached.contentType || "application/octet-stream",
         },
       ],
     });

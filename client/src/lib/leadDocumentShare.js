@@ -2,18 +2,18 @@ import { sendDocumentEmail } from "@/services/clientService";
 import { API_BASE_URL } from "@/services/apiClient";
 import { shareFileNatively, buildWhatsAppUrl } from "@/lib/documentShare";
 
-// Shares an already-uploaded lead document (a PDF proposal/agreement) by
-// email or WhatsApp. Unlike the invoice builder's share flow, there's
-// nothing to generate here — the file already exists on Drive with a
-// Document id — so this is closer to agreementEmail.js, just with a
-// WhatsApp path added too.
+// Shares an already-uploaded lead document (any file type — proposal,
+// agreement, image, whatever was uploaded) by email or WhatsApp. Unlike the
+// invoice builder's share flow, there's nothing to generate here — the file
+// already exists on Drive with a Document id — so this is closer to
+// agreementEmail.js, just with a WhatsApp path added too.
 
 const getStreamUrl = (document) => `${API_BASE_URL}/documents/${document.id}/stream`;
 
 /**
- * Emails the document to `toEmail`. Tries a real SMTP send with the PDF
+ * Emails the document to `toEmail`. Tries a real SMTP send with the file
  * attached first; if that fails (SMTP not configured, transient error),
- * falls back to opening the user's own mail app with a direct PDF link,
+ * falls back to opening the user's own mail app with a direct link,
  * since mailto: can't carry an attachment.
  */
 export async function shareLeadDocumentByEmail(document, toEmail) {
@@ -39,10 +39,10 @@ export async function shareLeadDocumentByEmail(document, toEmail) {
 
 /**
  * Shares the document to `phoneNumber` over WhatsApp. Tries handing the
- * actual PDF bytes to the OS/browser share sheet first (real attachment,
+ * actual file bytes to the OS/browser share sheet first (real attachment,
  * not a link) — supported on mobile Chrome/Safari and modern desktop
  * Chrome/Edge. Falls back to a wa.me link carrying the document's direct
- * PDF link on browsers without file-sharing support.
+ * link on browsers without file-sharing support.
  */
 export async function shareLeadDocumentByWhatsApp(document, phoneNumber) {
   const streamUrl = getStreamUrl(document);
@@ -55,7 +55,10 @@ export async function shareLeadDocumentByWhatsApp(document, phoneNumber) {
       const shareResult = await shareFileNatively({
         blob,
         fileName: document.fileName,
-        mimeType: "application/pdf",
+        // The document can be any file type now, not just PDFs — trust the
+        // stream response's own Content-Type (which the server derives from
+        // the upload, see documentRoutes.js) over assuming PDF.
+        mimeType: document.fileType || res.headers.get("content-type") || "application/octet-stream",
         title: document.fileName,
         text: `Hi, please find the document "${document.fileName}" attached.`,
       });

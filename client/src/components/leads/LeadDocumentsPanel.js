@@ -5,6 +5,7 @@ import { useDispatch, useSelector } from "react-redux";
 import { fetchLeadDocuments, uploadLeadDocuments, deleteLeadDocument } from "@/redux/slices/documentsSlice";
 import ShareMenu from "@/components/ui/ShareMenu";
 import { shareLeadDocumentByEmail, shareLeadDocumentByWhatsApp } from "@/lib/leadDocumentShare";
+import { fileIconFor } from "@/lib/fileIcon";
 
 const formatSize = (bytes) => {
   if (!bytes) return "N/A";
@@ -12,10 +13,11 @@ const formatSize = (bytes) => {
   return `${(bytes / 1024).toFixed(0)} KB`;
 };
 
-// Multi-file PDF upload + list, mirroring the Client Files pattern
-// (ClientFilesTab.js) but keyed by leadId and restricted to PDFs — proposals
-// and agreements shared with a lead before it converts to a client. Files
-// upload straight into a per-lead Drive subfolder (see documentRoutes.js).
+// Multi-file upload + list, mirroring the Client Files pattern
+// (ClientFilesTab.js) but keyed by leadId — any file type, for proposals,
+// agreements, or anything else shared with a lead before it converts to a
+// client. Files upload straight into a per-lead Drive subfolder (see
+// documentRoutes.js).
 export default function LeadDocumentsPanel({ lead, embedded = false }) {
   const dispatch = useDispatch();
   const leadId = lead?.id;
@@ -35,12 +37,7 @@ export default function LeadDocumentsPanel({ lead, embedded = false }) {
 
   const handleFileChange = (e) => {
     setError("");
-    const picked = Array.from(e.target.files || []);
-    const nonPdf = picked.filter((f) => f.type !== "application/pdf" && !f.name.toLowerCase().endsWith(".pdf"));
-    if (nonPdf.length > 0) {
-      setError(`Only PDF files can be shared: ${nonPdf.map((f) => f.name).join(", ")}`);
-    }
-    setSelectedFiles(picked.filter((f) => f.type === "application/pdf" || f.name.toLowerCase().endsWith(".pdf")));
+    setSelectedFiles(Array.from(e.target.files || []));
   };
 
   const removeSelectedFile = (index) => {
@@ -49,7 +46,7 @@ export default function LeadDocumentsPanel({ lead, embedded = false }) {
 
   const handleUpload = async () => {
     if (selectedFiles.length === 0) {
-      setError("Please select at least one PDF file");
+      setError("Please select at least one file");
       return;
     }
     if (uploadingRef.current) return;
@@ -105,13 +102,12 @@ export default function LeadDocumentsPanel({ lead, embedded = false }) {
 
   return (
     <div className={embedded ? "" : "border-t border-gray-200 pt-4 mt-1"}>
-      {!embedded && <p className="block font-label-sm text-label-sm text-secondary mb-2">Documents (proposals, agreements)</p>}
+      {!embedded && <p className="block font-label-sm text-label-sm text-secondary mb-2">Documents (any file type)</p>}
 
       <div className={`flex items-stretch gap-2 ${embedded ? "flex-col" : "flex-col sm:flex-row sm:items-center"}`}>
         <input
           ref={fileInputRef}
           type="file"
-          accept="application/pdf"
           multiple
           onChange={handleFileChange}
           disabled={uploading}
@@ -153,9 +149,11 @@ export default function LeadDocumentsPanel({ lead, embedded = false }) {
           <p className="text-body-sm text-on-surface-variant py-1">No documents shared with this lead yet.</p>
         ) : (
           <ul className="divide-y divide-gray-100 max-h-48 overflow-y-auto border border-outline-variant rounded-lg">
-            {files.map((file) => (
+            {files.map((file) => {
+              const { icon, color } = fileIconFor(file.fileType);
+              return (
               <li key={file.id} className="flex items-center gap-2 px-3 py-2">
-                <span className="material-symbols-outlined text-[18px] text-red-500 shrink-0">picture_as_pdf</span>
+                <span className={`material-symbols-outlined text-[18px] ${color} shrink-0`}>{icon}</span>
                 <div className="flex-1 min-w-0">
                   <p className="font-label-sm text-label-sm text-on-surface truncate" title={file.fileName}>
                     {file.fileName}
@@ -180,7 +178,8 @@ export default function LeadDocumentsPanel({ lead, embedded = false }) {
                   <span className="material-symbols-outlined text-[18px]">delete</span>
                 </button>
               </li>
-            ))}
+              );
+            })}
           </ul>
         )}
       </div>

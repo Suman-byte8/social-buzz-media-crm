@@ -5,6 +5,7 @@ import { useDispatch, useSelector } from "react-redux";
 import { fetchLeadDocuments, uploadLeadDocuments, deleteLeadDocument } from "@/redux/slices/documentsSlice";
 import ShareMenu from "@/components/ui/ShareMenu";
 import { shareLeadDocumentByEmail, shareLeadDocumentByWhatsApp } from "@/lib/leadDocumentShare";
+import { fileIconFor } from "@/lib/fileIcon";
 
 // Documents live directly in their own table column (not tucked behind an
 // Actions-menu popover) so they're visible at a glance and a proposal can
@@ -30,18 +31,13 @@ export default function LeadDocumentsCell({ lead }) {
 
   const handleFileChange = async (e) => {
     const picked = Array.from(e.target.files || []);
-    const pdfFiles = picked.filter((f) => f.type === "application/pdf" || f.name.toLowerCase().endsWith(".pdf"));
-    if (pdfFiles.length === 0) {
-      if (picked.length > 0) alert("Only PDF files can be shared.");
-      if (fileInputRef.current) fileInputRef.current.value = "";
-      return;
-    }
+    if (picked.length === 0) return;
     if (uploadingRef.current) return;
     uploadingRef.current = true;
     setUploading(true);
     try {
       const formData = new FormData();
-      pdfFiles.forEach((file) => formData.append("files", file));
+      picked.forEach((file) => formData.append("files", file));
       formData.append("leadId", leadId);
       const result = await dispatch(uploadLeadDocuments({ formData, leadId })).unwrap();
       if (result?.failed?.length > 0) {
@@ -90,12 +86,14 @@ export default function LeadDocumentsCell({ lead }) {
         <span className="material-symbols-outlined animate-spin text-[16px] text-on-surface-variant">progress_activity</span>
       )}
 
-      {files.map((file) => (
+      {files.map((file) => {
+        const { icon, color } = fileIconFor(file.fileType);
+        return (
         <div
           key={file.id}
           className="flex items-center gap-1 pl-2 pr-1 py-1 bg-surface-container rounded-lg border border-outline-variant/60"
         >
-          <span className="material-symbols-outlined text-[16px] text-red-500 shrink-0">picture_as_pdf</span>
+          <span className={`material-symbols-outlined text-[16px] ${color} shrink-0`}>{icon}</span>
           <span className="font-label-sm text-label-sm text-on-surface truncate max-w-[110px]" title={file.fileName}>
             {file.fileName}
           </span>
@@ -117,13 +115,14 @@ export default function LeadDocumentsCell({ lead }) {
             <span className="material-symbols-outlined text-[14px]">delete</span>
           </button>
         </div>
-      ))}
+        );
+      })}
 
       <button
         type="button"
         onClick={handlePick}
         disabled={uploading}
-        title="Upload PDF documents"
+        title="Upload documents"
         className="flex items-center gap-1 px-2 py-1 border border-dashed border-outline-variant rounded-lg text-on-surface-variant hover:text-primary hover:border-primary transition-colors disabled:opacity-50"
       >
         <span className={`material-symbols-outlined text-[16px] ${uploading ? "animate-spin" : ""}`}>{uploading ? "progress_activity" : "add"}</span>
@@ -132,7 +131,6 @@ export default function LeadDocumentsCell({ lead }) {
       <input
         ref={fileInputRef}
         type="file"
-        accept="application/pdf"
         multiple
         onChange={handleFileChange}
         className="hidden"
