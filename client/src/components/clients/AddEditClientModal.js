@@ -1,22 +1,12 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { useDispatch } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 import { createClient, updateClient, uploadClientLogo } from "@/redux/slices/clientsSlice";
+import { fetchServices } from "@/redux/slices/servicesSlice";
 import { getAssetUrl } from "@/services/apiClient";
 import { CLIENT_INDUSTRY_OPTIONS } from "@/lib/clientIndustries";
 
-const SERVICE_OPTIONS = [
-  "Digital Marketing",
-  "Performance Marketing",
-  "Social Media Marketing",
-  "Web Development",
-  "Search Engine Optimization (Local SEO)",
-  "Brand Identity",
-  "Data Analytics",
-  "Content Strategy",
-  "Creative Design",
-];
 const MAX_LOGO_SIZE = 5 * 1024 * 1024;
 const todayISO = () => new Date().toISOString().split("T")[0];
 
@@ -45,6 +35,13 @@ export default function AddEditClientModal({ isOpen, client, teamMembers = [], o
 
 function ClientForm({ client, teamMembers, onClose, onSuccess }) {
   const dispatch = useDispatch();
+  const services = useSelector((state) => state.services.services);
+  const serviceOptions = services.map((s) => s.name);
+
+  useEffect(() => {
+    if (services.length === 0) dispatch(fetchServices());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dispatch]);
 
   const [formData, setFormData] = useState({
     name: "",
@@ -342,7 +339,12 @@ function ClientForm({ client, teamMembers, onClose, onSuccess }) {
             <>
               <div className="fixed inset-0 z-10" onClick={() => setServicesOpen(false)} />
               <div className="absolute z-20 mt-1 w-full bg-white border border-outline-variant rounded-lg shadow-lg max-h-56 overflow-y-auto">
-                {SERVICE_OPTIONS.map((service) => {
+                {serviceOptions.length === 0 && (
+                  <p className="px-4 py-2 font-body-sm text-body-sm text-secondary">
+                    No services configured yet — add some from Settings.
+                  </p>
+                )}
+                {serviceOptions.map((service) => {
                   const isSelected = formData.servicesSelected.includes(service);
                   return (
                     <div

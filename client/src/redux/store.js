@@ -9,6 +9,7 @@ import meetingNotesReducer from './slices/meetingNotesSlice';
 import miscTasksReducer from './slices/miscTasksSlice';
 import leadsReducer from './slices/leadsSlice';
 import notificationsReducer from './slices/notificationsSlice';
+import servicesReducer from './slices/servicesSlice';
 
 export const store = configureStore({
   reducer: {
@@ -22,6 +23,7 @@ export const store = configureStore({
     miscTasks: miscTasksReducer,
     leads: leadsReducer,
     notifications: notificationsReducer,
+    services: servicesReducer,
   },
   devTools: process.env.NODE_ENV !== 'production',
 });

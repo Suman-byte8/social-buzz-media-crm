@@ -4,6 +4,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { fetchSettings, saveSettings, uploadLogo, clearMessages } from '@/redux/slices/settingsSlice';
 import LoginAccessCard from '@/components/settings/LoginAccessCard';
+import ServicesCard from '@/components/settings/ServicesCard';
 import RequireAdmin from '@/components/auth/RequireAdmin';
 
 export default function SettingsPage() {
@@ -350,6 +351,7 @@ export default function SettingsPage() {
         </section>
 
         <LoginAccessCard />
+        <ServicesCard />
       </div>
     </main>
     </RequireAdmin>

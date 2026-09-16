@@ -19,7 +19,8 @@
     "migrate:lead-documents": "node scripts/add-lead-documents-column.js",
     "migrate:document-link-columns": "node scripts/add-document-link-columns.js",
     "migrate:task-assigned-by": "node scripts/add-task-assigned-by-column.js",
-    "seed:users": "node scripts/seed-users.js"
+    "seed:users": "node scripts/seed-users.js",
+    "seed:services": "node scripts/seed-services.js"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",

@@ -11,6 +11,7 @@ import userModel from "./User.js";
 import taskAssigneeModel from "./TaskAssignee.js";
 import leadModel from "./Lead.js";
 import notificationModel from "./Notification.js";
+import serviceModel from "./Service.js";
 
 export const initModels = (sequelize) => {
   const Client = clientModel(sequelize, DataTypes);
@@ -25,6 +26,7 @@ export const initModels = (sequelize) => {
   const TaskAssignee = taskAssigneeModel(sequelize, DataTypes);
   const Lead = leadModel(sequelize, DataTypes);
   const Notification = notificationModel(sequelize, DataTypes);
+  const Service = serviceModel(sequelize, DataTypes);
 
   Client.hasMany(Document, { foreignKey: "clientId", as: "documents" });
   Document.belongsTo(Client, { foreignKey: "clientId", as: "client" });
@@ -77,5 +79,6 @@ export const initModels = (sequelize) => {
     TaskAssignee,
     Lead,
     Notification,
+    Service,
   };
 };
