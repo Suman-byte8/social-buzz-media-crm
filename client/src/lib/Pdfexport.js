@@ -8,8 +8,7 @@ const A4_WIDTH_MM = 210;
 const A4_HEIGHT_MM = 297;
 
 /**
- * Renders a DOM node to a PDF sized to true A4 dimensions, always fit onto
- * a single page.
+ * Renders one DOM node ("sheet") to a canvas.
  *
  * Every field (input/textarea) is swapped for a plain <span>/<div> carrying
  * the same text and CSS classes before anything else touches the clone,
@@ -30,25 +29,28 @@ const A4_HEIGHT_MM = 297;
  *
  * This substitution has to happen *before* `[data-html2canvas-ignore]`
  * elements are removed from the clone (edit controls, the client picker
- * dropdown, the decorative blur shape — none of that belongs in the PDF).
- * The removed client-picker <select> sits earlier in the page than the line
- * items table; deleting it first and *then* pairing up original/cloned
- * fields by list position (the previous approach) shifted every field after
- * it by one slot, so each line item silently rendered the *previous*
- * field's value. Pairing fields while both trees are still structurally
- * identical avoids that class of bug entirely, not just today's instance.
+ * dropdown, the decorative blur shape, a report page's per-image remove
+ * button — none of that belongs in the PDF). The removed client-picker
+ * <select> sits earlier in the page than the line items table; deleting it
+ * first and *then* pairing up original/cloned fields by list position (the
+ * previous approach) shifted every field after it by one slot, so each line
+ * item silently rendered the *previous* field's value. Pairing fields while
+ * both trees are still structurally identical avoids that class of bug
+ * entirely, not just today's instance.
+ *
+ * Report pages (ReportImagePage.js) have no input/textarea fields, so this
+ * step is simply a no-op for them — the ignore-attribute stripping is what
+ * they actually rely on this shared function for.
  */
-async function generateInvoicePdfBlob(node) {
-  if (!node) throw new Error("Invoice element not found");
+async function captureSheetToCanvas(node) {
+  if (!node) throw new Error("Sheet element not found");
 
-  const canvas = await html2canvas(node, {
+  return html2canvas(node, {
     scale: 3,
     useCORS: true,
     backgroundColor: "#ffffff",
     onclone: (clonedDoc) => {
-      const clonedRoot = node.id
-        ? clonedDoc.getElementById(node.id)
-        : clonedDoc.body;
+      const clonedRoot = node.id ? clonedDoc.getElementById(node.id) : clonedDoc.body;
       if (!clonedRoot) return;
 
       const originalFields = node.querySelectorAll("input, textarea");
@@ -70,19 +72,20 @@ async function generateInvoicePdfBlob(node) {
         .forEach((el) => el.remove());
     },
   });
+}
 
-  const pdf = new jsPDF({ unit: "mm", format: "a4", orientation: "portrait" });
-
+// Places a captured canvas as the PDF's current page: fit to the page
+// width, and only shrunk further if it comes out taller than a full A4
+// page — never stretched to fill a shorter page. That means a lightly
+// filled last report page (e.g. one leftover image) just leaves blank
+// space at the bottom of that PDF page instead of being blown up, and the
+// single-page invoice keeps its existing "shrink to fit one page rather
+// than spill onto an almost-empty second page" behavior.
+function placeCanvasAsPage(pdf, canvas) {
   const imgWidthMm = A4_WIDTH_MM;
-  const imgHeightMm = (canvas.height * imgWidthMm) / canvas.width;
-
   let finalWidthMm = imgWidthMm;
-  let finalHeightMm = imgHeightMm;
+  let finalHeightMm = (canvas.height * imgWidthMm) / canvas.width;
 
-  // This is a single-page invoice template — always fit it onto one A4
-  // page. If the rendered content is slightly taller than one page, scale
-  // the whole image down proportionally (and center it) rather than
-  // spilling a few lines onto a near-empty second page.
   if (finalHeightMm > A4_HEIGHT_MM) {
     const scale = A4_HEIGHT_MM / finalHeightMm;
     finalHeightMm = A4_HEIGHT_MM;
@@ -90,25 +93,35 @@ async function generateInvoicePdfBlob(node) {
   }
 
   const xOffset = (A4_WIDTH_MM - finalWidthMm) / 2;
-  const yOffset = 0;
-
   const imgData = canvas.toDataURL("image/jpeg", 0.98);
-  pdf.addImage(
-    imgData,
-    "JPEG",
-    xOffset,
-    yOffset,
-    finalWidthMm,
-    finalHeightMm,
-    undefined,
-    "FAST",
-  );
+  pdf.addImage(imgData, "JPEG", xOffset, 0, finalWidthMm, finalHeightMm, undefined, "FAST");
+}
+
+/**
+ * Renders the invoice sheet, plus any additional full sheets (e.g. the
+ * report's pasted-screenshot pages), into one combined multi-page A4 PDF —
+ * invoice first, then each extra page in order. `extraPageNodes` may
+ * contain null/undefined entries (e.g. a ref not yet attached) — those are
+ * skipped rather than throwing.
+ */
+async function generateInvoicePdfBlob(invoiceNode, extraPageNodes = []) {
+  const pdf = new jsPDF({ unit: "mm", format: "a4", orientation: "portrait" });
+
+  const invoiceCanvas = await captureSheetToCanvas(invoiceNode);
+  placeCanvasAsPage(pdf, invoiceCanvas);
+
+  for (const node of extraPageNodes) {
+    if (!node) continue;
+    const canvas = await captureSheetToCanvas(node);
+    pdf.addPage();
+    placeCanvasAsPage(pdf, canvas);
+  }
 
   return pdf.output("blob");
 }
 
-export async function exportInvoiceToPdf(node, filename) {
-  const blob = await generateInvoicePdfBlob(node);
+export async function exportInvoiceToPdf(invoiceNode, filename, extraPageNodes = []) {
+  const blob = await generateInvoicePdfBlob(invoiceNode, extraPageNodes);
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
@@ -119,6 +132,6 @@ export async function exportInvoiceToPdf(node, filename) {
   URL.revokeObjectURL(url);
 }
 
-export async function getInvoicePdfBlob(node) {
-  return generateInvoicePdfBlob(node);
+export async function getInvoicePdfBlob(invoiceNode, extraPageNodes = []) {
+  return generateInvoicePdfBlob(invoiceNode, extraPageNodes);
 }
