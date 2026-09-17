@@ -6,29 +6,34 @@ import { exportInvoiceToPdf, getInvoicePdfBlob } from "@/lib/Pdfexport";
 import { API_BASE_URL } from "@/services/apiClient";
 import { shareFileNatively, buildWhatsAppUrl } from "@/lib/documentShare";
 
-export function useInvoiceActions({ invoiceSheetRef, invoiceNumber, dueDate, grandTotal, selectedClientId, selectedClient }) {
+export function useInvoiceActions({ invoiceSheetRef, reportPageRefs, invoiceNumber, dueDate, grandTotal, selectedClientId, selectedClient }) {
   const [isSavingPdf, setIsSavingPdf] = useState(false);
   const [isSavingToDrive, setIsSavingToDrive] = useState(false);
   const [isSharing, setIsSharing] = useState(false);
+
+  // reportPageRefs.current can briefly contain nulls (a page unmounting/
+  // remounting as the image layout recomputes) — filter those out right
+  // before every use rather than trying to keep the array itself pristine.
+  const getReportPageNodes = useCallback(() => (reportPageRefs?.current || []).filter(Boolean), [reportPageRefs]);
 
   const handleSavePdf = useCallback(async () => {
     if (!invoiceSheetRef.current) return;
     setIsSavingPdf(true);
     try {
-      await exportInvoiceToPdf(invoiceSheetRef.current, `Invoice-${invoiceNumber || "draft"}.pdf`);
+      await exportInvoiceToPdf(invoiceSheetRef.current, `Invoice-${invoiceNumber || "draft"}.pdf`, getReportPageNodes());
     } catch (e) {
       console.error("PDF generation failed:", e);
       window.print();
     } finally {
       setIsSavingPdf(false);
     }
-  }, [invoiceSheetRef, invoiceNumber]);
+  }, [invoiceSheetRef, invoiceNumber, getReportPageNodes]);
 
   const handleSaveToDrive = useCallback(async () => {
     if (!invoiceSheetRef.current || !selectedClientId) return;
     setIsSavingToDrive(true);
     try {
-      const pdfBlob = await getInvoicePdfBlob(invoiceSheetRef.current);
+      const pdfBlob = await getInvoicePdfBlob(invoiceSheetRef.current, getReportPageNodes());
       await uploadInvoiceToDrive(pdfBlob, selectedClientId, invoiceNumber);
       alert("Invoice saved to Google Drive successfully!");
     } catch (e) {
@@ -37,11 +42,12 @@ export function useInvoiceActions({ invoiceSheetRef, invoiceNumber, dueDate, gra
     } finally {
       setIsSavingToDrive(false);
     }
-  }, [invoiceSheetRef, invoiceNumber, selectedClientId]);
+  }, [invoiceSheetRef, invoiceNumber, selectedClientId, getReportPageNodes]);
 
-  // Uploads the invoice and returns the created Document record (id,
-  // fileName, ...), used by both the WhatsApp and Email link-based
-  // fallbacks below to build a direct PDF link or attach the file.
+  // Uploads the invoice (+ any report pages) and returns the created
+  // Document record (id, fileName, ...), used by both the WhatsApp and
+  // Email link-based fallbacks below to build a direct PDF link or attach
+  // the file.
   const uploadInvoiceDocument = useCallback(
     async (pdfBlob) => {
       if (!selectedClientId) return null;
@@ -90,7 +96,7 @@ export function useInvoiceActions({ invoiceSheetRef, invoiceNumber, dueDate, gra
       setIsSharing(true);
       try {
         const fileName = `Invoice-${invoiceNumber || "draft"}.pdf`;
-        const pdfBlob = await getInvoicePdfBlob(invoiceSheetRef.current);
+        const pdfBlob = await getInvoicePdfBlob(invoiceSheetRef.current, getReportPageNodes());
 
         // Preferred path: hand the actual PDF file to the OS/browser share
         // sheet so the user picks WhatsApp and the real file gets attached —
@@ -126,7 +132,7 @@ export function useInvoiceActions({ invoiceSheetRef, invoiceNumber, dueDate, gra
           const pdfLink = getDocumentPdfLink(documentRecord);
           let downloadedLocally = false;
           if (!pdfLink) {
-            await exportInvoiceToPdf(invoiceSheetRef.current, fileName);
+            await exportInvoiceToPdf(invoiceSheetRef.current, fileName, getReportPageNodes());
             downloadedLocally = true;
           }
           const message = buildShareMessage({ pdfLink, downloadedLocally });
@@ -149,7 +155,7 @@ export function useInvoiceActions({ invoiceSheetRef, invoiceNumber, dueDate, gra
         setIsSharing(false);
       }
     },
-    [selectedClient, invoiceNumber, invoiceSheetRef, uploadInvoiceDocument, buildShareMessage]
+    [selectedClient, invoiceNumber, invoiceSheetRef, uploadInvoiceDocument, buildShareMessage, getReportPageNodes]
   );
 
   const handleSendEmail = useCallback(async () => {
@@ -157,7 +163,7 @@ export function useInvoiceActions({ invoiceSheetRef, invoiceNumber, dueDate, gra
     setIsSharing(true);
     try {
       const fileName = `Invoice-${invoiceNumber || "draft"}.pdf`;
-      const pdfBlob = await getInvoicePdfBlob(invoiceSheetRef.current);
+      const pdfBlob = await getInvoicePdfBlob(invoiceSheetRef.current, getReportPageNodes());
       const subject = `Invoice ${invoiceNumber} from Social Buzz Media`;
 
       let documentRecord = null;
@@ -193,7 +199,7 @@ export function useInvoiceActions({ invoiceSheetRef, invoiceNumber, dueDate, gra
       const pdfLink = getDocumentPdfLink(documentRecord);
       let downloadedLocally = false;
       if (!pdfLink) {
-        await exportInvoiceToPdf(invoiceSheetRef.current, fileName);
+        await exportInvoiceToPdf(invoiceSheetRef.current, fileName, getReportPageNodes());
         downloadedLocally = true;
       }
       const body = buildShareMessage({ pdfLink, downloadedLocally });
@@ -208,7 +214,7 @@ export function useInvoiceActions({ invoiceSheetRef, invoiceNumber, dueDate, gra
     } finally {
       setIsSharing(false);
     }
-  }, [selectedClient, invoiceNumber, invoiceSheetRef, uploadInvoiceDocument, buildShareMessage]);
+  }, [selectedClient, invoiceNumber, invoiceSheetRef, uploadInvoiceDocument, buildShareMessage, getReportPageNodes]);
 
   return {
     isSavingPdf,

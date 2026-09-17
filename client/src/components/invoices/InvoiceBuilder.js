@@ -3,11 +3,15 @@
 import React, { useState, useCallback, useRef, useMemo } from "react";
 import InvoiceToolbar from "./Invoicetoolbar";
 import InvoiceDocument from "./Invoicedocument";
+import ReportPagesEditor from "./ReportPagesEditor";
+import ReportImagePage from "./ReportImagePage";
 import { numberToIndianWords } from "../../lib/Numbertowords";
 import { computeInvoiceTotals } from "../../lib/invoiceTotals";
+import { layoutImagesIntoPages } from "../../lib/imageGridLayout";
 import { DEFAULT_ROWS, DEFAULT_TERMS } from "./invoiceDefaults";
 import { useInvoiceClients } from "./useInvoiceClients";
 import { useInvoiceActions } from "./useInvoiceActions";
+import { useReportImages } from "./useReportImages";
 
 export default function InvoiceBuilder() {
   const [invoiceNumber, setInvoiceNumber] = useState("SBM-2026-014");
@@ -30,6 +34,11 @@ export default function InvoiceBuilder() {
   const [advancePaid, setAdvancePaid] = useState(0);
 
   const invoiceSheetRef = useRef(null);
+  const reportPageRefs = useRef([]);
+
+  const { images: reportImages, addFiles: addReportImages, removeImage: removeReportImage, error: reportImagesError } =
+    useReportImages();
+  const reportPages = useMemo(() => layoutImagesIntoPages(reportImages), [reportImages]);
 
   const { clients, isClientLoading, selectedClientId, selectedClient, handleClientChange } = useInvoiceClients({
     onClientSelected: () => setInvoiceNumber((prev) => prev || `SBM-INVOICE-${Date.now()}`),
@@ -70,6 +79,7 @@ export default function InvoiceBuilder() {
   const { isSavingPdf, isSavingToDrive, isSharing, handleSavePdf, handleSaveToDrive, handleSendWhatsApp, handleSendEmail } =
     useInvoiceActions({
       invoiceSheetRef,
+      reportPageRefs,
       invoiceNumber,
       dueDate,
       grandTotal: totals.grand,
@@ -134,6 +144,22 @@ export default function InvoiceBuilder() {
           onRemoveTerm={removeTerm}
           stampMode={stampMode}
         />
+
+        <ReportPagesEditor onAddFiles={addReportImages} imageCount={reportImages.length} error={reportImagesError} />
+
+        {reportPages.map((page, index) => (
+          <div key={index} className="mt-8">
+            <ReportImagePage
+              ref={(el) => {
+                reportPageRefs.current[index] = el;
+              }}
+              rows={page.rows}
+              pageNumber={index + 2}
+              totalPages={reportPages.length + 1}
+              onRemoveImage={removeReportImage}
+            />
+          </div>
+        ))}
       </main>
     </div>
   );
