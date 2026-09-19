@@ -13,6 +13,7 @@ const navItems = [
   { label: "Tasks", href: "/tasks", icon: "assignment" },
   { label: "Team", href: "/team", icon: "people" },
   { label: "Invoices", href: "/invoices", icon: "receipt_long", adminOnly: true },
+  { label: "Salary Slip Generator", href: "/salary-slips", icon: "payments", adminOnly: true },
   { label: "Agreements", href: "/agreements", icon: "description", adminOnly: true },
   { label: "Meeting Notes", href: "/notes", icon: "event_note" },
   { label: "Miscellaneous", href: "/miscellaneous", icon: "widgets" },

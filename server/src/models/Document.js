@@ -37,11 +37,15 @@ const documentModel = (sequelize) => {
       // document, or an external image link that got mirrored into Drive.
       // A STRING rather than another ENUM, same reasoning as linkType below.
       noteAttachmentKind: { type: DataTypes.STRING, allowNull: true },
+      // Soft reference (no FK constraint, same as leadId/noteId) — only set
+      // when documentType is "salary_slip". A team member's Drive folder
+      // (not a client's) is where these land — see getOrCreateTeamMembersFolder.
+      teamMemberId: { type: DataTypes.INTEGER, allowNull: true },
       uploadedBy: { type: DataTypes.STRING, allowNull: true },
       description: { type: DataTypes.TEXT, allowNull: true },
       // Agreement-specific fields
       documentType: {
-        type: DataTypes.ENUM("agreement", "proposal", "invoice", "report", "content_calendar", "brand_kit", "creative", "strategy", "lead", "note", "other"),
+        type: DataTypes.ENUM("agreement", "proposal", "invoice", "report", "content_calendar", "brand_kit", "creative", "strategy", "lead", "note", "salary_slip", "other"),
         allowNull: true,
         defaultValue: "other",
       },
@@ -69,6 +73,7 @@ const documentModel = (sequelize) => {
         { fields: ["clientId"] },
         { fields: ["leadId"] },
         { fields: ["noteId"] },
+        { fields: ["teamMemberId"] },
         { fields: ["documentType"] },
         { fields: ["status"] },
       ],

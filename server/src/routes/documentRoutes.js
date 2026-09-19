@@ -1,7 +1,7 @@
 import express from "express";
 import multer from "multer";
 import { Op } from "sequelize";
-import { uploadFileToDrive, getFileBufferFromDrive, getOrCreateClientFolder, getOrCreateClientSubfolder, getOrCreateLeadsFolder, trashFileInDrive } from "../utils/googleDrive.js";
+import { uploadFileToDrive, getFileBufferFromDrive, getOrCreateClientFolder, getOrCreateClientSubfolder, getOrCreateLeadsFolder, getOrCreateTeamMembersFolder, trashFileInDrive } from "../utils/googleDrive.js";
 import { fetchImageAsBuffer } from "../utils/fetchRemoteImage.js";
 import { getCachedFile, setCachedFile } from "../utils/fileCache.js";
 import { sendMail } from "../utils/mailer.js";
@@ -35,10 +35,11 @@ const mediaUpload = multer({
   limits: { fileSize: 200 * 1024 * 1024, files: 20 }, // 200MB per file, up to 20 files per request
 });
 
-// Agreements and Proposals are admin-only (hidden from team members).
-const ADMIN_ONLY_DOCUMENT_TYPES = ["agreement", "proposal"];
+// Agreements, Proposals, and Salary Slips are admin-only (hidden from team
+// members) — the last one because it carries compensation data.
+const ADMIN_ONLY_DOCUMENT_TYPES = ["agreement", "proposal", "salary_slip"];
 
-const requireAdminForAgreements = (req, res, next) => {
+const requireAdmin = (req, res, next) => {
   if (req.user?.role !== "admin") {
     return res.status(403).json({ success: false, message: "Admin access required" });
   }
@@ -73,7 +74,7 @@ const NOTE_SUBFOLDER_BY_KIND = {
 };
 
 // Upload agreement with specific subfolder
-router.post("/agreements/upload", requireAdminForAgreements, upload.single("file"), async (req, res) => {
+router.post("/agreements/upload", requireAdmin, upload.single("file"), async (req, res) => {
   try {
     const { id, clientId, issuedDate, expiryDate, status, description } = req.body;
 
@@ -245,6 +246,72 @@ router.post("/documents/upload", upload.single("file"), async (req, res) => {
     res.status(500).json({
       success: false,
       message: error.message || "Failed to upload document",
+      error: error.message,
+    });
+  }
+});
+
+// Salary slip PDF upload — team-member-scoped rather than client-scoped
+// (like invoices/agreements are for clients). Admin-gated server-side too
+// (not just the sidebar/page-level gate) since the PDF carries compensation
+// data.
+router.post("/documents/upload-salary-slip", requireAdmin, upload.single("file"), async (req, res) => {
+  try {
+    const { teamMemberId, description } = req.body;
+
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: "No PDF file provided" });
+    }
+    if (!teamMemberId) {
+      return res.status(400).json({ success: false, message: "teamMemberId is required" });
+    }
+
+    const { Document, TeamMember } = req.app.locals.models;
+    const teamMember = await TeamMember.findByPk(parseInt(teamMemberId));
+    if (!teamMember) {
+      return res.status(404).json({ success: false, message: "Team member not found" });
+    }
+
+    // Same nesting pattern as a client's Drive subfolders: one shared
+    // "Team Members" folder, one subfolder per member (already used for
+    // avatar/resume uploads — see teamRoutes.js), then a "Salary Slip"
+    // subfolder under that member's own folder.
+    const teamFolder = await getOrCreateTeamMembersFolder();
+    const memberFolder = await getOrCreateClientSubfolder(teamFolder.folderId, teamMember.name);
+    const salarySlipFolder = await getOrCreateClientSubfolder(memberFolder.folderId, "Salary Slip");
+
+    const driveResult = await uploadFileToDrive(
+      req.file.buffer,
+      req.file.originalname,
+      req.file.mimetype,
+      salarySlipFolder.folderId
+    );
+
+    const document = await Document.create({
+      fileName: req.file.originalname,
+      fileType: req.file.mimetype,
+      fileSize: req.file.size,
+      fileId: driveResult.fileId,
+      driveLink: driveResult.googleUserContentLink,
+      webViewLink: driveResult.webViewLink,
+      googleUserContentLink: driveResult.googleUserContentLink,
+      folderId: salarySlipFolder.folderId,
+      teamMemberId: parseInt(teamMemberId),
+      description: description || null,
+      documentType: "salary_slip",
+    });
+
+    await invalidateCache("documents");
+    res.status(201).json({
+      success: true,
+      message: "Salary slip saved to Google Drive successfully",
+      data: document,
+    });
+  } catch (error) {
+    console.error("Error uploading salary slip:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message || "Failed to upload salary slip",
       error: error.message,
     });
   }
@@ -649,7 +716,7 @@ router.post("/documents/note-image-link", async (req, res) => {
 router.get("/documents", cacheRoute("documents", 120), async (req, res) => {
   try {
     const { Document } = req.app.locals.models;
-    const { clientId, leadId, noteId, documentType, page, limit } = req.query;
+    const { clientId, leadId, noteId, teamMemberId, documentType, page, limit } = req.query;
 
     const where = {};
     if (clientId) {
@@ -660,6 +727,9 @@ router.get("/documents", cacheRoute("documents", 120), async (req, res) => {
     }
     if (noteId) {
       where.noteId = parseInt(noteId);
+    }
+    if (teamMemberId) {
+      where.teamMemberId = parseInt(teamMemberId);
     }
     if (documentType) {
       where.documentType = documentType;
@@ -882,7 +952,7 @@ router.post("/documents/:id/email", async (req, res) => {
 // `page`/`limit` are optional — omitting them preserves the historical
 // "return everything" behavior existing callers rely on (e.g. a client
 // profile's Agreement tab, which wants its one client's full list).
-router.get("/agreements", requireAdminForAgreements, cacheRoute("documents", 120), async (req, res) => {
+router.get("/agreements", requireAdmin, cacheRoute("documents", 120), async (req, res) => {
   try {
     const { Document } = req.app.locals.models;
     const { clientId, status, search, page, limit } = req.query;
@@ -929,7 +999,7 @@ router.get("/agreements", requireAdminForAgreements, cacheRoute("documents", 120
   }
 });
 
-router.get("/agreements/:id", requireAdminForAgreements, async (req, res) => {
+router.get("/agreements/:id", requireAdmin, async (req, res) => {
   try {
     const { Document } = req.app.locals.models;
     const agreement = await Document.findOne({
@@ -950,7 +1020,7 @@ router.get("/agreements/:id", requireAdminForAgreements, async (req, res) => {
   }
 });
 
-router.put("/agreements/:id", requireAdminForAgreements, async (req, res) => {
+router.put("/agreements/:id", requireAdmin, async (req, res) => {
   try {
     const { Document } = req.app.locals.models;
     const { issuedDate, expiryDate, status, description } = req.body;
@@ -982,7 +1052,7 @@ router.put("/agreements/:id", requireAdminForAgreements, async (req, res) => {
   }
 });
 
-router.delete("/agreements/:id", requireAdminForAgreements, async (req, res) => {
+router.delete("/agreements/:id", requireAdmin, async (req, res) => {
   try {
     const { Document } = req.app.locals.models;
     const agreement = await Document.findOne({
