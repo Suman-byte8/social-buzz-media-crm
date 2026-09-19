@@ -40,16 +40,49 @@ const sslOptions = needsSslByDefault
   ? { ssl: { require: true, rejectUnauthorized: false } }
   : undefined;
 
+// min: 1 keeps one connection warm so the first request after an idle
+// period doesn't pay for establishing a fresh connection (relevant on
+// managed Postgres with TLS handshake overhead); negligible idle cost for a
+// single connection.
+const poolOptions = { max: 10, min: 1, acquire: 30000, idle: 10000 };
+
+// Managed poolers (Supabase's Supavisor, PgBouncer, etc.) can silently close
+// a connection our pool still believes is warm — the app only finds out
+// when it tries to run the next query on it, which fails with a plain
+// "Connection terminated unexpectedly" from the `pg` driver rather than one
+// of the SequelizeConnection*Error subclasses. Sequelize DOES retry queries
+// automatically on connection-ish failures, but only for errors matching
+// its default `retry.match` patterns — that exact message isn't one of
+// them, so without this it reached routes as a real (and misleading) 500
+// instead of being retried once transparently. This list is Sequelize's
+// own defaults (see lib/sequelize.js) plus that one addition.
+const retryOptions = {
+  max: 3,
+  match: [
+    /ETIMEDOUT/,
+    /EHOSTUNREACH/,
+    /ECONNRESET/,
+    /ECONNREFUSED/,
+    /ESOCKETTIMEDOUT/,
+    /EPIPE/,
+    /EAI_AGAIN/,
+    /SequelizeConnectionError/,
+    /SequelizeConnectionRefusedError/,
+    /SequelizeHostNotFoundError/,
+    /SequelizeHostNotReachableError/,
+    /SequelizeInvalidConnectionError/,
+    /SequelizeConnectionTimedOutError/,
+    /Connection terminated unexpectedly/,
+  ],
+};
+
 if (process.env.DATABASE_URL) {
   sequelize = new Sequelize(process.env.DATABASE_URL, {
     dialect: "postgres",
     logging: isDev ? console.log : false,
     dialectOptions: sslOptions,
-    // min: 1 keeps one connection warm so the first request after an idle
-    // period doesn't pay for establishing a fresh connection (relevant on
-    // managed Postgres with TLS handshake overhead); negligible idle cost
-    // for a single connection.
-    pool: { max: 10, min: 1, acquire: 30000, idle: 10000 },
+    pool: poolOptions,
+    retry: retryOptions,
   });
   console.log(
     `[DB] Using DATABASE_URL (connection string) ssl=${!!sslOptions}`,
@@ -65,11 +98,8 @@ if (process.env.DATABASE_URL) {
       dialect: "postgres",
       logging: isDev ? console.log : false,
       dialectOptions: sslOptions,
-      // min: 1 keeps one connection warm so the first request after an idle
-    // period doesn't pay for establishing a fresh connection (relevant on
-    // managed Postgres with TLS handshake overhead); negligible idle cost
-    // for a single connection.
-    pool: { max: 10, min: 1, acquire: 30000, idle: 10000 },
+      pool: poolOptions,
+      retry: retryOptions,
     },
   );
   console.log(`[DB] Using DB_* env vars (host=${process.env.DB_HOST})`);
