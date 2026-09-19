@@ -30,14 +30,30 @@ export default function AgreementsTable({
   onView,
   onEdit,
   onDelete,
+  // The per-client profile tab (ClientAgreementTab) already scopes every
+  // row to one client, so a "Client" column would just repeat the same
+  // name down the whole table — hide it there and give that space back to
+  // the other columns instead of forcing a horizontal scrollbar.
+  hideClientColumn = false,
 }) {
+  const columnCount = hideClientColumn ? 5 : 6;
   return (
-    <div className="bg-white rounded-b-xl border border-outline-variant shadow-card overflow-hidden overflow-x-auto">
-      <table className="w-full min-w-[860px] text-left border-collapse">
+    <div className="bg-white rounded-b-xl border border-outline-variant shadow-card overflow-hidden">
+      <table className="w-full text-left border-collapse table-fixed">
+        <colgroup>
+          <col className={hideClientColumn ? "w-[34%]" : "w-[28%]"} />
+          {!hideClientColumn && <col className="w-[16%]" />}
+          <col className="w-[16%]" />
+          <col className="w-[16%]" />
+          <col className="w-[14%]" />
+          <col className={hideClientColumn ? "w-[20%]" : "w-[14%]"} />
+        </colgroup>
         <thead>
           <tr className="bg-[#FAFAFA] border-b border-[#F0F0F0]">
             <th className="py-3 px-4 font-label-sm text-label-sm text-secondary uppercase tracking-wider">Agreement</th>
-            <th className="py-3 px-4 font-label-sm text-label-sm text-secondary uppercase tracking-wider">Client</th>
+            {!hideClientColumn && (
+              <th className="py-3 px-4 font-label-sm text-label-sm text-secondary uppercase tracking-wider">Client</th>
+            )}
             <th className="py-3 px-4 font-label-sm text-label-sm text-secondary uppercase tracking-wider">Issued</th>
             <th className="py-3 px-4 font-label-sm text-label-sm text-secondary uppercase tracking-wider">Expires</th>
             <th className="py-3 px-4 font-label-sm text-label-sm text-secondary uppercase tracking-wider">Status</th>
@@ -47,14 +63,14 @@ export default function AgreementsTable({
         <tbody className="text-body-sm font-body-sm">
           {loading ? (
             <tr>
-              <td colSpan={6} className="py-12 text-center text-secondary">
+              <td colSpan={columnCount} className="py-12 text-center text-secondary">
                 <span className="animate-spin material-symbols-outlined align-middle mr-2">progress_activity</span>
                 Loading agreements...
               </td>
             </tr>
           ) : agreements.length === 0 ? (
             <tr>
-              <td colSpan={6} className="py-12 text-center text-secondary">
+              <td colSpan={columnCount} className="py-12 text-center text-secondary">
                 <span className="material-symbols-outlined text-[40px] block mb-1.5 mx-auto">description</span>
                 No agreements found.
               </td>
@@ -66,7 +82,7 @@ export default function AgreementsTable({
               const client = clients.find((c) => c.id === agreement.clientId) || null;
               return (
                 <tr key={agreement.id} className="border-b border-[#F0F0F0] hover:bg-[#F9F9F9] transition-colors group">
-                  <td className="py-4 px-4">
+                  <td className="py-4 px-4 overflow-hidden">
                     <div className="flex items-center gap-3">
                       <span className="material-symbols-outlined text-primary text-[24px] shrink-0">description</span>
                       <div className="min-w-0">
@@ -80,18 +96,20 @@ export default function AgreementsTable({
                           href={getAssetUrl(`/api/documents/${agreement.id}/stream`)}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="font-title-md text-title-md text-on-surface hover:text-primary transition-colors truncate block max-w-[240px]"
+                          className="font-title-md text-title-md text-on-surface hover:text-primary transition-colors truncate block"
                           title={agreement.fileName}
                         >
                           {agreement.fileName}
                         </a>
-                        <p className="text-xs text-secondary truncate max-w-[240px]" title={agreement.description}>
+                        <p className="text-xs text-secondary truncate" title={agreement.description}>
                           {agreement.description || "No description provided"}
                         </p>
                       </div>
                     </div>
                   </td>
-                  <td className="py-4 px-4 text-on-surface">{getClientName(agreement.clientId)}</td>
+                  {!hideClientColumn && (
+                    <td className="py-4 px-4 text-on-surface truncate">{getClientName(agreement.clientId)}</td>
+                  )}
                   <td className="py-4 px-4 text-secondary whitespace-nowrap">{formatDate(agreement.issuedDate)}</td>
                   <td className="py-4 px-4 whitespace-nowrap">
                     <span className={expiringSoon ? "text-amber-700 font-medium" : "text-secondary"}>
@@ -108,7 +126,7 @@ export default function AgreementsTable({
                     <StatusBadge status={meta.label} color={meta.color} showDot />
                   </td>
                   <td className="py-4 px-4 text-right">
-                    <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="flex flex-wrap items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                       <button
                         onClick={() => onView(agreement)}
                         className="p-1.5 text-secondary hover:text-primary hover:bg-gray-100 rounded transition-colors"

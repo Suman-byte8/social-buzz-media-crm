@@ -66,6 +66,9 @@ export const initModels = (sequelize) => {
   Lead.hasMany(Document, { foreignKey: "leadId", as: "documents", constraints: false });
   Document.belongsTo(Lead, { foreignKey: "leadId", as: "lead", constraints: false });
 
+  MeetingNote.hasMany(Document, { foreignKey: "noteId", as: "attachments", constraints: false });
+  Document.belongsTo(MeetingNote, { foreignKey: "noteId", as: "note", constraints: false });
+
   return {
     Client,
     TeamMember,

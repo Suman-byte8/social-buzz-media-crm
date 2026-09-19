@@ -2,6 +2,7 @@ import express from "express";
 import multer from "multer";
 import { Op } from "sequelize";
 import { uploadFileToDrive, getFileBufferFromDrive, getOrCreateClientFolder, getOrCreateClientSubfolder, getOrCreateLeadsFolder, trashFileInDrive } from "../utils/googleDrive.js";
+import { fetchImageAsBuffer } from "../utils/fetchRemoteImage.js";
 import { getCachedFile, setCachedFile } from "../utils/fileCache.js";
 import { sendMail } from "../utils/mailer.js";
 import { cacheRoute } from "../middleware/cacheRoute.js";
@@ -61,6 +62,15 @@ const MEDIA_SUBFOLDER_BY_TYPE = {
   report: "Reports",
 };
 const mediaSubfolderName = (documentType) => MEDIA_SUBFOLDER_BY_TYPE[documentType] || "Other";
+
+// Note attachments (documentType "note") share one Drive subfolder per
+// noteAttachmentKind rather than one per document type — see
+// Document.noteAttachmentKind.
+const NOTE_SUBFOLDER_BY_KIND = {
+  screenshot: "Note Screenshots",
+  document: "Note Documents",
+  image_link: "Note Images",
+};
 
 // Upload agreement with specific subfolder
 router.post("/agreements/upload", requireAdminForAgreements, upload.single("file"), async (req, res) => {
@@ -497,12 +507,149 @@ router.post("/documents/upload-lead-bulk", leadUpload.array("files", 10), async 
   }
 });
 
+// Note attachments (screenshot dump / documents / image links) — any file
+// type, multiple files per upload, into a per-client Drive subfolder keyed
+// by `kind` (see NOTE_SUBFOLDER_BY_KIND). Mirrors upload-media-bulk above,
+// but tagged with noteId/noteAttachmentKind instead of a documentType per
+// kind, so the Notes tab can fetch all three kinds for a client in one call.
+router.post("/documents/upload-note-bulk", mediaUpload.array("files", 20), async (req, res) => {
+  try {
+    const { clientId, noteId, kind, description } = req.body;
+
+    if (!req.files || req.files.length === 0) {
+      return res.status(400).json({ success: false, message: "No files provided" });
+    }
+    if (!clientId) {
+      return res.status(400).json({ success: false, message: "clientId is required" });
+    }
+    if (!NOTE_SUBFOLDER_BY_KIND[kind]) {
+      return res.status(400).json({ success: false, message: "kind must be screenshot or document" });
+    }
+
+    const { Document, Client } = req.app.locals.models;
+
+    const clientRecord = await Client.findByPk(parseInt(clientId));
+    if (!clientRecord) {
+      return res.status(404).json({ success: false, message: "Client not found" });
+    }
+
+    const clientFolder = await getOrCreateClientFolder(clientRecord.name, clientRecord.id);
+    const subfolder = await getOrCreateClientSubfolder(clientFolder.folderId, NOTE_SUBFOLDER_BY_KIND[kind]);
+
+    const uploaded = [];
+    const failed = [];
+
+    for (const file of req.files) {
+      try {
+        const driveResult = await uploadFileToDrive(file.buffer, file.originalname, file.mimetype, subfolder.folderId);
+
+        const document = await Document.create({
+          fileName: file.originalname,
+          fileType: file.mimetype,
+          fileSize: file.size,
+          fileId: driveResult.fileId,
+          driveLink: driveResult.googleUserContentLink,
+          webViewLink: driveResult.webViewLink,
+          googleUserContentLink: driveResult.googleUserContentLink,
+          folderId: subfolder.folderId,
+          clientId: parseInt(clientId),
+          noteId: noteId ? parseInt(noteId) : null,
+          noteAttachmentKind: kind,
+          description: description || null,
+          documentType: "note",
+        });
+
+        uploaded.push(document);
+      } catch (fileError) {
+        console.error(`Error uploading file "${file.originalname}":`, fileError);
+        failed.push({ fileName: file.originalname, error: fileError.message });
+      }
+    }
+
+    if (uploaded.length > 0) await invalidateCache("documents");
+    res.status(201).json({
+      success: true,
+      message:
+        failed.length > 0
+          ? `${uploaded.length} file(s) uploaded, ${failed.length} failed`
+          : "Files uploaded successfully",
+      data: uploaded,
+      failed,
+    });
+  } catch (error) {
+    console.error("Error bulk uploading note attachments:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message || "Failed to upload files",
+      error: error.message,
+    });
+  }
+});
+
+// A note's "image links" flow — the user pastes a URL to an image hosted
+// elsewhere; we fetch it server-side (see fetchRemoteImage.js for the SSRF
+// guards) and store the actual bytes in Drive, rather than just recording
+// the external link the way the Strategy tab's Google Sheet/Doc links do.
+// The original URL is kept on linkUrl for reference, but the Drive copy
+// (fileId/stream) is what the UI shows going forward.
+router.post("/documents/note-image-link", async (req, res) => {
+  try {
+    const { clientId, noteId, imageUrl } = req.body;
+
+    if (!clientId) {
+      return res.status(400).json({ success: false, message: "clientId is required" });
+    }
+    if (!imageUrl || !imageUrl.trim()) {
+      return res.status(400).json({ success: false, message: "imageUrl is required" });
+    }
+
+    const { Document, Client } = req.app.locals.models;
+    const clientRecord = await Client.findByPk(parseInt(clientId));
+    if (!clientRecord) {
+      return res.status(404).json({ success: false, message: "Client not found" });
+    }
+
+    const { buffer, contentType, fileName } = await fetchImageAsBuffer(imageUrl.trim());
+
+    const clientFolder = await getOrCreateClientFolder(clientRecord.name, clientRecord.id);
+    const subfolder = await getOrCreateClientSubfolder(clientFolder.folderId, NOTE_SUBFOLDER_BY_KIND.image_link);
+
+    const driveResult = await uploadFileToDrive(buffer, fileName, contentType, subfolder.folderId);
+
+    const document = await Document.create({
+      fileName,
+      fileType: contentType,
+      fileSize: buffer.length,
+      fileId: driveResult.fileId,
+      driveLink: driveResult.googleUserContentLink,
+      webViewLink: driveResult.webViewLink,
+      googleUserContentLink: driveResult.googleUserContentLink,
+      folderId: subfolder.folderId,
+      clientId: parseInt(clientId),
+      noteId: noteId ? parseInt(noteId) : null,
+      noteAttachmentKind: "image_link",
+      linkUrl: imageUrl.trim(),
+      documentType: "note",
+    });
+
+    await invalidateCache("documents");
+    res.status(201).json({ success: true, message: "Image saved to Drive", data: document });
+  } catch (error) {
+    console.error("Error saving note image link:", error);
+    res.status(400).json({
+      success: false,
+      message: error.message || "Failed to save image link",
+      error: error.message,
+    });
+  }
+});
+
 // `page`/`limit` are optional — omitting them preserves the historical
 // "return everything" behavior existing callers rely on.
 router.get("/documents", cacheRoute("documents", 120), async (req, res) => {
   try {
     const { Document } = req.app.locals.models;
-    const { clientId, leadId, documentType, page, limit } = req.query;
+    const { clientId, leadId, noteId, documentType, page, limit } = req.query;
 
     const where = {};
     if (clientId) {
@@ -510,6 +657,9 @@ router.get("/documents", cacheRoute("documents", 120), async (req, res) => {
     }
     if (leadId) {
       where.leadId = parseInt(leadId);
+    }
+    if (noteId) {
+      where.noteId = parseInt(noteId);
     }
     if (documentType) {
       where.documentType = documentType;

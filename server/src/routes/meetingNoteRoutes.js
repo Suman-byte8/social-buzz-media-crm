@@ -13,6 +13,7 @@ router.post("/meeting-notes", async (req, res) => {
       meetingType,
       attendees,
       actionItems,
+      link,
       clientId,
       createdBy,
     } = req.body;
@@ -28,6 +29,7 @@ router.post("/meeting-notes", async (req, res) => {
       meetingType: meetingType || "other",
       attendees: attendees || null,
       actionItems: actionItems || null,
+      link: link || null,
       clientId: clientId ? parseInt(clientId) : null,
       createdBy: createdBy || null,
     });
@@ -150,7 +152,7 @@ router.put("/meeting-notes/:id", async (req, res) => {
       return res.status(404).json({ success: false, message: "Meeting note not found" });
     }
 
-    const { title, description, meetingDate, meetingType, attendees, actionItems, clientId } = req.body;
+    const { title, description, meetingDate, meetingType, attendees, actionItems, link, clientId } = req.body;
 
     const updateData = {
       title: title ?? meetingNote.title,
@@ -159,6 +161,7 @@ router.put("/meeting-notes/:id", async (req, res) => {
       meetingType: meetingType ?? meetingNote.meetingType,
       attendees: attendees !== undefined ? attendees : meetingNote.attendees,
       actionItems: actionItems !== undefined ? actionItems : meetingNote.actionItems,
+      link: link !== undefined ? link : meetingNote.link,
       clientId: clientId !== undefined ? parseInt(clientId) : meetingNote.clientId,
     };
 

@@ -27,11 +27,21 @@ const documentModel = (sequelize) => {
       // be deleted (e.g. converted to a client) without losing the
       // proposals/agreements that were shared with it.
       leadId: { type: DataTypes.INTEGER, allowNull: true },
+      // Soft reference (no FK constraint, same as leadId) — only set when
+      // documentType is "note" (see noteAttachmentKind below). Ties a
+      // screenshot/document/image-link back to the MeetingNote it was
+      // attached to.
+      noteId: { type: DataTypes.INTEGER, allowNull: true },
+      // Only set when documentType is "note" — which of the three note
+      // attachment flows this came from: a pasted screenshot, an uploaded
+      // document, or an external image link that got mirrored into Drive.
+      // A STRING rather than another ENUM, same reasoning as linkType below.
+      noteAttachmentKind: { type: DataTypes.STRING, allowNull: true },
       uploadedBy: { type: DataTypes.STRING, allowNull: true },
       description: { type: DataTypes.TEXT, allowNull: true },
       // Agreement-specific fields
       documentType: {
-        type: DataTypes.ENUM("agreement", "proposal", "invoice", "report", "content_calendar", "brand_kit", "creative", "strategy", "lead", "other"),
+        type: DataTypes.ENUM("agreement", "proposal", "invoice", "report", "content_calendar", "brand_kit", "creative", "strategy", "lead", "note", "other"),
         allowNull: true,
         defaultValue: "other",
       },
@@ -58,6 +68,7 @@ const documentModel = (sequelize) => {
       indexes: [
         { fields: ["clientId"] },
         { fields: ["leadId"] },
+        { fields: ["noteId"] },
         { fields: ["documentType"] },
         { fields: ["status"] },
       ],

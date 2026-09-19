@@ -92,11 +92,14 @@ export default function ProposalTab({ client, clientId }) {
   };
 
   return (
-    <div className="flex flex-col gap-stack-md">
-      {/* Toolbar */}
-      <div className="flex flex-col gap-4 bg-white p-4 rounded-xl border border-outline-variant shadow-[0px_2px_4px_rgba(0,0,0,0.02)]">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <div className="relative w-full sm:w-80">
+    <section>
+      {/* Header + toolbar — one card, fused with the table below (see
+          ClientAgreementTab.js for the same rounded-t/rounded-b pairing,
+          kept in step so both Documents-tab columns read as one system). */}
+      <div className="flex flex-col gap-4 bg-white rounded-t-xl p-card-padding border border-b-0 border-outline-variant shadow-card">
+        <div className="flex flex-wrap justify-between items-center gap-3">
+          <h2 className="font-title-lg text-title-lg text-on-surface shrink-0">Proposals</h2>
+          <div className="relative w-full sm:w-64 shrink-0">
             <span
               className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-tertiary-fixed-dim"
               style={{ fontVariationSettings: "'FILL' 0" }}
@@ -111,22 +114,22 @@ export default function ProposalTab({ client, clientId }) {
               onChange={(e) => setSearch(e.target.value)}
             />
           </div>
-          <p className="font-body-sm text-body-sm text-on-surface-variant">
-            Files upload to the client&apos;s Drive folder, in the Proposals subfolder.
-          </p>
         </div>
+        <p className="font-body-sm text-body-sm text-secondary -mt-2">
+          Files upload to the client&apos;s Drive folder, in the Proposals subfolder.
+        </p>
 
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 border-t border-outline-variant pt-4">
+        <div className="flex flex-wrap items-stretch gap-2 border-t border-outline-variant pt-4">
           <input
             ref={fileInputRef}
             type="file"
             accept=".pdf"
             onChange={handleFileChange}
             disabled={uploading}
-            className="flex-1 text-body-sm text-on-surface-variant file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-surface-container file:text-on-surface file:font-label-sm file:cursor-pointer"
+            className="flex-1 min-w-[180px] text-body-sm text-on-surface-variant file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-surface-container file:text-on-surface file:font-label-sm file:cursor-pointer"
           />
           <input
-            className="flex-1 bg-surface-container-lowest border border-outline-variant rounded-lg px-4 py-2 text-body-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-colors"
+            className="flex-1 min-w-[180px] bg-surface-container-lowest border border-outline-variant rounded-lg px-4 py-2 text-body-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-colors"
             placeholder="Description (optional)"
             type="text"
             value={description}
@@ -136,7 +139,7 @@ export default function ProposalTab({ client, clientId }) {
           <button
             onClick={handleUpload}
             disabled={uploading || !selectedFile}
-            className="shrink-0 px-5 py-2.5 bg-primary hover:bg-surface-tint text-on-primary rounded-lg font-label-md text-label-md transition-colors flex items-center justify-center gap-2 shadow-sm disabled:opacity-50"
+            className="shrink-0 w-full sm:w-auto px-5 py-2.5 bg-primary hover:bg-surface-tint text-on-primary rounded-lg font-label-md text-label-md transition-colors flex items-center justify-center gap-2 shadow-sm disabled:opacity-50"
           >
             <span className="material-symbols-outlined text-[18px]">
               {uploading ? "progress_activity" : "upload"}
@@ -148,9 +151,15 @@ export default function ProposalTab({ client, clientId }) {
       </div>
 
       {/* Data Table */}
-      <div className="bg-white rounded-xl border border-outline-variant shadow-[0px_2px_4px_rgba(0,0,0,0.02)] overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
+      <div className="bg-white rounded-b-xl border border-outline-variant shadow-card overflow-hidden">
+        <div>
+          <table className="w-full text-left border-collapse table-fixed">
+            <colgroup>
+              <col className="w-[46%]" />
+              <col className="w-[22%]" />
+              <col className="w-[14%]" />
+              <col className="w-[18%]" />
+            </colgroup>
             <thead>
               <tr className="bg-[#FAFAFA] border-b border-[#F0F0F0]">
                 <th className="py-4 px-6 font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider font-semibold">
@@ -177,9 +186,9 @@ export default function ProposalTab({ client, clientId }) {
               ) : filteredProposals.length > 0 ? (
                 filteredProposals.map((proposal) => (
                   <tr key={proposal.id} className="hover:bg-[#F9F9F9] transition-colors group">
-                    <td className="py-4 px-6">
+                    <td className="py-4 px-6 overflow-hidden">
                       <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded bg-surface-container flex items-center justify-center text-primary">
+                        <div className="w-8 h-8 rounded bg-surface-container flex items-center justify-center text-primary shrink-0">
                           <span
                             className="material-symbols-outlined text-[18px]"
                             style={{ fontVariationSettings: "'FILL' 1" }}
@@ -187,12 +196,14 @@ export default function ProposalTab({ client, clientId }) {
                             description
                           </span>
                         </div>
-                        <div>
-                          <p className="font-body-sm text-body-sm font-medium text-on-background">
+                        <div className="min-w-0">
+                          <p className="font-body-sm text-body-sm font-medium text-on-background truncate" title={proposal.fileName}>
                             {proposal.fileName}
                           </p>
                           {proposal.description && (
-                            <p className="font-label-sm text-label-sm text-tertiary">{proposal.description}</p>
+                            <p className="font-label-sm text-label-sm text-tertiary truncate" title={proposal.description}>
+                              {proposal.description}
+                            </p>
                           )}
                         </div>
                       </div>
@@ -238,6 +249,6 @@ export default function ProposalTab({ client, clientId }) {
           </table>
         </div>
       </div>
-    </div>
+    </section>
   );
 }
