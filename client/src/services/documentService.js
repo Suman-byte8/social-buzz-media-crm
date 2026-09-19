@@ -156,6 +156,19 @@ export const addNoteImageLink = async ({ clientId, noteId, imageUrl }) => {
   return response;
 };
 
+// ── Salary Slips (team-member-scoped, like invoices are client-scoped) ─────
+
+export const uploadSalarySlipToDrive = async (pdfBlob, teamMemberId, slipLabel) => {
+  const formData = new FormData();
+  formData.append("file", pdfBlob, `SalarySlip-${slipLabel || "draft"}.pdf`);
+  formData.append("teamMemberId", teamMemberId.toString());
+  const response = await apiClient("/documents/upload-salary-slip", {
+    method: "POST",
+    body: formData,
+  });
+  return response;
+};
+
 // ── Lead Documents (proposals/agreements shared before conversion) ─────────
 
 export const fetchLeadDocuments = async (leadId) => {
