@@ -125,6 +125,37 @@ export const addClientFileLink = async ({ clientId, documentType, linkType, link
   return response;
 };
 
+// ── Note Attachments (screenshot dump / documents / image links) ───────────
+// All three flows share one documentType ("note") so a client's whole set
+// of note attachments can be fetched in a single call and grouped by
+// noteId/noteAttachmentKind on the frontend — see the Notes tab.
+
+export const fetchNoteAttachmentsByClient = async (clientId) => {
+  const params = new URLSearchParams({ documentType: "note" });
+  if (clientId) params.append("clientId", clientId);
+  const response = await apiClient(`/documents?${params.toString()}`);
+  return response;
+};
+
+export const uploadNoteAttachmentsBulk = async (formData) => {
+  const response = await apiClient("/documents/upload-note-bulk", {
+    method: "POST",
+    body: formData,
+  });
+  return response;
+};
+
+// Pastes an external image URL — the server fetches it and stores the
+// actual bytes in Drive, returning a Document row that points at the
+// mirrored copy rather than the original link.
+export const addNoteImageLink = async ({ clientId, noteId, imageUrl }) => {
+  const response = await apiClient("/documents/note-image-link", {
+    method: "POST",
+    body: { clientId, noteId, imageUrl },
+  });
+  return response;
+};
+
 // ── Lead Documents (proposals/agreements shared before conversion) ─────────
 
 export const fetchLeadDocuments = async (leadId) => {

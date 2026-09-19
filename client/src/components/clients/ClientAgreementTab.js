@@ -87,6 +87,7 @@ export default function ClientAgreementTab({ client, clientId }) {
         onView={handleView}
         onEdit={handleEdit}
         onDelete={handleDelete}
+        hideClientColumn
       />
 
       <AgreementUploadModal

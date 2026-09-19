@@ -16,6 +16,9 @@ import {
   addClientFileLink as addClientFileLinkApi,
   fetchLeadDocuments as fetchLeadDocumentsApi,
   uploadLeadDocumentsBulk as uploadLeadDocumentsBulkApi,
+  fetchNoteAttachmentsByClient as fetchNoteAttachmentsByClientApi,
+  uploadNoteAttachmentsBulk as uploadNoteAttachmentsBulkApi,
+  addNoteImageLink as addNoteImageLinkApi,
   fetchAgreements as fetchAgreementsApi,
   uploadAgreement as uploadAgreementApi,
   updateAgreement as updateAgreementApi,
@@ -253,6 +256,59 @@ export const deleteLeadDocument = createAsyncThunk(
   }
 );
 
+// ── Note Attachments (screenshot dump / documents / image links) ───────────
+// Keyed by clientId (not noteId) — one call fetches every note attachment
+// for the client, grouped by noteId/noteAttachmentKind in the Notes tab
+// itself, rather than one request per note.
+
+export const fetchNoteAttachments = createCachedThunk(
+  "documents/fetchNoteAttachments",
+  async (clientId) => {
+    const response = await fetchNoteAttachmentsByClientApi(clientId);
+    return { clientId, ...response };
+  },
+  { ttlMs: DOCS_TTL_MS, getCacheKey: (clientId) => `note:${clientId}` }
+);
+
+export const uploadNoteAttachments = createAsyncThunk(
+  "documents/uploadNoteAttachments",
+  async ({ formData, clientId }, { rejectWithValue }) => {
+    try {
+      const response = await uploadNoteAttachmentsBulkApi(formData);
+      invalidateCache(`documents/fetchNoteAttachments:note:${clientId}`);
+      return { clientId, ...response };
+    } catch (error) {
+      return rejectWithValue(error.message || "Failed to upload files");
+    }
+  }
+);
+
+export const addNoteImageLink = createAsyncThunk(
+  "documents/addNoteImageLink",
+  async ({ clientId, noteId, imageUrl }, { rejectWithValue }) => {
+    try {
+      const response = await addNoteImageLinkApi({ clientId, noteId, imageUrl });
+      invalidateCache(`documents/fetchNoteAttachments:note:${clientId}`);
+      return { clientId, ...response };
+    } catch (error) {
+      return rejectWithValue(error.message || "Failed to save image link");
+    }
+  }
+);
+
+export const deleteNoteAttachment = createAsyncThunk(
+  "documents/deleteNoteAttachment",
+  async ({ id, clientId }, { rejectWithValue }) => {
+    try {
+      await deleteDocumentApi(id);
+      invalidateCache(`documents/fetchNoteAttachments:note:${clientId}`);
+      return { id, clientId };
+    } catch (error) {
+      return rejectWithValue(error.message || "Failed to delete attachment");
+    }
+  }
+);
+
 // ── Agreements ───────────────────────────────────────────────────────────
 
 export const fetchAgreements = createCachedThunk("documents/fetchAgreements", fetchAgreementsApi, {
@@ -309,6 +365,9 @@ const initialState = {
   // Keyed by leadId — see the Lead Documents thunks above.
   filesByLeadId: {},
   loadingByLeadId: {},
+  // Keyed by clientId — see the Note Attachments thunks above.
+  noteAttachmentsByClient: {},
+  loadingNoteAttachmentsByClient: {},
   agreements: [],
   // Only populated when fetchAgreements is called with page/limit (the
   // admin Agreements page) — callers that fetch a single client's full
@@ -534,6 +593,49 @@ const documentsSlice = createSlice({
       })
       .addCase(deleteLeadDocument.rejected, (state, action) => {
         state.error = action.payload || "Failed to delete file";
+      })
+      .addCase(fetchNoteAttachments.pending, (state, action) => {
+        state.loadingNoteAttachmentsByClient[action.meta.arg] = true;
+        state.error = null;
+      })
+      .addCase(fetchNoteAttachments.fulfilled, (state, action) => {
+        const { clientId, data } = action.payload;
+        state.loadingNoteAttachmentsByClient[clientId] = false;
+        state.noteAttachmentsByClient[clientId] = data || [];
+      })
+      .addCase(fetchNoteAttachments.rejected, (state, action) => {
+        state.loadingNoteAttachmentsByClient[action.meta.arg] = false;
+        state.error = action.payload || "Failed to fetch note attachments";
+      })
+      .addCase(uploadNoteAttachments.fulfilled, (state, action) => {
+        const { clientId, data = [], message } = action.payload;
+        if (!state.noteAttachmentsByClient[clientId]) state.noteAttachmentsByClient[clientId] = [];
+        const existingIds = new Set(state.noteAttachmentsByClient[clientId].map((f) => f.id));
+        const newDocs = data.filter((d) => !existingIds.has(d.id));
+        state.noteAttachmentsByClient[clientId].push(...newDocs);
+        state.successMessage = message || "Files uploaded successfully";
+      })
+      .addCase(uploadNoteAttachments.rejected, (state, action) => {
+        state.error = action.payload || "Failed to upload files";
+      })
+      .addCase(addNoteImageLink.fulfilled, (state, action) => {
+        const { clientId, data } = action.payload;
+        if (!state.noteAttachmentsByClient[clientId]) state.noteAttachmentsByClient[clientId] = [];
+        if (data) state.noteAttachmentsByClient[clientId].unshift(data);
+        state.successMessage = "Image saved to Drive";
+      })
+      .addCase(addNoteImageLink.rejected, (state, action) => {
+        state.error = action.payload || "Failed to save image link";
+      })
+      .addCase(deleteNoteAttachment.fulfilled, (state, action) => {
+        const { id, clientId } = action.payload;
+        if (state.noteAttachmentsByClient[clientId]) {
+          state.noteAttachmentsByClient[clientId] = state.noteAttachmentsByClient[clientId].filter((f) => f.id !== id);
+        }
+        state.successMessage = "Attachment deleted successfully";
+      })
+      .addCase(deleteNoteAttachment.rejected, (state, action) => {
+        state.error = action.payload || "Failed to delete attachment";
       })
       .addCase(fetchAgreements.pending, (state) => {
         state.loadingAgreements = true;

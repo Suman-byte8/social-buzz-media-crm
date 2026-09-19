@@ -3,7 +3,6 @@
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { useDispatch, useSelector } from "react-redux";
-import ProposalTab from "@/components/clients/ProposalTab";
 import Overview from "@/components/clients/Overview";
 import Credentials from "@/components/clients/Credentials";
 import BrandKit from "@/components/clients/BrandKit";
@@ -16,7 +15,7 @@ import Invoices from "@/components/clients/Invoices";
 import Notes from "@/components/clients/Notes";
 import Renewal from "@/components/clients/Renewal";
 import ContentCalendarTab from "@/components/clients/ContentCalendarTab";
-import ClientAgreementTab from "@/components/clients/ClientAgreementTab";
+import DocumentsTab from "@/components/clients/DocumentsTab";
 import AddEditClientModal from "@/components/clients/AddEditClientModal";
 import { fetchClientById } from "@/redux/slices/clientsSlice";
 import { fetchTeamMembers } from "@/redux/slices/teamSlice";
@@ -25,7 +24,7 @@ import { useAuth } from "@/app/login/context/AuthContext";
 
 const tabs = [
   { id: "overview", label: "Overview", icon: "grid_view" },
-  { id: "proposal", label: "Proposal", icon: "description", adminOnly: true },
+  { id: "documents", label: "Documents", icon: "folder_copy", adminOnly: true },
   { id: "credentials", label: "Credentials", icon: "key" },
   { id: "brand_kit", label: "Brand Kit", icon: "palette" },
   { id: "creative", label: "Creatives", icon: "brush" },
@@ -35,7 +34,6 @@ const tabs = [
   { id: "social", label: "Social", icon: "thumb_up" },
   { id: "reports", label: "Reports", icon: "bar_chart" },
   { id: "invoices", label: "Invoices", icon: "receipt_long", adminOnly: true },
-  { id: "agreement", label: "Agreement", icon: "gavel", adminOnly: true },
   { id: "notes", label: "Notes", icon: "event_note" },
   { id: "renewal", label: "Renewal", icon: "autorenew" },
   { id: "content_calendar", label: "Content Calendar", icon: "calendar_today" },
@@ -192,8 +190,8 @@ export default function ClientDetailContent({ activeTab, setActiveTab, client = 
       </div>
 
       {/* Dynamic Tab Content */}
-      {activeTab === "proposal" && isAdmin ? (
-        <ProposalTab client={client} clientId={clientId} />
+      {activeTab === "documents" && isAdmin ? (
+        <DocumentsTab client={client} clientId={clientId} />
       ) : activeTab === "credentials" ? (
         <Credentials client={client} clientId={clientId} />
       ) : activeTab === "brand_kit" ? (
@@ -226,8 +224,6 @@ export default function ClientDetailContent({ activeTab, setActiveTab, client = 
         />
       ) : activeTab === "invoices" && isAdmin ? (
         <Invoices client={client} clientId={clientId} />
-      ) : activeTab === "agreement" && isAdmin ? (
-        <ClientAgreementTab client={client} clientId={clientId} />
       ) : activeTab === "notes" ? (
         <Notes client={client} clientId={clientId} />
       ) : activeTab === "renewal" ? (

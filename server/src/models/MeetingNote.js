@@ -15,6 +15,11 @@ const meetingNoteModel = (sequelize) => {
       },
       attendees: { type: DataTypes.TEXT, allowNull: true },
       actionItems: { type: DataTypes.TEXT, allowNull: true },
+      // A single reference link (e.g. a recording, shared doc, or ticket)
+      // attached to the note — separate from the "image links" flow, which
+      // mirrors external images into Drive as Document rows (see
+      // Document.noteAttachmentKind).
+      link: { type: DataTypes.STRING, allowNull: true },
       clientId: { type: DataTypes.INTEGER, allowNull: true },
       createdBy: { type: DataTypes.STRING, allowNull: true },
       createdAt: {

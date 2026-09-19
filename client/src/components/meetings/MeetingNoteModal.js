@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { createMeetingNote, updateMeetingNote } from "@/redux/slices/meetingNotesSlice";
 import { fetchTeamMembers } from "@/redux/slices/teamSlice";
+import { uploadNoteAttachments, addNoteImageLink } from "@/redux/slices/documentsSlice";
 
 export default function MeetingNoteModal({
   open,
@@ -21,8 +22,14 @@ export default function MeetingNoteModal({
   const [attendees, setAttendees] = useState([]);
   const [attendeesOpen, setAttendeesOpen] = useState(false);
   const [actionItems, setActionItems] = useState("");
+  const [link, setLink] = useState("");
+  const [screenshotFiles, setScreenshotFiles] = useState([]);
+  const [documentFiles, setDocumentFiles] = useState([]);
+  const [imageLinkInput, setImageLinkInput] = useState("");
+  const [imageLinks, setImageLinks] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const documentInputRef = useRef(null);
 
   useEffect(() => {
     if (open) {
@@ -42,6 +49,7 @@ export default function MeetingNoteModal({
           : []
       );
       setActionItems(meetingNoteToEdit.actionItems || "");
+      setLink(meetingNoteToEdit.link || "");
     } else {
       setTitle("");
       setDescription("");
@@ -49,9 +57,40 @@ export default function MeetingNoteModal({
       setMeetingType("other");
       setAttendees([]);
       setActionItems("");
+      setLink("");
     }
+    setScreenshotFiles([]);
+    setDocumentFiles([]);
+    setImageLinkInput("");
+    setImageLinks([]);
     setError(null);
   }, [meetingNoteToEdit, open]);
+
+  // Screenshot dump: paste one or more images (Ctrl+V) into the drop zone
+  // below — they queue up here and upload once the note itself is saved.
+  const handleScreenshotPaste = (e) => {
+    const items = Array.from(e.clipboardData?.items || []);
+    const files = items
+      .filter((item) => item.kind === "file" && item.type.startsWith("image/"))
+      .map((item) => item.getAsFile())
+      .filter(Boolean);
+    if (files.length > 0) {
+      e.preventDefault();
+      setScreenshotFiles((prev) => [...prev, ...files]);
+    }
+  };
+
+  const handleDocumentFilesChange = (e) => {
+    setDocumentFiles((prev) => [...prev, ...Array.from(e.target.files || [])]);
+    if (documentInputRef.current) documentInputRef.current.value = "";
+  };
+
+  const handleAddImageLink = () => {
+    const url = imageLinkInput.trim();
+    if (!url) return;
+    setImageLinks((prev) => [...prev, url]);
+    setImageLinkInput("");
+  };
 
   const toggleAttendee = (name) => {
     setAttendees((prev) =>
@@ -84,22 +123,58 @@ export default function MeetingNoteModal({
         meetingType,
         attendees: attendees.length > 0 ? attendees.join(", ") : null,
         actionItems: actionItems.trim() || null,
+        link: link.trim() || null,
         clientId,
       };
 
+      let noteData;
       if (isEdit && meetingNoteToEdit?.id) {
         const data = await dispatch(
           updateMeetingNote({ id: meetingNoteToEdit.id, updateData: payload })
         ).unwrap();
-        setLoading(false);
-        onSuccess(data?.data);
-        onClose();
+        noteData = data?.data;
       } else {
         const data = await dispatch(createMeetingNote(payload)).unwrap();
-        setLoading(false);
-        onSuccess(data?.data);
-        onClose();
+        noteData = data?.data;
       }
+
+      // Attachments upload against the now-known note id — best-effort:
+      // a failure here shouldn't undo the note that already saved above.
+      const noteId = noteData?.id;
+      if (noteId) {
+        const uploadTasks = [];
+        if (screenshotFiles.length > 0) {
+          const formData = new FormData();
+          screenshotFiles.forEach((file) => formData.append("files", file));
+          formData.append("clientId", clientId);
+          formData.append("noteId", noteId);
+          formData.append("kind", "screenshot");
+          uploadTasks.push(dispatch(uploadNoteAttachments({ formData, clientId })).unwrap());
+        }
+        if (documentFiles.length > 0) {
+          const formData = new FormData();
+          documentFiles.forEach((file) => formData.append("files", file));
+          formData.append("clientId", clientId);
+          formData.append("noteId", noteId);
+          formData.append("kind", "document");
+          uploadTasks.push(dispatch(uploadNoteAttachments({ formData, clientId })).unwrap());
+        }
+        imageLinks.forEach((imageUrl) => {
+          uploadTasks.push(dispatch(addNoteImageLink({ clientId, noteId, imageUrl })).unwrap());
+        });
+
+        if (uploadTasks.length > 0) {
+          const results = await Promise.allSettled(uploadTasks);
+          const failed = results.filter((r) => r.status === "rejected");
+          if (failed.length > 0) {
+            setError(`Note saved, but ${failed.length} attachment(s) failed to save to Drive.`);
+          }
+        }
+      }
+
+      setLoading(false);
+      onSuccess(noteData);
+      onClose();
     } catch (err) {
       setLoading(false);
       setError(
@@ -114,7 +189,7 @@ export default function MeetingNoteModal({
 
   return (
     <div className="fixed inset-0 backdrop-blur-sm bg-black/30 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-lg shadow-xl max-w-3xl w-full mx-4 p-6">
+      <div className="bg-white rounded-lg shadow-xl max-w-5xl w-full mx-4 p-6 max-h-[90vh] overflow-y-auto">
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-xl font-bold text-gray-900">
             {isEdit ? "Edit Meeting Note" : "Add Meeting Note"}
@@ -138,19 +213,17 @@ export default function MeetingNoteModal({
             </div>
           )}
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             <div className="space-y-3">
               <label className="block text-sm font-medium text-gray-700">
                 Client
               </label>
-              <div className="mt-1">
-                <input
-                  type="text"
-                  value={clientName || "Loading..."}
-                  readOnly
-                  className="w-full py-2 px-3 border border-gray-300 rounded-md bg-gray-50"
-                />
-              </div>
+              <input
+                type="text"
+                value={clientName || "Loading..."}
+                readOnly
+                className="w-full py-2 px-3 border border-gray-300 rounded-md bg-gray-50"
+              />
             </div>
 
             <div className="space-y-3">
@@ -166,9 +239,7 @@ export default function MeetingNoteModal({
                 disabled={loading}
               />
             </div>
-          </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-3">
               <label className="block text-sm font-medium text-gray-700">
                 Meeting Date
@@ -197,20 +268,6 @@ export default function MeetingNoteModal({
                 <option value="other">Other</option>
               </select>
             </div>
-          </div>
-
-          <div className="space-y-3">
-            <label className="block text-sm font-medium text-gray-700">
-              Description / Notes
-            </label>
-            <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              rows="4"
-              className="w-full py-2 px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
-              placeholder="Meeting notes and discussion points"
-              disabled={loading}
-            />
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -289,18 +346,156 @@ export default function MeetingNoteModal({
             </div>
 
             <div className="space-y-3">
-              <label className="block text-sm font-medium text-gray-700">
+              <label className="block text-sm font-medium text-gray-700">Link</label>
+              <input
+                type="url"
+                value={link}
+                onChange={(e) => setLink(e.target.value)}
+                placeholder="https://... (recording, shared doc, ticket, etc.)"
+                disabled={loading}
+                className="w-full py-2 px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              />
+              <label className="block text-sm font-medium text-gray-700 pt-2">
                 Action Items
               </label>
               <textarea
                 value={actionItems}
                 onChange={(e) => setActionItems(e.target.value)}
-                rows="3"
+                rows="2"
                 className="w-full py-2 px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
                 placeholder="Action items from meeting"
                 disabled={loading}
               />
             </div>
+          </div>
+
+          <div className="space-y-3">
+            <label className="block text-sm font-medium text-gray-700">
+              Description / Notes
+            </label>
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              rows="3"
+              className="w-full py-2 px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
+              placeholder="Meeting notes and discussion points"
+              disabled={loading}
+            />
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2 border-t border-gray-200">
+            <div className="space-y-3">
+              <label className="block text-sm font-medium text-gray-700">Screenshot Dump</label>
+              <div
+                tabIndex={0}
+                onPaste={handleScreenshotPaste}
+                className="flex items-center gap-1.5 min-h-[42px] rounded-md border border-dashed border-gray-300 bg-gray-50 px-3 py-2 text-sm text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              >
+                <span className="material-symbols-outlined text-[16px]">content_paste</span>
+                Click here, then Ctrl+V to paste screenshots
+              </div>
+              {screenshotFiles.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {screenshotFiles.map((file, idx) => (
+                    <span key={`${file.name}-${idx}`} className="inline-flex items-center gap-1 pl-2.5 pr-1 py-1 bg-blue-50 text-blue-800 rounded-md text-xs border border-blue-200">
+                      {file.name || `Screenshot ${idx + 1}`}
+                      <button
+                        type="button"
+                        onClick={() => setScreenshotFiles((prev) => prev.filter((_, i) => i !== idx))}
+                        disabled={loading}
+                        className="hover:bg-blue-200 p-0.5 rounded-full text-blue-700 transition-colors"
+                        title="Remove"
+                      >
+                        <span className="material-symbols-outlined text-[14px]">close</span>
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+              <p className="text-[11px] text-gray-400">Saved to the client&apos;s Drive folder once you save this note.</p>
+            </div>
+
+            <div className="space-y-3">
+              <label className="block text-sm font-medium text-gray-700">Documents</label>
+              <input
+                ref={documentInputRef}
+                type="file"
+                multiple
+                onChange={handleDocumentFilesChange}
+                disabled={loading}
+                className="w-full text-sm text-gray-500 file:mr-3 file:py-2 file:px-3 file:rounded-md file:border-0 file:bg-gray-100 file:text-gray-700 file:text-sm file:cursor-pointer"
+              />
+              {documentFiles.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {documentFiles.map((file, idx) => (
+                    <span key={`${file.name}-${idx}`} className="inline-flex items-center gap-1 pl-2.5 pr-1 py-1 bg-gray-100 text-gray-800 rounded-md text-xs border border-gray-200">
+                      {file.name}
+                      <button
+                        type="button"
+                        onClick={() => setDocumentFiles((prev) => prev.filter((_, i) => i !== idx))}
+                        disabled={loading}
+                        className="hover:bg-gray-200 p-0.5 rounded-full text-gray-700 transition-colors"
+                        title="Remove"
+                      >
+                        <span className="material-symbols-outlined text-[14px]">close</span>
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+              <p className="text-[11px] text-gray-400">Any file type — uploaded to the client&apos;s Drive folder.</p>
+            </div>
+          </div>
+
+          <div className="space-y-3 pt-2 border-t border-gray-200">
+            <label className="block text-sm font-medium text-gray-700">Image Links</label>
+            <div className="flex items-stretch gap-2">
+              <input
+                type="url"
+                value={imageLinkInput}
+                onChange={(e) => setImageLinkInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    handleAddImageLink();
+                  }
+                }}
+                placeholder="Paste an image URL..."
+                disabled={loading}
+                className="flex-1 py-2 px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              />
+              <button
+                type="button"
+                onClick={handleAddImageLink}
+                disabled={loading || !imageLinkInput.trim()}
+                className="px-4 py-2 text-sm font-medium bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 disabled:opacity-50"
+              >
+                Add
+              </button>
+            </div>
+            <p className="text-[11px] text-gray-400">
+              The image is fetched and stored in the client&apos;s Drive folder once you save this note — the preview
+              below is just from the original link until then.
+            </p>
+            {imageLinks.length > 0 && (
+              <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
+                {imageLinks.map((url, idx) => (
+                  <div key={`${url}-${idx}`} className="relative group aspect-square rounded-md border border-gray-200 overflow-hidden bg-gray-50">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={url} alt="" className="w-full h-full object-cover" />
+                    <button
+                      type="button"
+                      onClick={() => setImageLinks((prev) => prev.filter((_, i) => i !== idx))}
+                      disabled={loading}
+                      className="absolute top-1 right-1 p-1 rounded-full bg-black/60 text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                      title="Remove"
+                    >
+                      <span className="material-symbols-outlined text-[14px]">close</span>
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="mt-8 pt-4 border-t border-gray-200 flex justify-end space-x-3">

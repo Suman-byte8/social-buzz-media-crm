@@ -100,6 +100,22 @@ export default function StrategyTab({ client, clientId }) {
     setSelectedFiles(Array.from(e.target.files || []));
   };
 
+  // Screenshot dump: paste one or more images (Ctrl+V) into the drop zone
+  // below and they queue up alongside any manually-picked files, ready for
+  // the same "Save to Drive" action already used for regular uploads.
+  const handleScreenshotPaste = (e) => {
+    const items = Array.from(e.clipboardData?.items || []);
+    const files = items
+      .filter((item) => item.kind === "file" && item.type.startsWith("image/"))
+      .map((item) => item.getAsFile())
+      .filter(Boolean);
+    if (files.length > 0) {
+      e.preventDefault();
+      setError("");
+      setSelectedFiles((prev) => [...prev, ...files]);
+    }
+  };
+
   const removeSelectedFile = (index) => {
     setSelectedFiles((prev) => prev.filter((_, i) => i !== index));
   };
@@ -222,6 +238,15 @@ export default function StrategyTab({ client, clientId }) {
               disabled={uploading}
               className="flex-1 text-body-sm text-on-surface-variant file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-surface-container file:text-on-surface file:font-label-sm file:cursor-pointer"
             />
+            <div
+              tabIndex={0}
+              onPaste={handleScreenshotPaste}
+              className="flex h-[42px] shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-dashed border-outline-variant bg-surface-container-lowest px-3 text-body-sm text-on-surface-variant focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-colors"
+              title="Click here, then paste a screenshot with Ctrl+V"
+            >
+              <span className="material-symbols-outlined text-[16px]">content_paste</span>
+              Screenshot dump — click, then Ctrl+V
+            </div>
             <input
               className="flex-1 bg-surface-container-lowest border border-outline-variant rounded-lg px-4 py-2 text-body-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-colors"
               placeholder="Label (optional)"
@@ -235,27 +260,32 @@ export default function StrategyTab({ client, clientId }) {
               disabled={uploading || selectedFiles.length === 0}
               className="shrink-0 px-5 py-2.5 bg-primary hover:bg-surface-tint text-on-primary rounded-lg font-label-md text-label-md transition-colors flex items-center justify-center gap-2 shadow-sm disabled:opacity-50"
             >
-              <span className="material-symbols-outlined text-[18px]">{uploading ? "progress_activity" : "upload"}</span>
-              {uploading ? "Uploading..." : selectedFiles.length > 1 ? `Upload ${selectedFiles.length} Files` : "Upload File"}
+              <span className="material-symbols-outlined text-[18px]">{uploading ? "progress_activity" : "save"}</span>
+              {uploading ? "Saving..." : selectedFiles.length > 1 ? `Save ${selectedFiles.length} Files to Drive` : "Save to Drive"}
             </button>
           </div>
 
           {selectedFiles.length > 0 && (
             <div className="flex flex-wrap gap-1.5 mt-3">
-              {selectedFiles.map((file, idx) => (
-                <span key={`${file.name}-${idx}`} className="inline-flex items-center gap-1 pl-2.5 pr-1 py-1 bg-surface-container rounded-full text-label-sm font-label-sm text-on-surface">
-                  {file.name}
-                  <button type="button" onClick={() => removeSelectedFile(idx)} disabled={uploading} className="p-0.5 rounded-full hover:bg-red-100 hover:text-red-600 transition-colors" title="Remove">
-                    <span className="material-symbols-outlined text-[14px]">close</span>
-                  </button>
-                </span>
-              ))}
+              {selectedFiles.map((file, idx) => {
+                const isPastedImage = file.type?.startsWith("image/") && (!file.name || file.name.startsWith("image."));
+                return (
+                  <span key={`${file.name}-${idx}`} className="inline-flex items-center gap-1 pl-2.5 pr-1 py-1 bg-surface-container rounded-full text-label-sm font-label-sm text-on-surface">
+                    {isPastedImage && <span className="material-symbols-outlined text-[14px] text-primary">content_paste</span>}
+                    {file.name}
+                    <button type="button" onClick={() => removeSelectedFile(idx)} disabled={uploading} className="p-0.5 rounded-full hover:bg-red-100 hover:text-red-600 transition-colors" title="Remove">
+                      <span className="material-symbols-outlined text-[14px]">close</span>
+                    </button>
+                  </span>
+                );
+              })}
             </div>
           )}
 
           <p className="font-label-sm text-label-sm text-on-surface-variant mt-2">
-            Select as many files as you need, any format or size — they upload straight to the client&apos;s Drive folder,
-            in the Strategy subfolder. Or share a Google Sheet/Doc link above instead of uploading a file.
+            Select files, or paste a screenshot into the box above — any format or size — then click Save to
+            upload straight to the client&apos;s Drive folder, in the Strategy subfolder. Or share a Google
+            Sheet/Doc link above instead.
           </p>
           {error && <p className="text-red-600 font-body-sm text-body-sm mt-2">{error}</p>}
         </div>
