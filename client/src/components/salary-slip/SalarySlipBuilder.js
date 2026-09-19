@@ -5,6 +5,7 @@ import SalarySlipToolbar from "./SalarySlipToolbar";
 import SalarySlipDocument from "./SalarySlipDocument";
 import { numberToIndianWords } from "../../lib/Numbertowords";
 import { computeSalaryTotals } from "../../lib/salarySlipTotals";
+import { DEFAULT_EARNING_ROWS, DEFAULT_DEDUCTION_ROWS } from "./salarySlipDefaults";
 import { useSalarySlipTeamMembers } from "./useSalarySlipTeamMembers";
 import { useSalarySlipActions } from "./useSalarySlipActions";
 
@@ -12,22 +13,13 @@ const today = new Date();
 const DEFAULT_ISSUED_DATE = today.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
 const DEFAULT_PAY_PERIOD = today.toLocaleDateString("en-GB", { month: "short", year: "numeric" });
 
-const DEFAULT_COMPONENTS = {
-  basicSalary: 0,
-  hra: 0,
-  otherAllowances: 0,
-  employeePf: 0,
-  professionalTax: 0,
-  tds: 0,
-  otherDeductions: 0,
-};
-
 export default function SalarySlipBuilder() {
   const [slipNumber, setSlipNumber] = useState(`SBM-SAL-${today.getFullYear()}-001`);
   const [issuedDate, setIssuedDate] = useState(DEFAULT_ISSUED_DATE);
   const [payDate, setPayDate] = useState("");
   const [payPeriod, setPayPeriod] = useState(DEFAULT_PAY_PERIOD);
-  const [components, setComponents] = useState(DEFAULT_COMPONENTS);
+  const [earningRows, setEarningRows] = useState(DEFAULT_EARNING_ROWS);
+  const [deductionRows, setDeductionRows] = useState(DEFAULT_DEDUCTION_ROWS);
 
   const sheetRef = useRef(null);
 
@@ -36,11 +28,27 @@ export default function SalarySlipBuilder() {
       onMemberSelected: () => setSlipNumber((prev) => prev || `SBM-SAL-${Date.now()}`),
     });
 
-  const updateComponent = useCallback((key, value) => {
-    setComponents((prev) => ({ ...prev, [key]: value }));
+  const addEarningRow = useCallback(() => {
+    setEarningRows((prev) => [...prev, { id: Date.now(), label: "", amount: 0 }]);
+  }, []);
+  const updateEarningRow = useCallback((id, field, value) => {
+    setEarningRows((prev) => prev.map((r) => (r.id === id ? { ...r, [field]: value } : r)));
+  }, []);
+  const removeEarningRow = useCallback((id) => {
+    setEarningRows((prev) => prev.filter((r) => r.id !== id));
   }, []);
 
-  const totals = useMemo(() => computeSalaryTotals(components), [components]);
+  const addDeductionRow = useCallback(() => {
+    setDeductionRows((prev) => [...prev, { id: Date.now(), label: "", amount: 0 }]);
+  }, []);
+  const updateDeductionRow = useCallback((id, field, value) => {
+    setDeductionRows((prev) => prev.map((r) => (r.id === id ? { ...r, [field]: value } : r)));
+  }, []);
+  const removeDeductionRow = useCallback((id) => {
+    setDeductionRows((prev) => prev.filter((r) => r.id !== id));
+  }, []);
+
+  const totals = useMemo(() => computeSalaryTotals({ earningRows, deductionRows }), [earningRows, deductionRows]);
   const netInWords = numberToIndianWords(totals.net);
 
   const { isSavingPdf, isSavingToDrive, handleSavePdf, handleSaveToDrive } = useSalarySlipActions({
@@ -76,8 +84,14 @@ export default function SalarySlipBuilder() {
           isMembersLoading={isMembersLoading}
           selectedMemberId={selectedMemberId}
           onMemberChange={handleMemberChange}
-          components={components}
-          onUpdateComponent={updateComponent}
+          earningRows={earningRows}
+          deductionRows={deductionRows}
+          onAddEarningRow={addEarningRow}
+          onUpdateEarningRow={updateEarningRow}
+          onRemoveEarningRow={removeEarningRow}
+          onAddDeductionRow={addDeductionRow}
+          onUpdateDeductionRow={updateDeductionRow}
+          onRemoveDeductionRow={removeDeductionRow}
           totals={totals}
           netInWords={netInWords}
         />

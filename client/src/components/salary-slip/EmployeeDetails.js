@@ -2,6 +2,14 @@
 import React from "react";
 import TeamMemberSelectDropdown from "./TeamMemberSelectDropdown";
 
+const BankRow = ({ label, value }) =>
+  value ? (
+    <p className="mt-1 flex items-baseline justify-between gap-3 text-[10.5px] leading-[1.6] text-[#6E6A65]">
+      <span className="uppercase tracking-[.08em]">{label}</span>
+      <span className="text-right font-mono text-[#1A1A1A]">{value}</span>
+    </p>
+  ) : null;
+
 // Same two-column layout as invoices/Billingdetails.js: left is "who this
 // document is for" (picker + resolved identity), right is supporting detail
 // specific to the document type (bank details here, engagement title there).
@@ -58,11 +66,25 @@ export default function EmployeeDetails({ members, isMembersLoading, selectedMem
         <p className="font-display text-[9.5px] font-700 uppercase tracking-[.24em] text-[#6E6A65]">
           Bank Details
         </p>
-        <p className="mt-2 whitespace-pre-line text-[10.5px] leading-[1.7] text-[#6E6A65]">
-          {selectedMember
-            ? selectedMember.bankDetails || "No bank details on file for this employee."
-            : "Select a team member to show their bank details."}
-        </p>
+        {!selectedMember ? (
+          <p className="mt-2 text-[10.5px] text-[#6E6A65]">Select a team member to show their bank details.</p>
+        ) : (
+          (() => {
+            const bank = selectedMember.bankDetails;
+            const hasAnyDetail = bank && Object.values(bank).some(Boolean);
+            return hasAnyDetail ? (
+              <div className="mt-2">
+                <BankRow label="Account Holder" value={bank.accountHolderName} />
+                <BankRow label="Bank Name" value={bank.bankName} />
+                <BankRow label="Account No." value={bank.accountNumber} />
+                <BankRow label="IFSC Code" value={bank.ifscCode?.toUpperCase()} />
+                <BankRow label="UPI ID" value={bank.upiId} />
+              </div>
+            ) : (
+              <p className="mt-2 text-[10.5px] text-[#6E6A65]">No bank details on file for this employee.</p>
+            );
+          })()
+        )}
       </div>
     </section>
   );

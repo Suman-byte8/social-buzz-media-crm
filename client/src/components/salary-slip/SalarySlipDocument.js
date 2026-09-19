@@ -21,8 +21,14 @@ const SalarySlipDocument = forwardRef(function SalarySlipDocument(props, ref) {
     isMembersLoading,
     selectedMemberId,
     onMemberChange,
-    components,
-    onUpdateComponent,
+    earningRows,
+    deductionRows,
+    onAddEarningRow,
+    onUpdateEarningRow,
+    onRemoveEarningRow,
+    onAddDeductionRow,
+    onUpdateDeductionRow,
+    onRemoveDeductionRow,
     totals,
     netInWords,
   } = props;
@@ -57,7 +63,17 @@ const SalarySlipDocument = forwardRef(function SalarySlipDocument(props, ref) {
         onMemberChange={onMemberChange}
       />
 
-      <SalaryComponentsTable components={components} onUpdateComponent={onUpdateComponent} totals={totals} />
+      <SalaryComponentsTable
+        earningRows={earningRows}
+        deductionRows={deductionRows}
+        onAddEarningRow={onAddEarningRow}
+        onUpdateEarningRow={onUpdateEarningRow}
+        onRemoveEarningRow={onRemoveEarningRow}
+        onAddDeductionRow={onAddDeductionRow}
+        onUpdateDeductionRow={onUpdateDeductionRow}
+        onRemoveDeductionRow={onRemoveDeductionRow}
+        totals={totals}
+      />
 
       <div className="mt-4 border-l-[3px] border-[#E8262A] bg-[#F5F4F2] px-3 py-2.5">
         <p className="font-display text-[9px] font-700 uppercase tracking-[.2em] text-[#6E6A65]">
