@@ -9,7 +9,7 @@ const formatRupees = (n) =>
     maximumFractionDigits: 2,
   }).format(n || 0);
 
-export default function LineItemsTable({ rows, onUpdateRow, onRemoveRow, services = [] }) {
+export default function LineItemsTable({ rows, onUpdateRow, onRemoveRow, services = [], isLoadingServices = false }) {
   return (
     <section className="mt-7">
       <table className="w-full border-collapse text-[11px]">
@@ -43,11 +43,15 @@ export default function LineItemsTable({ rows, onUpdateRow, onRemoveRow, service
                 <select
                   value={r.desc}
                   onChange={(e) => onUpdateRow(r.id, "desc", e.target.value)}
-                  disabled={services.length === 0}
+                  disabled={isLoadingServices || services.length === 0}
                   className="w-full bg-transparent leading-snug outline-none disabled:text-[#B8B4AF]"
                 >
                   <option value="">
-                    {services.length === 0 ? "Select a client to load services" : "Select a service…"}
+                    {isLoadingServices
+                      ? "Loading services…"
+                      : services.length === 0
+                      ? "Select a client to load services"
+                      : "Select a service…"}
                   </option>
                   {services.map((s) => (
                     <option key={s} value={s} className="text-black bg-white">

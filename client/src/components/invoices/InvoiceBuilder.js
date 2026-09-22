@@ -40,7 +40,7 @@ export default function InvoiceBuilder() {
     useReportImages();
   const reportPages = useMemo(() => layoutImagesIntoPages(reportImages), [reportImages]);
 
-  const { clients, isClientLoading, selectedClientId, selectedClient, handleClientChange } = useInvoiceClients({
+  const { clients, isClientLoading, isDetailLoading, selectedClientId, selectedClient, handleClientChange } = useInvoiceClients({
     onClientSelected: () => setInvoiceNumber((prev) => prev || `SBM-INVOICE-${Date.now()}`),
   });
 
@@ -125,6 +125,7 @@ export default function InvoiceBuilder() {
           onPeriodChange={setPeriod}
           clients={clients}
           isClientLoading={isClientLoading}
+          isDetailLoading={isDetailLoading}
           selectedClientId={selectedClientId}
           selectedClient={selectedClient}
           onClientChange={handleClientChange}
