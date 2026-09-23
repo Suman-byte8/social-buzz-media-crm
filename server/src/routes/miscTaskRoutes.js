@@ -1,6 +1,7 @@
 import express from "express";
 import multer from "multer";
 import { uploadFileToDrive, getOrCreateClientFolder, getOrCreateClientSubfolder } from "../utils/googleDrive.js";
+import { wrapUpload } from "../middleware/multerUpload.js";
 
 const router = express.Router();
 
@@ -64,7 +65,7 @@ router.get("/misc-tasks", async (req, res) => {
 });
 
 // POST /api/misc-tasks/upload - create, or update (with optional new file) when `id` is present
-router.post("/misc-tasks/upload", upload.single("file"), async (req, res) => {
+router.post("/misc-tasks/upload", wrapUpload(upload.single("file")), async (req, res) => {
   try {
     const { id, clientId, typeOfWork, assignedDate, deliveryDate, status, assignedTo, notes } = req.body;
     const { MiscTask, Client } = req.app.locals.models;

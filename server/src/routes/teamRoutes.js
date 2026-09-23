@@ -7,6 +7,7 @@ import {
 } from "../utils/googleDrive.js";
 import { cacheRoute } from "../middleware/cacheRoute.js";
 import { invalidateCache } from "../utils/serverCache.js";
+import { wrapUpload } from "../middleware/multerUpload.js";
 
 const router = express.Router();
 
@@ -310,7 +311,7 @@ router.put("/team-members/:id", async (req, res) => {
 // profile photo. Stored in Google Drive (Team Members/<member name>/),
 // same pattern as client logos — the DB column just holds the resulting
 // proxy link, not the file itself.
-router.post("/team-members/:id/upload-avatar", avatarUpload.single("avatar"), async (req, res) => {
+router.post("/team-members/:id/upload-avatar", wrapUpload(avatarUpload.single("avatar")), async (req, res) => {
   try {
     const { TeamMember } = req.app.locals.models;
     const teamMember = await TeamMember.findByPk(req.params.id);
@@ -336,7 +337,7 @@ router.post("/team-members/:id/upload-avatar", avatarUpload.single("avatar"), as
 });
 
 // POST /api/team-members/:id/upload-resume - Upload/replace a member's resume.
-router.post("/team-members/:id/upload-resume", resumeUpload.single("resume"), async (req, res) => {
+router.post("/team-members/:id/upload-resume", wrapUpload(resumeUpload.single("resume")), async (req, res) => {
   try {
     const { TeamMember } = req.app.locals.models;
     const teamMember = await TeamMember.findByPk(req.params.id);

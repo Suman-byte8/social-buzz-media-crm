@@ -5,6 +5,7 @@ import { getCachedFile, setCachedFile } from "../utils/fileCache.js";
 import { encryptPassword, decryptPassword, comparePassword } from "../utils/password.js";
 import { encryptText } from "../utils/encryption.js";
 import { requireAdmin } from "../middleware/auth.js";
+import { wrapUpload } from "../middleware/multerUpload.js";
 
 const router = express.Router();
 
@@ -227,7 +228,7 @@ const handleLogoUpload = async (req, res) => {
   }
 };
 
-router.post("/settings/upload-logo", requireAdmin, upload.single("logo"), handleLogoUpload);
-router.post("/settings/upload-logo/file", requireAdmin, upload.single("file"), handleLogoUpload);
+router.post("/settings/upload-logo", requireAdmin, wrapUpload(upload.single("logo")), handleLogoUpload);
+router.post("/settings/upload-logo/file", requireAdmin, wrapUpload(upload.single("file")), handleLogoUpload);
 
 export default router;

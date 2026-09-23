@@ -7,6 +7,7 @@ import { getCachedFile, setCachedFile } from "../utils/fileCache.js";
 import { sendMail } from "../utils/mailer.js";
 import { cacheRoute } from "../middleware/cacheRoute.js";
 import { invalidateCache } from "../utils/serverCache.js";
+import { wrapUpload } from "../middleware/multerUpload.js";
 
 const router = express.Router();
 
@@ -74,7 +75,7 @@ const NOTE_SUBFOLDER_BY_KIND = {
 };
 
 // Upload agreement with specific subfolder
-router.post("/agreements/upload", requireAdmin, upload.single("file"), async (req, res) => {
+router.post("/agreements/upload", requireAdmin, wrapUpload(upload.single("file")), async (req, res) => {
   try {
     const { id, clientId, issuedDate, expiryDate, status, description } = req.body;
 
@@ -183,7 +184,7 @@ router.post("/agreements/upload", requireAdmin, upload.single("file"), async (re
 });
 
 // Upload other document types (invoices, reports, content_calendar)
-router.post("/documents/upload", upload.single("file"), async (req, res) => {
+router.post("/documents/upload", wrapUpload(upload.single("file")), async (req, res) => {
   try {
     const { clientId, description, documentType } = req.body;
 
@@ -255,7 +256,7 @@ router.post("/documents/upload", upload.single("file"), async (req, res) => {
 // (like invoices/agreements are for clients). Admin-gated server-side too
 // (not just the sidebar/page-level gate) since the PDF carries compensation
 // data.
-router.post("/documents/upload-salary-slip", requireAdmin, upload.single("file"), async (req, res) => {
+router.post("/documents/upload-salary-slip", requireAdmin, wrapUpload(upload.single("file")), async (req, res) => {
   try {
     const { teamMemberId, description } = req.body;
 
@@ -318,7 +319,7 @@ router.post("/documents/upload-salary-slip", requireAdmin, upload.single("file")
 });
 
 // Upload media-capable document types (currently: brand kit logos/images/PDFs)
-router.post("/documents/upload-media", mediaUpload.single("file"), async (req, res) => {
+router.post("/documents/upload-media", wrapUpload(mediaUpload.single("file")), async (req, res) => {
   try {
     const { clientId, description, documentType } = req.body;
 
@@ -383,7 +384,7 @@ router.post("/documents/upload-media", mediaUpload.single("file"), async (req, r
 // large batch doesn't fire a burst of simultaneous Drive API calls; a
 // per-file failure is recorded and skipped instead of aborting the whole
 // batch, so one bad file doesn't lose the files that already succeeded.
-router.post("/documents/upload-media-bulk", mediaUpload.array("files", 20), async (req, res) => {
+router.post("/documents/upload-media-bulk", wrapUpload(mediaUpload.array("files", 20)), async (req, res) => {
   try {
     const { clientId, description, documentType } = req.body;
 
@@ -505,7 +506,7 @@ router.post("/documents/link", async (req, res) => {
 // before they convert to a client. Same one-at-a-time-with-per-file-failure
 // approach as upload-media-bulk above, into a per-lead Drive subfolder
 // under a shared "Leads" folder rather than a client folder.
-router.post("/documents/upload-lead-bulk", leadUpload.array("files", 10), async (req, res) => {
+router.post("/documents/upload-lead-bulk", wrapUpload(leadUpload.array("files", 10)), async (req, res) => {
   try {
     const { leadId, description } = req.body;
 
@@ -579,7 +580,7 @@ router.post("/documents/upload-lead-bulk", leadUpload.array("files", 10), async 
 // by `kind` (see NOTE_SUBFOLDER_BY_KIND). Mirrors upload-media-bulk above,
 // but tagged with noteId/noteAttachmentKind instead of a documentType per
 // kind, so the Notes tab can fetch all three kinds for a client in one call.
-router.post("/documents/upload-note-bulk", mediaUpload.array("files", 20), async (req, res) => {
+router.post("/documents/upload-note-bulk", wrapUpload(mediaUpload.array("files", 20)), async (req, res) => {
   try {
     const { clientId, noteId, kind, description } = req.body;
 

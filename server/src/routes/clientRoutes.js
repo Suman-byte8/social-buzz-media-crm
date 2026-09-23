@@ -5,6 +5,7 @@ import { encryptText, decryptText } from '../utils/encryption.js';
 import { uploadFileToDrive, getOrCreateClientFolder } from '../utils/googleDrive.js';
 import { cacheRoute } from '../middleware/cacheRoute.js';
 import { invalidateCache } from '../utils/serverCache.js';
+import { wrapUpload } from '../middleware/multerUpload.js';
 
 const router = express.Router();
 
@@ -303,7 +304,7 @@ router.get('/clients/:id', async (req, res) => {
 });
 
 // POST /api/clients/:id/upload-logo - Upload/replace a client's logo
-router.post('/clients/:id/upload-logo', logoUpload.single('logo'), async (req, res) => {
+router.post('/clients/:id/upload-logo', wrapUpload(logoUpload.single('logo')), async (req, res) => {
   try {
     const { Client } = req.app.locals.models;
     const client = await Client.findByPk(req.params.id);

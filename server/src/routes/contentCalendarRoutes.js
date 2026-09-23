@@ -11,6 +11,7 @@ import {
   fetchAndParseGoogleSheet,
   parseWorkbookBuffer,
 } from "../utils/sheetParser.js";
+import { wrapUpload } from "../middleware/multerUpload.js";
 
 const router = express.Router();
 
@@ -225,7 +226,7 @@ router.delete("/content-calendar/:id", async (req, res) => {
 });
 
 // ── Upload creatives to an entry ────────────────────────────────────────
-router.post("/content-calendar/:id/creatives", upload.array("files", 10), async (req, res) => {
+router.post("/content-calendar/:id/creatives", wrapUpload(upload.array("files", 10)), async (req, res) => {
   try {
     const { ContentCalendarEntry, Client } = req.app.locals.models;
     const entry = await ContentCalendarEntry.findByPk(req.params.id);
@@ -496,7 +497,7 @@ router.post("/content-calendar/sync-google-sheet", async (req, res) => {
 });
 
 // ── Import XLSX / CSV File ─────────────────────────────────────────────
-router.post("/content-calendar/import-file", sheetUpload.single("file"), async (req, res) => {
+router.post("/content-calendar/import-file", wrapUpload(sheetUpload.single("file")), async (req, res) => {
   try {
     const { ContentCalendarEntry, Client } = req.app.locals.models;
     const { clientId, clearExisting } = req.body;
