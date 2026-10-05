@@ -19,10 +19,10 @@ export const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
 const randomBetween = (min, max) => min + Math.random() * (max - min);
 
 // Where a newly pasted/uploaded image lands: a gentle diagonal cascade from
-// the top-left (so a batch of new screenshots fans out like a dropped stack
-// of photos rather than stacking in one exact spot), with a small random
-// tilt for a scrapbook feel. Wraps back toward the top-left once the
-// cascade would run off the page.
+// the top-left (so a batch of new screenshots fans out instead of stacking
+// in one exact spot) at its original aspect ratio, untilted — the user
+// rotates a tile themselves (via its rotate handle) only if they want to.
+// Wraps back toward the top-left once the cascade would run off the page.
 export function placeNewTile(existingTileCount, aspectRatio) {
   const width = DEFAULT_TILE_WIDTH_MM;
   const height = width / aspectRatio;
@@ -31,13 +31,7 @@ export function placeNewTile(existingTileCount, aspectRatio) {
   const x = clamp(10 + step * CASCADE_STEP_MM, 0, Math.max(0, PAGE_CONTENT_WIDTH_MM - width));
   const y = clamp(10 + step * CASCADE_STEP_MM, 0, Math.max(0, PAGE_CONTENT_HEIGHT_MM - height));
 
-  return {
-    x,
-    y,
-    width,
-    height,
-    rotation: randomBetween(-MAX_ROTATION_DEG, MAX_ROTATION_DEG),
-  };
+  return { x, y, width, height, rotation: 0 };
 }
 
 // "Shuffle" — scatters every tile on the page to a random position (size

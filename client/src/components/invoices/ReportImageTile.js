@@ -99,13 +99,9 @@ export default function ReportImageTile({ tile, pageContentRef, onUpdate, onRemo
         transformOrigin: "center center",
       }}
     >
-      {/* Polaroid-style frame: a fixed white border regardless of image
-          size, thicker at the bottom — the scrapbook feel Freeform mode
-          goes for. This, not the handles below, is what the PDF captures. */}
-      <div
-        onPointerDown={handleMoveStart}
-        className="cursor-move select-none rounded-[1px] bg-white p-[3mm] pb-[6mm] shadow-[0_6px_16px_rgba(26,26,26,.25)]"
-      >
+      {/* The image renders exactly as pasted — no border/shadow treatment —
+          so this, not the handles below, is what the PDF captures. */}
+      <div onPointerDown={handleMoveStart} className="cursor-move select-none">
         <img src={tile.src} alt="" draggable={false} className="block w-full object-contain" style={{ height: `${tile.height}mm` }} />
       </div>
 
