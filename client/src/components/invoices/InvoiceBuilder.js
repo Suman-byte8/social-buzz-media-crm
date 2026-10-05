@@ -5,6 +5,7 @@ import InvoiceToolbar from "./Invoicetoolbar";
 import InvoiceDocument from "./Invoicedocument";
 import ReportPagesEditor from "./ReportPagesEditor";
 import ReportImagePage from "./ReportImagePage";
+import CustomReportPage from "./CustomReportPage";
 import { numberToIndianWords } from "../../lib/Numbertowords";
 import { computeInvoiceTotals } from "../../lib/invoiceTotals";
 import { layoutImagesIntoPages } from "../../lib/imageGridLayout";
@@ -12,6 +13,7 @@ import { DEFAULT_ROWS, DEFAULT_TERMS } from "./invoiceDefaults";
 import { useInvoiceClients } from "./useInvoiceClients";
 import { useInvoiceActions } from "./useInvoiceActions";
 import { useReportImages } from "./useReportImages";
+import { useCustomReportPages } from "./useCustomReportPages";
 
 export default function InvoiceBuilder() {
   const [invoiceNumber, setInvoiceNumber] = useState("SBM-2026-014");
@@ -36,9 +38,35 @@ export default function InvoiceBuilder() {
   const invoiceSheetRef = useRef(null);
   const reportPageRefs = useRef([]);
 
+  // Two independent ways to attach screenshots to the invoice: Auto
+  // (existing behavior — pasted/uploaded images get packed into justified
+  // rows automatically) or Freeform (full creative control — drag, resize,
+  // and rotate each image anywhere on the page). Each mode keeps its own
+  // images; switching modes doesn't migrate between them. Whichever mode is
+  // active is what actually renders (and exports) below.
+  const [reportLayoutMode, setReportLayoutMode] = useState("auto");
+
   const { images: reportImages, addFiles: addReportImages, removeImage: removeReportImage, error: reportImagesError } =
     useReportImages();
   const reportPages = useMemo(() => layoutImagesIntoPages(reportImages), [reportImages]);
+
+  const {
+    pages: customPages,
+    activePageId: activeCustomPageId,
+    setActivePage: setActiveCustomPageId,
+    addPage: addCustomPage,
+    removePage: removeCustomPage,
+    addImages: addCustomImages,
+    updateTile: updateCustomTile,
+    removeTile: removeCustomTile,
+    bringToFront: bringCustomTileToFront,
+    shufflePage: shuffleCustomPage,
+    tidyPage: tidyCustomPage,
+    imageCount: customImageCount,
+    error: customReportError,
+  } = useCustomReportPages();
+
+  const isFreeformLayout = reportLayoutMode === "freeform";
 
   const { clients, isClientLoading, selectedClientId, selectedClient, handleClientChange } = useInvoiceClients({
     onClientSelected: () => setInvoiceNumber((prev) => prev || `SBM-INVOICE-${Date.now()}`),
@@ -144,21 +172,49 @@ export default function InvoiceBuilder() {
           stampMode={stampMode}
         />
 
-        <ReportPagesEditor onAddFiles={addReportImages} imageCount={reportImages.length} error={reportImagesError} />
+        <ReportPagesEditor
+          layoutMode={reportLayoutMode}
+          onLayoutModeChange={setReportLayoutMode}
+          onAddFiles={isFreeformLayout ? addCustomImages : addReportImages}
+          onAddPage={addCustomPage}
+          imageCount={isFreeformLayout ? customImageCount : reportImages.length}
+          error={isFreeformLayout ? customReportError : reportImagesError}
+        />
 
-        {reportPages.map((page, index) => (
-          <div key={index} className="mt-8">
-            <ReportImagePage
-              ref={(el) => {
-                reportPageRefs.current[index] = el;
-              }}
-              rows={page.rows}
-              pageNumber={index + 2}
-              totalPages={reportPages.length + 1}
-              onRemoveImage={removeReportImage}
-            />
-          </div>
-        ))}
+        {isFreeformLayout
+          ? customPages.map((page, index) => (
+              <div key={page.id} className="mt-8">
+                <CustomReportPage
+                  ref={(el) => {
+                    reportPageRefs.current[index] = el;
+                  }}
+                  tiles={page.tiles}
+                  pageNumber={index + 2}
+                  totalPages={customPages.length + 1}
+                  isActive={page.id === activeCustomPageId}
+                  onActivate={() => setActiveCustomPageId(page.id)}
+                  onUpdateTile={(tileId, patch) => updateCustomTile(page.id, tileId, patch)}
+                  onRemoveTile={(tileId) => removeCustomTile(page.id, tileId)}
+                  onBringToFront={(tileId) => bringCustomTileToFront(page.id, tileId)}
+                  onShuffle={() => shuffleCustomPage(page.id)}
+                  onTidy={() => tidyCustomPage(page.id)}
+                  onRemovePage={() => removeCustomPage(page.id)}
+                />
+              </div>
+            ))
+          : reportPages.map((page, index) => (
+              <div key={index} className="mt-8">
+                <ReportImagePage
+                  ref={(el) => {
+                    reportPageRefs.current[index] = el;
+                  }}
+                  rows={page.rows}
+                  pageNumber={index + 2}
+                  totalPages={reportPages.length + 1}
+                  onRemoveImage={removeReportImage}
+                />
+              </div>
+            ))}
       </main>
     </div>
   );
