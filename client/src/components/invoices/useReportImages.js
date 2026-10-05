@@ -1,24 +1,7 @@
 "use client";
 
 import { useCallback, useState } from "react";
-
-let nextId = 1;
-
-// Reads a File's natural pixel dimensions via a real <img> load rather than
-// createImageBitmap, so the same object URL created here is exactly what
-// ends up in the <img src> rendered on the report page — no double decode.
-function readImageFile(file) {
-  return new Promise((resolve, reject) => {
-    const src = URL.createObjectURL(file);
-    const img = new Image();
-    img.onload = () => resolve({ id: nextId++, src, naturalWidth: img.naturalWidth, naturalHeight: img.naturalHeight });
-    img.onerror = () => {
-      URL.revokeObjectURL(src);
-      reject(new Error(`Could not read image: ${file.name || "pasted image"}`));
-    };
-    img.src = src;
-  });
-}
+import { readImageFile } from "../../lib/readImageFile";
 
 // Manages the pasted/uploaded screenshots for the invoice's Performance
 // Report pages. Purely client-side and ephemeral (object URLs, never
