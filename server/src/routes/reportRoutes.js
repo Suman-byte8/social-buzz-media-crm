@@ -10,6 +10,12 @@ import { analyzeScreenshotsForReport, MAX_IMAGES_TOTAL } from "../utils/geminiVi
 
 const router = express.Router();
 
+// Default name for a report when the user doesn't type one — used for both
+// the DB title (dashboard list) and the exported PDF/Drive filename (see
+// useReportEditor.js, which derives both straight from `title`), so this is
+// the one place that convention needs to live.
+const defaultReportTitle = (clientName) => `${clientName}_${new Date().toLocaleDateString("en-US", { month: "long" })}_Report`;
+
 // Screenshots dragged onto a report page while editing — any image type,
 // same size cap as the other media-capable routes (brand kit, strategy).
 const assetUpload = multer({
@@ -274,7 +280,7 @@ router.post("/reports", async (req, res) => {
 
     const report = await Report.create({
       clientId: parseInt(clientId),
-      title: title?.trim() || "Untitled Report",
+      title: title?.trim() || defaultReportTitle(clientRecord.name),
       templateKey: templateId ? null : templateKey || "blank",
       templateId: resolvedTemplateId,
       documentData: JSON.stringify(documentData),
@@ -339,7 +345,11 @@ router.post("/reports/auto-generate", wrapUpload(assetUpload.array("files", MAX_
     let documentData;
     let aiGenerated = true;
     let aiError = null;
-    let resolvedTitle = title?.trim() || "";
+    // The report's name (dashboard title + PDF/Drive filename) always
+    // follows the client/month convention when the user doesn't type one —
+    // independent of whatever headline text Gemini puts ON the cover page
+    // itself (plan.reportTitle below), which stays human-readable either way.
+    const resolvedTitle = title?.trim() || defaultReportTitle(clientRecord.name);
 
     // buildPagesFromAiPlan reuses the same coverPage()/thankYouPage() chrome
     // as every built-in template, {{token}} placeholders included — these
@@ -356,15 +366,13 @@ router.post("/reports/auto-generate", wrapUpload(assetUpload.array("files", MAX_
     try {
       const plan = await analyzeScreenshotsForReport(req.files.map((f) => ({ buffer: f.buffer, mimeType: f.mimetype })));
       documentData = interpolateDocumentData(buildPagesFromAiPlan(plan, uploadedAssets, { clientName: clientRecord.name }), interpolationValues);
-      resolvedTitle = resolvedTitle || plan.reportTitle;
     } catch (err) {
       console.error("Gemini auto-generate failed, falling back to a plain gallery:", err.message);
       aiGenerated = false;
       aiError = err.message;
-      resolvedTitle = resolvedTitle || "Performance Report";
       // Deterministic fallback: every uploaded screenshot in simple
       // 4-per-page groups, no AI-written headings/KPIs.
-      const fallbackPlan = { reportTitle: resolvedTitle, reportSubtitle: "", pages: [] };
+      const fallbackPlan = { reportTitle: "Performance Report", reportSubtitle: "", pages: [] };
       for (let i = 0; i < uploadedAssets.length; i += 4) {
         fallbackPlan.pages.push({
           pageTitle: "Screenshots",

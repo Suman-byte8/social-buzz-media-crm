@@ -84,6 +84,15 @@ function tableEl({ x, y, width, height, rows }) {
   return { id: eid(), type: "table", x, y, width, height, rotation: 0, zIndex: 1, rows, headerRow: true };
 }
 
+// Bundled as a static client asset (client/public/images/sbm_logo.png)
+// rather than a Drive-uploaded one — assetId stays null (nothing to clean up
+// on delete/replace) and src is a plain same-origin path ImageElementContent
+// renders directly, unchanged by getAssetUrl. 300x90 source → 50x15mm here
+// keeps its real aspect ratio so object-fit:contain never letterboxes it.
+function logoEl({ x, y, width = 50, height = 15 }) {
+  return imageEl({ x, y, width, height, assetId: null, src: "/images/sbm_logo.png" });
+}
+
 function coverPage({ accentColor, reportTitle, reportSubtitle }) {
   return {
     id: `page-${eid()}`,
@@ -93,6 +102,7 @@ function coverPage({ accentColor, reportTitle, reportSubtitle }) {
     elements: [
       shapeEl({ x: 0, y: 0, width: PAGE_W, height: 6, fill: accentColor }),
       shapeEl({ x: 0, y: PAGE_H - 40, width: PAGE_W, height: 40, fill: accentColor }),
+      logoEl({ x: 20, y: 24 }),
       textEl({ x: 20, y: 100, width: PAGE_W - 40, height: 30, html: reportTitle, fontSize: 30, bold: true }),
       textEl({ x: 20, y: 132, width: PAGE_W - 40, height: 14, html: reportSubtitle, fontSize: 13, color: "#6E6A65" }),
       textEl({ x: 20, y: 160, width: PAGE_W - 40, height: 10, html: "Prepared for {{clientName}}", fontSize: 12, bold: true }),
