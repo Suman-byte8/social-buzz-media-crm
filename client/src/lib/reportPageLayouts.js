@@ -160,6 +160,57 @@ export const PAGE_LAYOUTS = {
   },
 };
 
+// Alternate thank-you page designs, selectable live in an already-open
+// report (see EditorTopToolbar.js's "Thank-you style" menu + useReportEditor.js's
+// replaceThankYouPage) — each returns only {name, background, elements}
+// (deliberately no id/kind) so replaceThankYouPage can spread it onto the
+// existing thank-you page without disturbing its id or its place in the
+// page list. Every field here is a plain text/shape element, immediately
+// editable afterward like anything else on the canvas.
+export const THANK_YOU_VARIANTS = {
+  "minimal-luxury": {
+    name: "Minimal Luxury",
+    build: () => ({
+      name: "Thank You",
+      background: { type: "color", value: "#FAF7F0" },
+      elements: [
+        shapeEl({ x: 0, y: H / 2 - 0.5, width: W, height: 1, fill: "#1A1A1A" }),
+        textEl({ x: 0, y: H / 2 - 40, width: W, height: 24, html: "Thank You", fontSize: 30, bold: true, align: "center", color: "#1A1A1A" }),
+        textEl({ x: 30, y: H / 2 + 14, width: W - 60, height: 20, html: "We appreciate the opportunity to work with you.", fontSize: 11, align: "center", color: "#6E6A65" }),
+        textEl({ x: 0, y: H - 40, width: W, height: 8, html: "hellosocialbuzzmedia@gmail.com", fontSize: 9, align: "center", color: "#6E6A65" }),
+        textEl({ x: 0, y: H - 30, width: W, height: 8, html: "socialbuzzmedia.in", fontSize: 9, align: "center", color: "#6E6A65" }),
+      ],
+    }),
+  },
+  "elegant-editorial": {
+    name: "Elegant Editorial",
+    build: () => ({
+      name: "Thank You",
+      background: { type: "color", value: "#FFFFFF" },
+      elements: [
+        shapeEl({ x: 0, y: 0, width: 8, height: H, fill: "#1A1A1A" }),
+        textEl({ x: 28, y: 100, width: W - 60, height: 40, html: "Thank you.", fontSize: 40, bold: false, color: "#1A1A1A" }),
+        textEl({ x: 28, y: 150, width: W - 60, height: 24, html: "It's been a pleasure working on this with you — here's to what's next.", fontSize: 12, color: "#6E6A65" }),
+        textEl({ x: 28, y: H - 50, width: W - 60, height: 8, html: "hellosocialbuzzmedia@gmail.com  ·  socialbuzzmedia.in", fontSize: 9, color: "#6E6A65" }),
+      ],
+    }),
+  },
+  "bold-statement": {
+    name: "Bold Statement",
+    build: () => ({
+      name: "Thank You",
+      background: { type: "color", value: "#1A1A1A" },
+      elements: [
+        shapeEl({ x: 0, y: 0, width: W, height: 10, fill: "#E8262A" }),
+        textEl({ x: 20, y: 110, width: W - 40, height: 50, html: "THANK YOU", fontSize: 42, bold: true, align: "center", color: "#FFFFFF" }),
+        textEl({ x: 30, y: 168, width: W - 60, height: 20, html: "We appreciate the opportunity to work with you.", fontSize: 12, align: "center", color: "#FFFFFF" }),
+        textEl({ x: 0, y: H - 40, width: W, height: 8, html: "hellosocialbuzzmedia@gmail.com", fontSize: 9, align: "center", color: "#FFFFFF" }),
+        textEl({ x: 0, y: H - 30, width: W, height: 8, html: "socialbuzzmedia.in", fontSize: 9, align: "center", color: "#FFFFFF" }),
+      ],
+    }),
+  },
+};
+
 export function buildPage(kind) {
   const layout = PAGE_LAYOUTS[kind] || PAGE_LAYOUTS.blank;
   return layout.build();

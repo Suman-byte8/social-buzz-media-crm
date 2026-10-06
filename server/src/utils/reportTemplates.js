@@ -41,8 +41,12 @@ function textEl({ x, y, width, height, html, fontSize = 12, color = "#1A1A1A", a
   };
 }
 
-function shapeEl({ x, y, width, height, shapeType = "rect", fill = "#1A1A1A", stroke = null, strokeWidth = 0, zIndex = 0 }) {
-  return { id: eid(), type: "shape", x, y, width, height, rotation: 0, zIndex, shapeType, fill, stroke, strokeWidth };
+// clipPoints is only meaningful for shapeType "diagonal" (see
+// ShapeElementContent.js) — a polygon over the shape's own box as
+// [xPercent, yPercent] pairs, left undefined for every other shape type so
+// it falls through to that component's own default angled cut.
+function shapeEl({ x, y, width, height, shapeType = "rect", fill = "#1A1A1A", stroke = null, strokeWidth = 0, zIndex = 0, clipPoints }) {
+  return { id: eid(), type: "shape", x, y, width, height, rotation: 0, zIndex, shapeType, fill, stroke, strokeWidth, ...(clipPoints ? { clipPoints } : {}) };
 }
 
 function kpiEl({ x, y, width, height, label, value, trend = "", accentColor = "#E8262A" }) {
@@ -109,6 +113,36 @@ function coverPage({ accentColor, reportTitle, reportSubtitle }) {
       textEl({ x: 20, y: 172, width: PAGE_W - 40, height: 8, html: "Reporting period: {{reportPeriod}}", fontSize: 10, color: "#6E6A65" }),
       textEl({ x: 20, y: PAGE_H - 28, width: 120, height: 8, html: "Prepared by {{preparedBy}}", fontSize: 9, color: "#FFFFFF" }),
       textEl({ x: 20, y: PAGE_H - 18, width: 120, height: 8, html: "{{reportDate}}", fontSize: 9, color: "#FFFFFF" }),
+    ],
+  };
+}
+
+// A second, more editorial cover — hero photo with the title overlapping its
+// bottom edge, a stacked pair of framed photos down the left, and a diagonal
+// accent block on the right carrying the subtitle/client/period, closing
+// with the agency logo bottom-right. Same (accentColor, reportTitle,
+// reportSubtitle) signature as coverPage() so it's a drop-in alternative
+// wherever a template's cover is built, not a special-cased flow. Every
+// element here is a plain, independently draggable text/image/shape element
+// — nothing is a flattened graphic.
+function premiumCoverPage({ accentColor, reportTitle, reportSubtitle }) {
+  return {
+    id: `page-${eid()}`,
+    name: "Cover",
+    kind: "cover",
+    background: { type: "color", value: "#FAF7F0" },
+    elements: [
+      imagePlaceholderEl({ x: 0, y: 0, width: PAGE_W, height: 118, caption: "Add a hero photo" }),
+      textEl({ x: 16, y: 78, width: PAGE_W - 32, height: 34, html: reportTitle, fontSize: 32, bold: true, color: "#FFFFFF", fontFamily: "Montserrat, sans-serif" }),
+      textEl({ x: 16, y: 112, width: PAGE_W - 32, height: 8, html: "Prepared for {{clientName}}", fontSize: 10, bold: true, color: "#FFFFFF", letterSpacing: 1 }),
+      imagePlaceholderEl({ x: 16, y: 130, width: 58, height: 68, caption: "Photo 1" }),
+      imagePlaceholderEl({ x: 16, y: 202, width: 58, height: 68, caption: "Photo 2" }),
+      shapeEl({ x: 80, y: 124, width: PAGE_W - 80 - 16, height: 156, shapeType: "diagonal", fill: accentColor }),
+      textEl({ x: 92, y: 148, width: PAGE_W - 92 - 16, height: 40, html: reportSubtitle, fontSize: 20, bold: true, color: "#FFFFFF" }),
+      textEl({ x: 92, y: 195, width: PAGE_W - 92 - 16, height: 8, html: "Reporting period: {{reportPeriod}}", fontSize: 9, color: "#FFFFFF" }),
+      textEl({ x: 92, y: 207, width: PAGE_W - 92 - 16, height: 8, html: "{{reportDate}}", fontSize: 8, color: "#F2EFEA" }),
+      textEl({ x: 16, y: 282, width: 130, height: 8, html: "Prepared by {{preparedBy}}", fontSize: 8, color: "#6E6A65" }),
+      logoEl({ x: 150, y: 284, width: 44, height: 13.2 }),
     ],
   };
 }
@@ -269,6 +303,33 @@ function buildTemplate({ key, name, description, category, accentColor, reportTi
 }
 
 export const BUILT_IN_TEMPLATES = [
+  {
+    key: "premium_agency",
+    name: "Premium Agency Report",
+    description: "An editorial cover with a hero photo, framed image column, and an accent block — the dressiest starting point.",
+    category: "premium",
+    documentData: {
+      version: 1,
+      pageSize: "a4-portrait",
+      pages: [
+        premiumCoverPage({ accentColor: "#1B4332", reportTitle: "Performance Report", reportSubtitle: "A closer look at the results" }),
+        ...[
+          kpiGalleryPage({
+            accentColor: "#1B4332",
+            title: "Overview",
+            kpis: [
+              { label: "Metric 1", value: "—" },
+              { label: "Metric 2", value: "—" },
+              { label: "Metric 3", value: "—" },
+              { label: "Metric 4", value: "—" },
+            ],
+          }),
+          twoColumnGalleryPage({ accentColor: "#1B4332", title: "Screenshots" }),
+        ],
+        thankYouPage({ accentColor: "#1B4332" }),
+      ],
+    },
+  },
   buildTemplate({
     key: "website_performance",
     name: "Website Performance Report",

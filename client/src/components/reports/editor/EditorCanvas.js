@@ -40,6 +40,48 @@ function ElementContent({ element, isSelected, onUpdate, onPickImage, isUploadin
 // Zoom is applied to a wrapper OUTSIDE the captured <article>, so export
 // (which reads the article's own, un-transformed layout box) is unaffected
 // by whatever zoom level the user happens to have on screen.
+// Translates the page.border schema (see reportDesignPresets.js's
+// PAGE_BORDER_PRESETS) into real CSS border/outline — never box-shadow,
+// since a shadow drawn outside an element's own box gets clipped at the
+// page edge during PDF export (see Pdfexport.js), while an ordinary border
+// rasterizes correctly as-is. "inset" uses an outline offset inward by
+// `inset`mm (a real border can't be inset without eating into the content
+// box); "double" doubles the declared width as two visually-distinct lines
+// via CSS's own `double` border-style.
+function borderStyleFor(border) {
+  if (!border) return {};
+  const { kind, color, width, inset, cornerRadius } = border;
+  const base = { borderRadius: cornerRadius ? `${cornerRadius}px` : undefined };
+  if (kind === "double") return { ...base, border: `${width}px double ${color}` };
+  if (kind === "inset") return { ...base, outline: `${width}px solid ${color}`, outlineOffset: `-${inset}px` };
+  return { ...base, border: `${width}px solid ${color}` };
+}
+
+// Four small L-shaped brackets just inside the page border — a decorative
+// touch the "corner-accents" border preset adds on top of its inset outline.
+// Plain bordered divs (not an SVG/icon asset) so they're ordinary CSS and
+// rasterize with the rest of the page with no extra export handling.
+function CornerAccents({ color = "#1A1A1A", inset = 6 }) {
+  const size = 10;
+  const corners = [
+    { top: inset, left: inset, borderWidth: "2px 0 0 2px" },
+    { top: inset, right: inset, borderWidth: "2px 2px 0 0" },
+    { bottom: inset, left: inset, borderWidth: "0 0 2px 2px" },
+    { bottom: inset, right: inset, borderWidth: "0 2px 2px 0" },
+  ];
+  return (
+    <>
+      {corners.map((pos, i) => (
+        <div
+          key={i}
+          className="pointer-events-none absolute"
+          style={{ ...pos, width: size, height: size, borderStyle: "solid", borderColor: color }}
+        />
+      ))}
+    </>
+  );
+}
+
 function PageSheet({
   page,
   pageWidthMm,
@@ -79,6 +121,8 @@ function PageSheet({
             backgroundImage: background.type === "image" && background.value ? `url(${background.value})` : "none",
             backgroundSize: "cover",
             backgroundPosition: "center",
+            boxSizing: "border-box",
+            ...borderStyleFor(page.border),
           }}
         >
           {isActivePage && (
@@ -87,6 +131,7 @@ function PageSheet({
               className="no-print pointer-events-none absolute inset-0 z-[9999] ring-2 ring-inset ring-[#E8262A]"
             />
           )}
+          {page.border?.cornerAccents && <CornerAccents color={page.border.color} inset={page.border.inset || 6} />}
           {page.elements.map((element) => (
             <CanvasElement
               key={element.id}

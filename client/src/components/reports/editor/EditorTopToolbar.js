@@ -1,5 +1,7 @@
 "use client";
 import React, { useState } from "react";
+import { FONT_PAIRING_PRESETS } from "@/lib/reportDesignPresets";
+import { THANK_YOU_VARIANTS } from "@/lib/reportPageLayouts";
 
 const SAVE_STATUS_LABEL = {
   idle: "",
@@ -38,10 +40,14 @@ export default function EditorTopToolbar({
   onExportToDrive,
   isExporting,
   onBackToDashboard,
+  onApplyFontPairing,
+  onReplaceThankYouPage,
 }) {
   const [addMenuOpen, setAddMenuOpen] = useState(false);
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
+  const [typographySubmenuOpen, setTypographySubmenuOpen] = useState(false);
+  const [thankYouSubmenuOpen, setThankYouSubmenuOpen] = useState(false);
 
   return (
     <div className="flex flex-wrap items-center gap-2 border-b border-outline-variant bg-surface px-4 py-2">
@@ -132,7 +138,7 @@ export default function EditorTopToolbar({
           {moreMenuOpen && (
             <>
               <div className="fixed inset-0 z-10" onClick={() => setMoreMenuOpen(false)} />
-              <div className="absolute right-0 z-20 mt-1 w-52 rounded-lg border border-outline-variant bg-white py-1 shadow-lg">
+              <div className="absolute right-0 z-20 mt-1 w-56 rounded-lg border border-outline-variant bg-white py-1 shadow-lg">
                 <button
                   type="button"
                   onClick={() => {
@@ -144,6 +150,56 @@ export default function EditorTopToolbar({
                   <span className="material-symbols-outlined text-[16px]">bookmark_add</span>
                   Save as template
                 </button>
+
+                <div className="relative" onMouseEnter={() => setTypographySubmenuOpen(true)} onMouseLeave={() => setTypographySubmenuOpen(false)}>
+                  <button type="button" className="flex w-full items-center gap-2 px-3 py-2 text-left text-body-sm text-on-surface hover:bg-surface-variant">
+                    <span className="material-symbols-outlined text-[16px]">font_download</span>
+                    Typography
+                    <span className="material-symbols-outlined ml-auto text-[16px]">chevron_right</span>
+                  </button>
+                  {typographySubmenuOpen && (
+                    <div className="absolute right-full top-0 w-52 rounded-lg border border-outline-variant bg-white py-1 shadow-lg">
+                      {FONT_PAIRING_PRESETS.map((preset) => (
+                        <button
+                          key={preset.key}
+                          type="button"
+                          onClick={() => {
+                            onApplyFontPairing(preset);
+                            setMoreMenuOpen(false);
+                          }}
+                          className="flex w-full items-center gap-2 px-3 py-2 text-left text-body-sm text-on-surface hover:bg-surface-variant"
+                        >
+                          {preset.name}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="relative" onMouseEnter={() => setThankYouSubmenuOpen(true)} onMouseLeave={() => setThankYouSubmenuOpen(false)}>
+                  <button type="button" className="flex w-full items-center gap-2 px-3 py-2 text-left text-body-sm text-on-surface hover:bg-surface-variant">
+                    <span className="material-symbols-outlined text-[16px]">volunteer_activism</span>
+                    Thank-you style
+                    <span className="material-symbols-outlined ml-auto text-[16px]">chevron_right</span>
+                  </button>
+                  {thankYouSubmenuOpen && (
+                    <div className="absolute right-full top-0 w-52 rounded-lg border border-outline-variant bg-white py-1 shadow-lg">
+                      {Object.entries(THANK_YOU_VARIANTS).map(([key, variant]) => (
+                        <button
+                          key={key}
+                          type="button"
+                          onClick={() => {
+                            onReplaceThankYouPage(variant.build);
+                            setMoreMenuOpen(false);
+                          }}
+                          className="flex w-full items-center gap-2 px-3 py-2 text-left text-body-sm text-on-surface hover:bg-surface-variant"
+                        >
+                          {variant.name}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
             </>
           )}

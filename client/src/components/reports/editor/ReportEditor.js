@@ -142,6 +142,8 @@ export default function ReportEditor({ reportId }) {
         onExportToDrive={handleExportToDrive}
         isExporting={editor.isExporting}
         onBackToDashboard={handleBackToDashboard}
+        onApplyFontPairing={editor.applyFontPairing}
+        onReplaceThankYouPage={editor.replaceThankYouPage}
       />
 
       <div className="flex flex-1 overflow-hidden">
@@ -183,6 +185,7 @@ export default function ReportEditor({ reportId }) {
           selectedElement={editor.selectedElement}
           onUpdateElement={(patch) => editor.updateElement(editor.selectedPageId, editor.selectedElementId, patch)}
           onUpdatePage={(patch) => editor.updatePage(editor.selectedPageId, patch)}
+          onApplyBorderToAllPages={editor.applyBorderToAllPages}
           onCommitHistory={editor.snapshotHistory}
           onDuplicateElement={() => editor.duplicateElement(editor.selectedPageId, editor.selectedElementId)}
           onRemoveElement={() => editor.removeElement(editor.selectedPageId, editor.selectedElementId)}

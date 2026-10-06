@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { fetchReportById, updateReport as updateReportApi, exportReportToDrive, uploadReportAsset } from "@/services/reportService";
 import { buildPage, clonePageWithNewIds, createEmptyElement } from "@/lib/reportPageLayouts";
 import { getNodesPdfBlob, exportNodesToPdf } from "@/lib/Pdfexport";
+import { HEADING_MIN_SIZE } from "@/lib/reportDesignPresets";
 
 const AUTOSAVE_DELAY_MS = 2000;
 const MAX_HISTORY = 50;
@@ -244,6 +245,50 @@ export function useReportEditor(reportId) {
     [commitDocumentChange]
   );
 
+  // One history entry for every page at once, rather than one per page —
+  // "apply to all" is a single user action and should undo as one.
+  const applyBorderToAllPages = useCallback(
+    (border) => {
+      commitDocumentChange((prev) => ({
+        ...prev,
+        pages: prev.pages.map((p) => ({ ...p, border })),
+      }));
+    },
+    [commitDocumentChange]
+  );
+
+  // Walks every text element and sets its fontFamily based on whether it
+  // reads as a heading (fontSize >= HEADING_MIN_SIZE) or body text — the
+  // document schema has no explicit "role" field, and size is already a
+  // reliable enough signal across these templates' own text elements.
+  const applyFontPairing = useCallback(
+    (preset) => {
+      commitDocumentChange((prev) => ({
+        ...prev,
+        pages: prev.pages.map((p) => ({
+          ...p,
+          elements: p.elements.map((el) =>
+            el.type !== "text" ? el : { ...el, fontFamily: (el.fontSize || 0) >= HEADING_MIN_SIZE ? preset.heading : preset.body }
+          ),
+        })),
+      }));
+    },
+    [commitDocumentChange]
+  );
+
+  // Swaps the thank-you page's elements for a different variant's, keeping
+  // its id/kind/background slot — a real set of editable elements the user
+  // can still tweak afterward, not a locked design.
+  const replaceThankYouPage = useCallback(
+    (buildVariant) => {
+      commitDocumentChange((prev) => ({
+        ...prev,
+        pages: prev.pages.map((p) => (p.kind !== "thankyou" ? p : { ...p, ...buildVariant() })),
+      }));
+    },
+    [commitDocumentChange]
+  );
+
   const reorderPages = useCallback(
     (fromIndex, toIndex) => {
       commitDocumentChange((prev) => {
@@ -429,6 +474,9 @@ export function useReportEditor(reportId) {
     removePage,
     renamePage,
     updatePage,
+    applyBorderToAllPages,
+    applyFontPairing,
+    replaceThankYouPage,
     reorderPages,
     addElement,
     updateElement,

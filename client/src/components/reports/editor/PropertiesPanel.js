@@ -1,5 +1,6 @@
 "use client";
 import React from "react";
+import { FONT_FAMILY_OPTIONS, HEADLINE_SUGGESTIONS, PAGE_BORDER_PRESETS, FRAME_STYLE_PRESETS, HEADING_MIN_SIZE } from "@/lib/reportDesignPresets";
 
 const Field = ({ label, children }) => (
   <div className="space-y-1">
@@ -54,6 +55,45 @@ function PositionSizeSection({ element, onUpdate }) {
   );
 }
 
+// A headline-sized element is big enough that an unchecked suggestion could
+// visibly overflow its own box — this isn't a real text-measurement engine,
+// just a cheap mm-of-height-to-px-of-font-size ratio that keeps a suggested
+// size from obviously busting a short/narrow title box.
+function capFontSizeToElement(fontSize, element) {
+  const maxByHeight = Math.max(14, element.height * 2.4);
+  return Math.round(Math.min(fontSize, maxByHeight));
+}
+
+function HeadlineSuggestions({ element, onUpdate }) {
+  if ((element.fontSize || 0) < HEADING_MIN_SIZE) return null;
+  return (
+    <div className="space-y-1.5 border-t border-outline-variant pt-3">
+      <p className="font-label-sm text-label-sm text-on-surface-variant">Headline style</p>
+      <div className="flex flex-wrap gap-1.5">
+        {HEADLINE_SUGGESTIONS.map((s) => (
+          <button
+            key={s.key}
+            type="button"
+            title={s.name}
+            onClick={() =>
+              onUpdate({
+                fontFamily: s.fontFamily,
+                fontSize: capFontSizeToElement(s.fontSize, element),
+                bold: s.bold,
+                letterSpacing: s.letterSpacing,
+                align: s.align,
+              })
+            }
+            className="rounded-full border border-outline-variant px-2.5 py-1 text-[11px] text-on-surface hover:border-primary hover:text-primary"
+          >
+            {s.name}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function TextProperties({ element, onUpdate }) {
   return (
     <div className="space-y-3">
@@ -88,10 +128,20 @@ function TextProperties({ element, onUpdate }) {
           </button>
         ))}
       </div>
+      <Field label="Font family">
+        <select value={element.fontFamily || "Inter, sans-serif"} onChange={(e) => onUpdate({ fontFamily: e.target.value })} className={inputClass}>
+          {FONT_FAMILY_OPTIONS.map((f) => (
+            <option key={f.value} value={f.value} style={{ fontFamily: f.value }}>
+              {f.label}
+            </option>
+          ))}
+        </select>
+      </Field>
       <NumberField label="Font size" value={element.fontSize || 12} suffix="px" onChange={(v) => onUpdate({ fontSize: v })} />
       <NumberField label="Line height" value={element.lineHeight || 1.4} step={0.1} onChange={(v) => onUpdate({ lineHeight: v })} />
       <NumberField label="Letter spacing" value={element.letterSpacing || 0} step={0.1} suffix="px" onChange={(v) => onUpdate({ letterSpacing: v })} />
       <ColorField label="Color" value={element.color} onChange={(v) => onUpdate({ color: v })} />
+      <HeadlineSuggestions element={element} onUpdate={onUpdate} />
     </div>
   );
 }
@@ -108,6 +158,15 @@ function ImageProperties({ element, onUpdate }) {
       </Field>
       <Field label="Caption">
         <input type="text" value={element.caption || ""} onChange={(e) => onUpdate({ caption: e.target.value })} className={inputClass} placeholder="Optional caption" />
+      </Field>
+      <Field label="Frame style">
+        <select value={element.frameStyle || "none"} onChange={(e) => onUpdate({ frameStyle: e.target.value })} className={inputClass}>
+          {FRAME_STYLE_PRESETS.map((p) => (
+            <option key={p.key} value={p.key}>
+              {p.name}
+            </option>
+          ))}
+        </select>
       </Field>
       <NumberField label="Corner radius" value={element.borderRadius || 0} suffix="px" onChange={(v) => onUpdate({ borderRadius: v })} />
       {element.src && (
@@ -128,6 +187,7 @@ function ShapeProperties({ element, onUpdate }) {
           <option value="rect">Rectangle</option>
           <option value="circle">Circle</option>
           <option value="line">Line</option>
+          <option value="diagonal">Diagonal accent block</option>
         </select>
       </Field>
       <ColorField label="Fill" value={element.fill} onChange={(v) => onUpdate({ fill: v })} />
@@ -193,7 +253,17 @@ function KpiProperties({ element, onUpdate }) {
   );
 }
 
-function PageProperties({ page, onUpdatePage }) {
+// Which preset a page's current `border` matches, by deep-equality against
+// each preset's style object — needed because the page stores the resolved
+// style object, not the preset key, so re-selecting after a reload still
+// shows the right option highlighted.
+function matchBorderPresetKey(border) {
+  if (!border) return "none";
+  const match = PAGE_BORDER_PRESETS.find((p) => p.style && JSON.stringify(p.style) === JSON.stringify(border));
+  return match?.key || "none";
+}
+
+function PageProperties({ page, onUpdatePage, onApplyBorderToAllPages }) {
   const background = page.background || { type: "color", value: "#FFFFFF" };
   return (
     <div className="space-y-3">
@@ -213,11 +283,38 @@ function PageProperties({ page, onUpdatePage }) {
       ) : (
         <p className="text-body-sm text-on-surface-variant">Upload a background image from the Assets panel, then paste its link here once uploaded.</p>
       )}
+
+      <div className="space-y-1.5 border-t border-outline-variant pt-3">
+        <p className="font-label-sm text-label-sm text-on-surface-variant">Page border</p>
+        <select
+          value={matchBorderPresetKey(page.border)}
+          onChange={(e) => {
+            const preset = PAGE_BORDER_PRESETS.find((p) => p.key === e.target.value);
+            onUpdatePage({ border: preset?.style || null });
+          }}
+          className={inputClass}
+        >
+          {PAGE_BORDER_PRESETS.map((p) => (
+            <option key={p.key} value={p.key}>
+              {p.name}
+            </option>
+          ))}
+        </select>
+        {page.border && (
+          <button
+            type="button"
+            onClick={() => onApplyBorderToAllPages(page.border)}
+            className="w-full rounded-md border border-outline-variant py-1.5 text-body-sm text-on-surface hover:border-primary hover:text-primary"
+          >
+            Apply to all pages
+          </button>
+        )}
+      </div>
     </div>
   );
 }
 
-export default function PropertiesPanel({ selectedPage, selectedElement, onUpdateElement, onUpdatePage, onCommitHistory, onDuplicateElement, onRemoveElement }) {
+export default function PropertiesPanel({ selectedPage, selectedElement, onUpdateElement, onUpdatePage, onApplyBorderToAllPages, onCommitHistory, onDuplicateElement, onRemoveElement }) {
   if (!selectedPage) {
     return <aside className="w-[260px] shrink-0 border-l border-outline-variant bg-surface p-4" />;
   }
@@ -225,7 +322,7 @@ export default function PropertiesPanel({ selectedPage, selectedElement, onUpdat
   if (!selectedElement) {
     return (
       <aside className="w-[260px] shrink-0 overflow-y-auto border-l border-outline-variant bg-surface p-4">
-        <PageProperties page={selectedPage} onUpdatePage={onUpdatePage} />
+        <PageProperties page={selectedPage} onUpdatePage={onUpdatePage} onApplyBorderToAllPages={onApplyBorderToAllPages} />
       </aside>
     );
   }

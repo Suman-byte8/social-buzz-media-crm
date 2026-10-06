@@ -45,6 +45,14 @@ const A4_HEIGHT_MM = 297;
 async function captureSheetToCanvas(node) {
   if (!node) throw new Error("Sheet element not found");
 
+  // A text element whose fontFamily was just changed needs its web font
+  // actually downloaded before the capture reads computed styles — without
+  // this, an export triggered right after switching fonts can rasterize a
+  // page still showing the fallback font for a frame or two.
+  if (document.fonts?.ready) {
+    await document.fonts.ready;
+  }
+
   return html2canvas(node, {
     scale: 3,
     useCORS: true,
@@ -70,6 +78,20 @@ async function captureSheetToCanvas(node) {
       clonedRoot
         .querySelectorAll("[data-html2canvas-ignore]")
         .forEach((el) => el.remove());
+
+      // Every document type's ".sheet" page carries an editor-only drop
+      // shadow for visual depth against the workspace background. html2canvas
+      // crops exactly to the node's own border box, so a shadow drawn outside
+      // that box doesn't export as "no shadow" — it exports as a shadow
+      // abruptly clipped at the page edge. Stripping it here (not removing
+      // the element, just the one property) is the one place this fixes it
+      // for invoices, salary slips, custom report pages, and the report
+      // builder all at once, since they all share this capture function.
+      // A real page border (as opposed to this shadow) is unaffected — it's
+      // ordinary CSS border/outline, which rasterizes correctly as-is.
+      clonedRoot.querySelectorAll(".sheet").forEach((el) => {
+        el.style.boxShadow = "none";
+      });
     },
   });
 }
