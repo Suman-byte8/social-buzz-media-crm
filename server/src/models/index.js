@@ -12,6 +12,8 @@ import taskAssigneeModel from "./TaskAssignee.js";
 import leadModel from "./Lead.js";
 import notificationModel from "./Notification.js";
 import serviceModel from "./Service.js";
+import reportModel from "./Report.js";
+import reportTemplateModel from "./ReportTemplate.js";
 
 export const initModels = (sequelize) => {
   const Client = clientModel(sequelize, DataTypes);
@@ -27,6 +29,8 @@ export const initModels = (sequelize) => {
   const Lead = leadModel(sequelize, DataTypes);
   const Notification = notificationModel(sequelize, DataTypes);
   const Service = serviceModel(sequelize, DataTypes);
+  const Report = reportModel(sequelize, DataTypes);
+  const ReportTemplate = reportTemplateModel(sequelize, DataTypes);
 
   Client.hasMany(Document, { foreignKey: "clientId", as: "documents" });
   Document.belongsTo(Client, { foreignKey: "clientId", as: "client" });
@@ -72,6 +76,19 @@ export const initModels = (sequelize) => {
   TeamMember.hasMany(Document, { foreignKey: "teamMemberId", as: "salarySlips", constraints: false });
   Document.belongsTo(TeamMember, { foreignKey: "teamMemberId", as: "teamMember", constraints: false });
 
+  // Aliased "builderReports" rather than "reports" — Client already has a
+  // real `reports` TEXT column (a legacy free-text field, unrelated to the
+  // Report Builder), and Sequelize refuses an association alias that
+  // collides with an existing attribute name.
+  Client.hasMany(Report, { foreignKey: "clientId", as: "builderReports" });
+  Report.belongsTo(Client, { foreignKey: "clientId", as: "client" });
+
+  Report.hasMany(Document, { foreignKey: "reportId", as: "assets", constraints: false });
+  Document.belongsTo(Report, { foreignKey: "reportId", as: "report", constraints: false });
+
+  ReportTemplate.hasMany(Report, { foreignKey: "templateId", as: "reports", constraints: false });
+  Report.belongsTo(ReportTemplate, { foreignKey: "templateId", as: "template", constraints: false });
+
   return {
     Client,
     TeamMember,
@@ -86,5 +103,7 @@ export const initModels = (sequelize) => {
     Lead,
     Notification,
     Service,
+    Report,
+    ReportTemplate,
   };
 };
