@@ -21,6 +21,7 @@
     "migrate:task-assigned-by": "node scripts/add-task-assigned-by-column.js",
     "migrate:note-attachment-columns": "node scripts/add-note-attachment-columns.js",
     "migrate:salary-slip-columns": "node scripts/add-salary-slip-columns.js",
+    "migrate:report-builder-columns": "node scripts/add-report-builder-columns.js",
     "seed:users": "node scripts/seed-users.js",
     "seed:services": "node scripts/seed-services.js"
   },

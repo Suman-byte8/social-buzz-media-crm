@@ -75,49 +75,52 @@ async function captureSheetToCanvas(node) {
 }
 
 // Places a captured canvas as the PDF's current page: fit to the page
-// width, and only shrunk further if it comes out taller than a full A4
-// page — never stretched to fill a shorter page. That means a lightly
-// filled last report page (e.g. one leftover image) just leaves blank
-// space at the bottom of that PDF page instead of being blown up, and the
-// single-page invoice keeps its existing "shrink to fit one page rather
-// than spill onto an almost-empty second page" behavior.
-function placeCanvasAsPage(pdf, canvas) {
-  const imgWidthMm = A4_WIDTH_MM;
-  let finalWidthMm = imgWidthMm;
-  let finalHeightMm = (canvas.height * imgWidthMm) / canvas.width;
+// width, and only shrunk further if it comes out taller than a full page —
+// never stretched to fill a shorter page. That means a lightly filled last
+// report page (e.g. one leftover image) just leaves blank space at the
+// bottom of that PDF page instead of being blown up, and the single-page
+// invoice keeps its existing "shrink to fit one page rather than spill onto
+// an almost-empty second page" behavior.
+function placeCanvasAsPage(pdf, canvas, pageWidthMm, pageHeightMm) {
+  let finalWidthMm = pageWidthMm;
+  let finalHeightMm = (canvas.height * pageWidthMm) / canvas.width;
 
-  if (finalHeightMm > A4_HEIGHT_MM) {
-    const scale = A4_HEIGHT_MM / finalHeightMm;
-    finalHeightMm = A4_HEIGHT_MM;
-    finalWidthMm = imgWidthMm * scale;
+  if (finalHeightMm > pageHeightMm) {
+    const scale = pageHeightMm / finalHeightMm;
+    finalHeightMm = pageHeightMm;
+    finalWidthMm = pageWidthMm * scale;
   }
 
-  const xOffset = (A4_WIDTH_MM - finalWidthMm) / 2;
+  const xOffset = (pageWidthMm - finalWidthMm) / 2;
   const imgData = canvas.toDataURL("image/jpeg", 0.98);
   pdf.addImage(imgData, "JPEG", xOffset, 0, finalWidthMm, finalHeightMm, undefined, "FAST");
 }
 
 /**
- * Renders the invoice sheet, plus any additional full sheets (e.g. the
- * report's pasted-screenshot pages), into one combined multi-page A4 PDF —
- * invoice first, then each extra page in order. `extraPageNodes` may
- * contain null/undefined entries (e.g. a ref not yet attached) — those are
- * skipped rather than throwing.
+ * Renders an arbitrary list of already-mounted DOM "sheet" nodes into one
+ * combined multi-page PDF, in order. Entries may be null/undefined (e.g. a
+ * ref not yet attached) — those are skipped rather than throwing. Used
+ * directly by the Report Builder (any number of pages, portrait or
+ * landscape) and indirectly by the invoice/salary-slip exports below
+ * (always one primary node + optional extra pages, always A4 portrait).
  */
-async function generateInvoicePdfBlob(invoiceNode, extraPageNodes = []) {
-  const pdf = new jsPDF({ unit: "mm", format: "a4", orientation: "portrait" });
+async function generatePdfFromNodes(nodes, { orientation = "portrait" } = {}) {
+  const pageWidthMm = orientation === "landscape" ? A4_HEIGHT_MM : A4_WIDTH_MM;
+  const pageHeightMm = orientation === "landscape" ? A4_WIDTH_MM : A4_HEIGHT_MM;
+  const pdf = new jsPDF({ unit: "mm", format: "a4", orientation });
 
-  const invoiceCanvas = await captureSheetToCanvas(invoiceNode);
-  placeCanvasAsPage(pdf, invoiceCanvas);
-
-  for (const node of extraPageNodes) {
-    if (!node) continue;
-    const canvas = await captureSheetToCanvas(node);
-    pdf.addPage();
-    placeCanvasAsPage(pdf, canvas);
+  const validNodes = (nodes || []).filter(Boolean);
+  for (let i = 0; i < validNodes.length; i++) {
+    const canvas = await captureSheetToCanvas(validNodes[i]);
+    if (i > 0) pdf.addPage();
+    placeCanvasAsPage(pdf, canvas, pageWidthMm, pageHeightMm);
   }
 
   return pdf.output("blob");
+}
+
+async function generateInvoicePdfBlob(invoiceNode, extraPageNodes = []) {
+  return generatePdfFromNodes([invoiceNode, ...extraPageNodes]);
 }
 
 export async function exportInvoiceToPdf(invoiceNode, filename, extraPageNodes = []) {
@@ -134,4 +137,23 @@ export async function exportInvoiceToPdf(invoiceNode, filename, extraPageNodes =
 
 export async function getInvoicePdfBlob(invoiceNode, extraPageNodes = []) {
   return generateInvoicePdfBlob(invoiceNode, extraPageNodes);
+}
+
+// Generic versions of the two exports above, for callers (the Report
+// Builder) that have their own flat list of N page nodes rather than one
+// "primary" node plus extras, and that may need landscape orientation.
+export async function getNodesPdfBlob(nodes, options) {
+  return generatePdfFromNodes(nodes, options);
+}
+
+export async function exportNodesToPdf(nodes, filename, options) {
+  const blob = await generatePdfFromNodes(nodes, options);
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
 }

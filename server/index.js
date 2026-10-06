@@ -164,6 +164,7 @@ import miscTaskRoutes from "./src/routes/miscTaskRoutes.js";
 import leadRoutes from "./src/routes/leadRoutes.js";
 import notificationRoutes from "./src/routes/notificationRoutes.js";
 import serviceRoutes from "./src/routes/serviceRoutes.js";
+import reportRoutes from "./src/routes/reportRoutes.js";
 import authRoutes from "./src/routes/authRoutes.js";
 import { startKeepAlivePing } from "./src/utils/keepAlive.js";
 import { authenticate } from "./src/middleware/auth.js";
@@ -198,6 +199,7 @@ app.use("/api", miscTaskRoutes);
 app.use("/api", leadRoutes);
 app.use("/api", notificationRoutes);
 app.use("/api", serviceRoutes);
+app.use("/api", reportRoutes);
 
 app.get("/", (req, res) => {
   res.json({

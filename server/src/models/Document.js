@@ -41,11 +41,19 @@ const documentModel = (sequelize) => {
       // when documentType is "salary_slip". A team member's Drive folder
       // (not a client's) is where these land — see getOrCreateTeamMembersFolder.
       teamMemberId: { type: DataTypes.INTEGER, allowNull: true },
+      // Soft reference (no FK constraint, same as leadId/noteId/teamMemberId)
+      // — only set when documentType is "report_asset": an image uploaded
+      // while editing a Report Builder report (screenshots dragged onto a
+      // page). The report's own exported PDF is a separate Document row
+      // with documentType "report" (clientId + reportId both set) — the
+      // existing type ClientFilesTab's Reports tab already lists, so an
+      // exported report shows up there automatically.
+      reportId: { type: DataTypes.INTEGER, allowNull: true },
       uploadedBy: { type: DataTypes.STRING, allowNull: true },
       description: { type: DataTypes.TEXT, allowNull: true },
       // Agreement-specific fields
       documentType: {
-        type: DataTypes.ENUM("agreement", "proposal", "invoice", "report", "content_calendar", "brand_kit", "creative", "strategy", "lead", "note", "salary_slip", "other"),
+        type: DataTypes.ENUM("agreement", "proposal", "invoice", "report", "content_calendar", "brand_kit", "creative", "strategy", "lead", "note", "salary_slip", "report_asset", "other"),
         allowNull: true,
         defaultValue: "other",
       },
@@ -74,6 +82,7 @@ const documentModel = (sequelize) => {
         { fields: ["leadId"] },
         { fields: ["noteId"] },
         { fields: ["teamMemberId"] },
+        { fields: ["reportId"] },
         { fields: ["documentType"] },
         { fields: ["status"] },
       ],
