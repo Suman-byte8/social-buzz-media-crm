@@ -4,6 +4,7 @@ import { invalidateCache } from "@/utils/cache";
 import {
   fetchReports as fetchReportsApi,
   createReport as createReportApi,
+  autoGenerateReport as autoGenerateReportApi,
   updateReport as updateReportApi,
   duplicateReport as duplicateReportApi,
   trashReport as trashReportApi,
@@ -37,6 +38,19 @@ export const createReport = createAsyncThunk("reports/createReport", async (payl
     return rejectWithValue(error.message || "Failed to create report");
   }
 });
+
+export const autoGenerateReport = createAsyncThunk(
+  "reports/autoGenerateReport",
+  async (payload, { rejectWithValue }) => {
+    try {
+      const result = await autoGenerateReportApi(payload);
+      invalidateCache("reports/fetchReports");
+      return result;
+    } catch (error) {
+      return rejectWithValue(error.message || "Failed to generate report from screenshots");
+    }
+  }
+);
 
 // Dashboard-only "Rename" quick action — title-only update, reusing the
 // same PUT /reports/:id the editor's full save hits (omitting documentData
@@ -167,6 +181,14 @@ const reportsSlice = createSlice({
       })
       .addCase(createReport.rejected, (state, action) => {
         state.error = action.payload || "Failed to create report";
+      })
+      .addCase(autoGenerateReport.fulfilled, (state, action) => {
+        state.successMessage = action.payload?.data?.aiGenerated
+          ? "Report generated from your screenshots"
+          : "Screenshots uploaded, but AI analysis failed — added as a plain gallery";
+      })
+      .addCase(autoGenerateReport.rejected, (state, action) => {
+        state.error = action.payload || "Failed to generate report from screenshots";
       })
       .addCase(renameReportTitle.fulfilled, (state, action) => {
         const updated = action.payload?.data;

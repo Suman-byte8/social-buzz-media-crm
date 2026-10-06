@@ -5,7 +5,8 @@ import { uploadFileToDrive, getOrCreateClientFolder, getOrCreateClientSubfolder,
 import { wrapUpload } from "../middleware/multerUpload.js";
 import { cacheRoute } from "../middleware/cacheRoute.js";
 import { invalidateCache } from "../utils/serverCache.js";
-import { BUILT_IN_TEMPLATES, getBuiltInTemplateByKey, cloneDocumentData, interpolateDocumentData } from "../utils/reportTemplates.js";
+import { BUILT_IN_TEMPLATES, getBuiltInTemplateByKey, cloneDocumentData, interpolateDocumentData, buildPagesFromAiPlan } from "../utils/reportTemplates.js";
+import { analyzeScreenshotsForReport } from "../utils/geminiVision.js";
 
 const router = express.Router();
 
@@ -287,6 +288,116 @@ router.post("/reports", async (req, res) => {
   } catch (error) {
     console.error("Error creating report:", error);
     res.status(500).json({ success: false, message: "Error creating report", error: error.message });
+  }
+});
+
+// "Auto-generate from screenshots" — uploads every screenshot to the
+// client's Drive "Report Assets" subfolder (same as a manual upload inside
+// the editor), sends them to Gemini for a suggested title/grouping/
+// headings/KPIs (see geminiVision.js), and builds a real, fully-editable
+// report from the result. The upload always happens regardless of whether
+// the AI analysis itself succeeds — a Gemini hiccup should never lose the
+// user's screenshots, just fall back to a plain, ungrouped gallery they can
+// rearrange by hand. `aiGenerated: false` on the response tells the
+// frontend to say so rather than imply the layout was AI-written when it
+// wasn't.
+router.post("/reports/auto-generate", wrapUpload(assetUpload.array("files", 20)), async (req, res) => {
+  try {
+    const { clientId, title } = req.body;
+    if (!clientId) return res.status(400).json({ success: false, message: "clientId is required" });
+    if (!req.files || req.files.length === 0) {
+      return res.status(400).json({ success: false, message: "At least one screenshot is required" });
+    }
+
+    const { Report, Client, Document } = req.app.locals.models;
+    const clientRecord = await Client.findByPk(parseInt(clientId));
+    if (!clientRecord) return res.status(404).json({ success: false, message: "Client not found" });
+
+    const clientFolder = await getOrCreateClientFolder(clientRecord.name, clientRecord.id);
+    const assetsFolder = await getOrCreateClientSubfolder(clientFolder.folderId, "Report Assets");
+
+    // Upload every screenshot first — this is the part that must never be
+    // lost, so it happens before anything AI-related is even attempted.
+    const uploadedAssets = [];
+    for (const file of req.files) {
+      const driveResult = await uploadFileToDrive(file.buffer, file.originalname, file.mimetype, assetsFolder.folderId);
+      const asset = await Document.create({
+        fileName: file.originalname,
+        fileType: file.mimetype,
+        fileSize: file.size,
+        fileId: driveResult.fileId,
+        driveLink: driveResult.googleUserContentLink,
+        webViewLink: driveResult.webViewLink,
+        googleUserContentLink: driveResult.googleUserContentLink,
+        folderId: assetsFolder.folderId,
+        clientId: clientRecord.id,
+        documentType: "report_asset",
+      });
+      uploadedAssets.push({ id: asset.id, src: `/api/documents/${asset.id}/stream` });
+    }
+
+    let documentData;
+    let aiGenerated = true;
+    let aiError = null;
+    let resolvedTitle = title?.trim() || "";
+
+    // buildPagesFromAiPlan reuses the same coverPage()/thankYouPage() chrome
+    // as every built-in template, {{token}} placeholders included — these
+    // need the same interpolation pass POST /reports gives a template-based
+    // report, or the cover/thank-you pages would show literal "{{clientName}}"
+    // text instead of the real client name/date.
+    const interpolationValues = {
+      clientName: clientRecord.name,
+      reportPeriod: new Date().toLocaleDateString("en-US", { month: "long", year: "numeric" }),
+      preparedBy: req.user?.name || "",
+      reportDate: new Date().toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" }),
+    };
+
+    try {
+      const plan = await analyzeScreenshotsForReport(req.files.map((f) => ({ buffer: f.buffer, mimeType: f.mimetype })));
+      documentData = interpolateDocumentData(buildPagesFromAiPlan(plan, uploadedAssets, { clientName: clientRecord.name }), interpolationValues);
+      resolvedTitle = resolvedTitle || plan.reportTitle;
+    } catch (err) {
+      console.error("Gemini auto-generate failed, falling back to a plain gallery:", err.message);
+      aiGenerated = false;
+      aiError = err.message;
+      resolvedTitle = resolvedTitle || "Performance Report";
+      // Deterministic fallback: every uploaded screenshot in simple
+      // 4-per-page groups, no AI-written headings/KPIs.
+      const fallbackPlan = { reportTitle: resolvedTitle, reportSubtitle: "", pages: [] };
+      for (let i = 0; i < uploadedAssets.length; i += 4) {
+        fallbackPlan.pages.push({
+          pageTitle: "Screenshots",
+          summary: "",
+          imageIndexes: Array.from({ length: Math.min(4, uploadedAssets.length - i) }, (_, j) => i + j),
+          kpis: [],
+        });
+      }
+      documentData = interpolateDocumentData(buildPagesFromAiPlan(fallbackPlan, uploadedAssets, { clientName: clientRecord.name }), interpolationValues);
+    }
+
+    // Each report_asset Document needs its final reportId filled in — they
+    // were created above without one since the report didn't exist yet.
+    const report = await Report.create({
+      clientId: clientRecord.id,
+      title: resolvedTitle,
+      templateKey: "blank",
+      documentData: JSON.stringify(documentData),
+      status: "draft",
+      createdBy: req.user?.name || null,
+      updatedBy: req.user?.name || null,
+    });
+    await Document.update({ reportId: report.id }, { where: { id: uploadedAssets.map((a) => a.id) } });
+
+    await invalidateCache("reports");
+    res.status(201).json({
+      success: true,
+      message: aiGenerated ? "Report generated from your screenshots" : "Screenshots uploaded, but AI analysis failed — added as a plain gallery instead",
+      data: { report: serializeReport(report), aiGenerated, aiError },
+    });
+  } catch (error) {
+    console.error("Error auto-generating report:", error);
+    res.status(500).json({ success: false, message: error.message || "Error auto-generating report", error: error.message });
   }
 });
 

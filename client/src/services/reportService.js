@@ -16,6 +16,19 @@ export const fetchReportById = async (id) => apiClient(`/reports/${id}`);
 export const createReport = async ({ clientId, title, templateKey, templateId }) =>
   apiClient("/reports", { method: "POST", body: { clientId, title, templateKey, templateId } });
 
+// "Auto-generate from screenshots" — uploads every file and asks Gemini to
+// propose a title/grouping/headings/KPIs, building a real editable report
+// from the result (see reportRoutes.js POST /reports/auto-generate). Always
+// succeeds at creating *a* report even if the AI analysis itself fails —
+// check the response's `aiGenerated` flag to know which happened.
+export const autoGenerateReport = async ({ clientId, title, files }) => {
+  const formData = new FormData();
+  formData.append("clientId", clientId);
+  if (title) formData.append("title", title);
+  files.forEach((file) => formData.append("files", file));
+  return apiClient("/reports/auto-generate", { method: "POST", body: formData });
+};
+
 // `expectedRevision` lets the caller detect a concurrent edit (see
 // reportRoutes.js PUT /reports/:id) — omit it to force-save regardless.
 export const updateReport = async (id, { title, documentData, expectedRevision }) =>
