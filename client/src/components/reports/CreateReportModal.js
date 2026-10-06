@@ -6,7 +6,11 @@ import { fetchClients } from "@/redux/slices/clientsSlice";
 import { fetchReportTemplates, createReport, autoGenerateReport } from "@/redux/slices/reportsSlice";
 import ClientSelectDropdown from "@/components/invoices/ClientSelectDropdown";
 
-const MAX_SCREENSHOTS = 20;
+// Matches the backend's MAX_IMAGES_TOTAL (geminiVision.js) — large uploads
+// are batched server-side (≤10 images per Gemini call) rather than sent as
+// one request, so this is a sane upper bound on total generation time/Drive
+// uploads per click, not a Gemini request-size limit.
+const MAX_SCREENSHOTS = 60;
 
 // Mounted only while open (see ReportsDashboard.js), rather than taking an
 // `open` prop and resetting its fields in an effect each time — a fresh
@@ -40,7 +44,15 @@ export default function CreateReportModal({ onClose }) {
   const addScreenshots = (fileList) => {
     const files = Array.from(fileList || []).filter((f) => f.type?.startsWith("image/"));
     if (files.length === 0) return;
-    setScreenshots((prev) => [...prev, ...files].slice(0, MAX_SCREENSHOTS));
+    setScreenshots((prev) => {
+      const combined = [...prev, ...files];
+      if (combined.length > MAX_SCREENSHOTS) {
+        setError(`Only the first ${MAX_SCREENSHOTS} screenshots were kept — that's the limit per report.`);
+      } else if (error) {
+        setError("");
+      }
+      return combined.slice(0, MAX_SCREENSHOTS);
+    });
   };
 
   const handlePaste = (e) => {

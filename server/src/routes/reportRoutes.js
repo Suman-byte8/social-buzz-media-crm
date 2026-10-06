@@ -6,7 +6,7 @@ import { wrapUpload } from "../middleware/multerUpload.js";
 import { cacheRoute } from "../middleware/cacheRoute.js";
 import { invalidateCache } from "../utils/serverCache.js";
 import { BUILT_IN_TEMPLATES, getBuiltInTemplateByKey, cloneDocumentData, interpolateDocumentData, buildPagesFromAiPlan } from "../utils/reportTemplates.js";
-import { analyzeScreenshotsForReport } from "../utils/geminiVision.js";
+import { analyzeScreenshotsForReport, MAX_IMAGES_TOTAL } from "../utils/geminiVision.js";
 
 const router = express.Router();
 
@@ -301,7 +301,7 @@ router.post("/reports", async (req, res) => {
 // rearrange by hand. `aiGenerated: false` on the response tells the
 // frontend to say so rather than imply the layout was AI-written when it
 // wasn't.
-router.post("/reports/auto-generate", wrapUpload(assetUpload.array("files", 20)), async (req, res) => {
+router.post("/reports/auto-generate", wrapUpload(assetUpload.array("files", MAX_IMAGES_TOTAL)), async (req, res) => {
   try {
     const { clientId, title } = req.body;
     if (!clientId) return res.status(400).json({ success: false, message: "clientId is required" });

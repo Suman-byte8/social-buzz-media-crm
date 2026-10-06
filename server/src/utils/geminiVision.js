@@ -14,7 +14,20 @@
 const DEFAULT_MODEL = "gemini-2.0-flash";
 const API_BASE = "https://generativelanguage.googleapis.com/v1beta/models";
 
-const RESPONSE_SCHEMA = {
+// A single request inlining too many base64 images risks the API's request-
+// size limit, and asking the model to correctly group/caption everything in
+// one shot measurably degrades with more images to juggle. Larger uploads
+// are split into batches analyzed independently (see analyzeScreenshotsForReport)
+// instead of raising this per-call size — ~10 images per call stays well
+// within both the size and quality sweet spot observed in practice.
+const BATCH_SIZE = 10;
+// A hard ceiling on top of the batching, so a request can't balloon into
+// dozens of sequential Gemini calls (and dozens of Drive uploads) from one
+// click — comfortably covers a real report while keeping total generation
+// time bounded. Raise if a genuine need for more shows up.
+export const MAX_IMAGES_TOTAL = 60;
+
+const PAGE_PLAN_SCHEMA = {
   type: "object",
   properties: {
     reportTitle: { type: "string" },
@@ -46,10 +59,19 @@ const RESPONSE_SCHEMA = {
   required: ["reportTitle", "pages"],
 };
 
-const PROMPT = `You are helping a digital marketing agency turn a batch of screenshots (Google Analytics, Search Console, PageSpeed Insights, social media dashboards, ad platforms, etc.) into a client-facing report outline.
+const TITLE_SCHEMA = {
+  type: "object",
+  properties: {
+    reportTitle: { type: "string" },
+    reportSubtitle: { type: "string" },
+  },
+  required: ["reportTitle"],
+};
 
-You will be given one or more images, each labeled with its index (0, 1, 2, ...). For the whole batch:
-1. Suggest a short, professional report title and one-line subtitle appropriate for what the screenshots show collectively.
+const BATCH_PROMPT = `You are helping a digital marketing agency turn a batch of screenshots (Google Analytics, Search Console, PageSpeed Insights, social media dashboards, ad platforms, etc.) into a client-facing report outline.
+
+You will be given one or more images, each labeled with its index (0, 1, 2, ...), all from the same overall report (this may be only part of a larger batch, analyzed separately). For these images:
+1. Suggest a short, professional report title and one-line subtitle appropriate for what these screenshots show.
 2. Group the images into pages — put visually/topically related screenshots together (e.g. two screenshots from the same tool), 1 to 4 images per page. Every image index must appear in exactly one page.
 3. For each page, write a short professional heading (pageTitle) and a 1-2 sentence plain-English summary (summary) of what that page's screenshot(s) show and any notable takeaway.
 4. If any screenshot has clearly legible numeric metrics (e.g. "Sessions: 12,400", "Engagement rate: 4.2%"), extract up to 4 of them per page as kpis (label + value, as plain strings exactly as shown). If nothing is clearly legible, return an empty kpis array — never invent numbers.
@@ -60,32 +82,26 @@ const buildImagePart = (image) => ({
   inlineData: { mimeType: image.mimeType, data: image.buffer.toString("base64") },
 });
 
-export async function analyzeScreenshotsForReport(images) {
+function getApiKey() {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
     throw new Error(
       "GEMINI_API_KEY is not configured. Get a free key at https://aistudio.google.com/apikey and add it to the server's .env file."
     );
   }
-  if (!images || images.length === 0) {
-    throw new Error("No images provided to analyze.");
-  }
+  return apiKey;
+}
 
+// Low-level call shared by the per-batch grouping call and the lightweight
+// title-synthesis call below — request construction, timeout, and response/
+// JSON-parsing error handling in one place.
+async function callGemini(parts, schema) {
+  const apiKey = getApiKey();
   const model = process.env.GEMINI_MODEL || DEFAULT_MODEL;
-  const labeledPrompt = `${PROMPT}\n\nThere are ${images.length} images, indexed 0 to ${images.length - 1} in the order given.`;
 
   const body = {
-    contents: [
-      {
-        role: "user",
-        parts: [{ text: labeledPrompt }, ...images.map(buildImagePart)],
-      },
-    ],
-    generationConfig: {
-      responseMimeType: "application/json",
-      responseSchema: RESPONSE_SCHEMA,
-      temperature: 0.4,
-    },
+    contents: [{ role: "user", parts }],
+    generationConfig: { responseMimeType: "application/json", responseSchema: schema, temperature: 0.4 },
   };
 
   const controller = new AbortController();
@@ -116,14 +132,83 @@ export async function analyzeScreenshotsForReport(images) {
     throw new Error("Gemini returned no usable content (the request may have been blocked by safety filters).");
   }
 
-  let plan;
   try {
-    plan = JSON.parse(text);
+    return JSON.parse(text);
   } catch {
     throw new Error("Gemini's response wasn't valid JSON.");
   }
+}
 
+// Analyzes one batch (≤ BATCH_SIZE images) and returns a sanitized plan
+// whose imageIndexes are local to *this batch* (0-based within it) — the
+// caller is responsible for offsetting them back into the full image list.
+async function analyzeBatch(images) {
+  const prompt = `${BATCH_PROMPT}\n\nThere are ${images.length} images in this batch, indexed 0 to ${images.length - 1}.`;
+  const plan = await callGemini([{ text: prompt }, ...images.map(buildImagePart)], PAGE_PLAN_SCHEMA);
   return sanitizePlan(plan, images.length);
+}
+
+// Best-effort only: ties together the per-batch titles into one overall
+// title/subtitle once there's more than one batch, since "whatever the
+// first batch happened to suggest" reads oddly once there are several
+// unrelated-looking page headings from later batches too. A text-only
+// call (no images), so it's fast and doesn't re-spend image-analysis
+// quota. Falling back to the first batch's title is a perfectly fine
+// result, so any failure here is swallowed rather than failing the whole
+// generation over a title.
+async function synthesizeOverallTitle(pageTitles, fallback) {
+  try {
+    const prompt = `A client performance report has the following page headings, in order:\n${pageTitles.map((t, i) => `${i + 1}. ${t}`).join("\n")}\n\nSuggest one short, professional overall report title and a one-line subtitle that ties all of these together. Respond with JSON matching the given schema only.`;
+    const result = await callGemini([{ text: prompt }], TITLE_SCHEMA);
+    return {
+      reportTitle: typeof result.reportTitle === "string" && result.reportTitle.trim() ? result.reportTitle.trim() : fallback.reportTitle,
+      reportSubtitle: typeof result.reportSubtitle === "string" ? result.reportSubtitle.trim() : fallback.reportSubtitle,
+    };
+  } catch (err) {
+    console.warn("Could not synthesize an overall report title, using the first batch's suggestion instead:", err.message);
+    return fallback;
+  }
+}
+
+// Splits `images` into BATCH_SIZE-sized chunks, analyzes each independently
+// (sequentially — not in parallel, to stay comfortably under the free
+// tier's requests-per-minute limit rather than bursting several calls at
+// once), and merges the results into one plan with globally-correct image
+// indexes. A single-batch upload (the common case) skips the extra title-
+// synthesis call entirely and behaves exactly as before.
+export async function analyzeScreenshotsForReport(images) {
+  if (!images || images.length === 0) {
+    throw new Error("No images provided to analyze.");
+  }
+  if (images.length > MAX_IMAGES_TOTAL) {
+    throw new Error(`Too many screenshots — up to ${MAX_IMAGES_TOTAL} are supported per report.`);
+  }
+  getApiKey(); // fail fast with the actionable message before doing any batching work
+
+  const batches = [];
+  for (let i = 0; i < images.length; i += BATCH_SIZE) {
+    batches.push(images.slice(i, i + BATCH_SIZE));
+  }
+
+  const mergedPages = [];
+  const batchTitles = [];
+  let globalOffset = 0;
+
+  for (const batch of batches) {
+    const result = await analyzeBatch(batch);
+    batchTitles.push({ reportTitle: result.reportTitle, reportSubtitle: result.reportSubtitle });
+    result.pages.forEach((page) => {
+      mergedPages.push({ ...page, imageIndexes: page.imageIndexes.map((i) => i + globalOffset) });
+    });
+    globalOffset += batch.length;
+  }
+
+  const { reportTitle, reportSubtitle } =
+    batches.length > 1
+      ? await synthesizeOverallTitle(mergedPages.map((p) => p.pageTitle), batchTitles[0])
+      : batchTitles[0];
+
+  return { reportTitle, reportSubtitle, pages: mergedPages };
 }
 
 // Defends against a plan that's well-formed JSON but logically incomplete
