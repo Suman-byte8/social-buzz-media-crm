@@ -11,7 +11,14 @@
 // one dependency fewer for a single endpoint, consistent with this app's
 // "don't add a library for what fetch already does" pattern elsewhere
 // (fetchRemoteImage.js).
-const DEFAULT_MODEL = "gemini-2.0-flash";
+// Google retires/renames Gemini models faster than this file can be kept in
+// sync by hand (gemini-2.0-flash, hardcoded here previously, was shut down
+// mid-2026) — so instead of guessing another name that will eventually go
+// stale too, the actual model is auto-discovered from Gemini's own
+// ListModels endpoint at request time (see getCandidateModels below) and
+// cached for an hour. This constant is only the last-resort fallback if that
+// discovery call itself fails (e.g. a transient network error).
+const DEFAULT_MODEL_FALLBACK = "gemini-3.8-flash";
 const API_BASE = "https://generativelanguage.googleapis.com/v1beta/models";
 
 // A single request inlining too many base64 images risks the API's request-
@@ -92,51 +99,158 @@ function getApiKey() {
   return apiKey;
 }
 
+// Cached result of the model-discovery call below, so a 60-screenshot report
+// (several sequential batch calls) doesn't re-list models on every single
+// call — only once an hour, which is more than fast enough to notice a newly
+// retired model without re-querying per request.
+const MODEL_CACHE_TTL_MS = 60 * 60 * 1000;
+let modelCache = null; // { candidates, fetchedAt }
+// The model that last actually answered a request, tried first on the next
+// call — avoids re-discovering a fresh flagship model only to find it's
+// overloaded (observed in practice: the newest model is often the most
+// congested one on the free tier) when a slightly older one just worked.
+let lastGoodModel = null;
+
+// Ranks the available models out of whatever Gemini's ListModels endpoint
+// currently reports, rather than trusting a hardcoded name to still exist.
+// Prefers plain "flash" models (this feature's actual needs — fast, cheap,
+// vision-capable) over "-lite" (weaker) or "-preview"/"-image" (unstable or
+// wrong-purpose) variants, falling back to those only if no plain flash
+// model is available; within a tier, newest (highest version number) first.
+// Returns a ranked list rather than a single name so callGemini can fall
+// through to the next candidate if the top pick turns out to be deprecated
+// or temporarily overloaded.
+function rankFlashModels(models) {
+  const candidates = (Array.isArray(models) ? models : [])
+    .filter((m) => Array.isArray(m.supportedGenerationMethods) && m.supportedGenerationMethods.includes("generateContent"))
+    .map((m) => (m.name || "").replace(/^models\//, ""))
+    // "flash" but not vision-capable at all — text-to-speech variants that
+    // otherwise pass every other filter here (no "lite"/"preview"/"image"
+    // in the name) yet reject image input outright.
+    .filter((name) => /flash/i.test(name) && !/tts/i.test(name));
+
+  const scoreForTier = (name, { allowLite, allowPreview, allowImage }) => {
+    if (!allowImage && /image/i.test(name)) return null;
+    if (!allowPreview && /preview/i.test(name)) return null;
+    if (!allowLite && /lite/i.test(name)) return null;
+    const versionMatch = name.match(/(\d+)(?:\.(\d+))?/);
+    return versionMatch ? parseFloat(`${versionMatch[1]}.${versionMatch[2] || 0}`) : 0;
+  };
+
+  const tiers = [
+    { allowLite: false, allowPreview: false, allowImage: false },
+    { allowLite: true, allowPreview: false, allowImage: false },
+    { allowLite: false, allowPreview: true, allowImage: false },
+    { allowLite: true, allowPreview: true, allowImage: true },
+  ];
+
+  const ranked = [];
+  const used = new Set();
+  for (const tier of tiers) {
+    const scored = candidates
+      .map((name) => ({ name, version: scoreForTier(name, tier) }))
+      .filter((c) => c.version !== null && !used.has(c.name))
+      .sort((a, b) => b.version - a.version);
+    scored.forEach((c) => {
+      ranked.push(c.name);
+      used.add(c.name);
+    });
+  }
+
+  return ranked.length > 0 ? ranked : [DEFAULT_MODEL_FALLBACK];
+}
+
+async function getCandidateModels(apiKey) {
+  if (process.env.GEMINI_MODEL) return [process.env.GEMINI_MODEL];
+
+  let candidates;
+  if (modelCache && Date.now() - modelCache.fetchedAt < MODEL_CACHE_TTL_MS) {
+    candidates = modelCache.candidates;
+  } else {
+    try {
+      const response = await fetch(`${API_BASE}?key=${apiKey}`);
+      if (!response.ok) throw new Error(`ListModels returned ${response.status}`);
+      const data = await response.json();
+      candidates = rankFlashModels(data.models);
+      modelCache = { candidates, fetchedAt: Date.now() };
+    } catch (err) {
+      console.warn("Could not auto-discover available Gemini models, falling back to default:", err.message);
+      candidates = [DEFAULT_MODEL_FALLBACK];
+    }
+  }
+
+  // Try whatever last succeeded before cycling through the rest, so a
+  // temporarily-overloaded flagship model doesn't get retried first on
+  // every single call once a less congested one is known to work.
+  if (lastGoodModel && candidates.includes(lastGoodModel)) {
+    return [lastGoodModel, ...candidates.filter((m) => m !== lastGoodModel)];
+  }
+  return candidates;
+}
+
 // Low-level call shared by the per-batch grouping call and the lightweight
 // title-synthesis call below — request construction, timeout, and response/
-// JSON-parsing error handling in one place.
+// JSON-parsing error handling in one place. Falls through a ranked list of
+// candidate models (see getCandidateModels) rather than trusting a single
+// name to be both valid and currently available — Gemini model names get
+// deprecated outright (404) and, independently, the newest ones are
+// frequently overloaded under free-tier demand (503) or rate-limited (429);
+// either case is better handled by trying the next candidate than failing
+// the whole report generation.
 async function callGemini(parts, schema) {
   const apiKey = getApiKey();
-  const model = process.env.GEMINI_MODEL || DEFAULT_MODEL;
+  const candidates = await getCandidateModels(apiKey);
 
   const body = {
     contents: [{ role: "user", parts }],
     generationConfig: { responseMimeType: "application/json", responseSchema: schema, temperature: 0.4 },
   };
 
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 45000);
+  let lastError;
+  for (const model of candidates) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 45000);
 
-  let response;
-  try {
-    response = await fetch(`${API_BASE}/${model}:generateContent?key=${apiKey}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-      signal: controller.signal,
-    });
-  } catch (err) {
-    throw new Error(`Could not reach Gemini: ${err.message}`);
-  } finally {
-    clearTimeout(timeout);
+    let response;
+    try {
+      response = await fetch(`${API_BASE}/${model}:generateContent?key=${apiKey}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+        signal: controller.signal,
+      });
+    } catch (err) {
+      lastError = new Error(`Could not reach Gemini: ${err.message}`);
+      continue;
+    } finally {
+      clearTimeout(timeout);
+    }
+
+    if (!response.ok) {
+      const errText = await response.text().catch(() => "");
+      lastError = new Error(`Gemini API error (${response.status}): ${errText.slice(0, 300) || response.statusText}`);
+      // Model gone (404), overloaded (503), or rate-limited (429) — worth
+      // trying the next candidate. Anything else (bad request, auth, safety
+      // block) will fail identically on every other model too, so stop.
+      if ([404, 503, 429].includes(response.status)) continue;
+      throw lastError;
+    }
+
+    lastGoodModel = model;
+    const data = await response.json();
+    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!text) {
+      throw new Error("Gemini returned no usable content (the request may have been blocked by safety filters).");
+    }
+
+    try {
+      return JSON.parse(text);
+    } catch {
+      throw new Error("Gemini's response wasn't valid JSON.");
+    }
   }
 
-  if (!response.ok) {
-    const errText = await response.text().catch(() => "");
-    throw new Error(`Gemini API error (${response.status}): ${errText.slice(0, 300) || response.statusText}`);
-  }
-
-  const data = await response.json();
-  const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-  if (!text) {
-    throw new Error("Gemini returned no usable content (the request may have been blocked by safety filters).");
-  }
-
-  try {
-    return JSON.parse(text);
-  } catch {
-    throw new Error("Gemini's response wasn't valid JSON.");
-  }
+  throw lastError || new Error("No Gemini model was available to handle this request.");
 }
 
 // Analyzes one batch (≤ BATCH_SIZE images) and returns a sanitized plan
