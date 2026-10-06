@@ -1,6 +1,36 @@
 import { google } from "googleapis";
 import stream from "stream";
 
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+// Google's Drive API occasionally returns a transient 500 — most visibly
+// "The operation was successful, but there was an error preparing the
+// response" (reason: responsePreparationFailure). This is a server-side
+// hiccup acknowledged by Google, not a malformed request: the upload itself
+// goes through, Drive just fails to build the success response to send
+// back. Google's own guidance for it is retry-with-backoff, same as for
+// ordinary rate-limit/quota 5xx/429s, so uploads retry a few times before
+// surfacing an error to the user instead of failing a whole report/document
+// upload over what's usually resolved by trying again a second later.
+const isTransientDriveError = (error) => {
+  const code = error?.code;
+  return [429, 500, 502, 503, 504].includes(code) || /error preparing the response/i.test(error?.message || "");
+};
+
+async function withDriveRetry(fn, { attempts = 3, baseDelayMs = 800 } = {}) {
+  let lastError;
+  for (let i = 0; i < attempts; i++) {
+    try {
+      return await fn();
+    } catch (error) {
+      lastError = error;
+      if (i === attempts - 1 || !isTransientDriveError(error)) throw error;
+      await sleep(baseDelayMs * 2 ** i);
+    }
+  }
+  throw lastError;
+}
+
 // Built once and reused across every call. googleapis' OAuth2Client caches
 // the minted access token (and its expiry) on the client instance itself —
 // rebuilding a fresh OAuth2Client per request (the previous behavior) threw
@@ -39,9 +69,6 @@ export const uploadFileToDrive = async (fileBuffer, fileName, mimeType, folderId
   try {
     const drive = getDriveClient();
 
-    const bufferStream = new stream.PassThrough();
-    bufferStream.end(fileBuffer);
-
     const fileMetaData = {
       name: `logo_${Date.now()}_${fileName}`,
     };
@@ -60,15 +87,18 @@ export const uploadFileToDrive = async (fileBuffer, fileName, mimeType, folderId
       fileMetaData.parents = parents;
     }
 
-    const media = {
-      mimeType: mimeType,
-      body: bufferStream,
-    };
-
-    const response = await drive.files.create({
-      requestBody: fileMetaData,
-      media: media,
-      fields: "id, webViewLink, webContentLink",
+    // A fresh PassThrough per attempt — a retry re-sends the same fileBuffer
+    // (an in-memory Buffer, safe to read any number of times) through a new
+    // stream, since the previous attempt's stream is already fully consumed
+    // and can't be replayed.
+    const response = await withDriveRetry(() => {
+      const bufferStream = new stream.PassThrough();
+      bufferStream.end(fileBuffer);
+      return drive.files.create({
+        requestBody: fileMetaData,
+        media: { mimeType, body: bufferStream },
+        fields: "id, webViewLink, webContentLink",
+      });
     });
 
     const fileId = response.data.id;
