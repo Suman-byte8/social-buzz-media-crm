@@ -12,6 +12,21 @@ import ClientSelectDropdown from "@/components/invoices/ClientSelectDropdown";
 // uploads per click, not a Gemini request-size limit.
 const MAX_SCREENSHOTS = 60;
 
+// Auto-generate is a single request that can genuinely take a minute or two
+// for a large batch (sequential Gemini calls, ~10 screenshots each — see
+// geminiVision.js) with no real progress events to report, so these are
+// time-paced guesses at what's likely happening rather than true progress.
+// Good enough to keep the wait from feeling broken/stuck, which a bare
+// disabled button does not.
+const AUTO_GENERATE_STAGES = [
+  "Uploading screenshots to Google Drive…",
+  "Analyzing screenshots with Gemini AI…",
+  "Grouping screenshots into pages…",
+  "Writing headings and summaries…",
+  "Finishing touches…",
+];
+const TEMPLATE_STAGES = ["Setting up your report…", "Applying the template…"];
+
 // Mounted only while open (see ReportsDashboard.js), rather than taking an
 // `open` prop and resetting its fields in an effect each time — a fresh
 // mount gets fresh initial state for free, no reset effect needed.
@@ -28,8 +43,18 @@ export default function CreateReportModal({ onClose }) {
   const [selectedTemplate, setSelectedTemplate] = useState(null); // { key } or { id }
   const [screenshots, setScreenshots] = useState([]);
   const [creating, setCreating] = useState(false);
+  const [stageIndex, setStageIndex] = useState(0);
   const [error, setError] = useState("");
   const fileInputRef = useRef(null);
+
+  useEffect(() => {
+    if (!creating) return;
+    const stages = mode === "auto" ? AUTO_GENERATE_STAGES : TEMPLATE_STAGES;
+    const interval = setInterval(() => {
+      setStageIndex((i) => Math.min(i + 1, stages.length - 1));
+    }, mode === "auto" ? 4000 : 1000);
+    return () => clearInterval(interval);
+  }, [creating, mode]);
 
   const clients = useMemo(
     () => (Array.isArray(rawClients) ? rawClients.map((c) => ({ id: c.id, name: c.name || c.clientName || "" })) : []),
@@ -92,6 +117,7 @@ export default function CreateReportModal({ onClose }) {
       return;
     }
     setCreating(true);
+    setStageIndex(0);
     setError("");
     try {
       const reportId = mode === "auto" ? await handleAutoGenerate() : await handleCreateFromTemplate();
@@ -105,8 +131,21 @@ export default function CreateReportModal({ onClose }) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
-      <div className="max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-xl bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => !creating && onClose()}>
+      <div className="relative max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-xl bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
+        {creating && (
+          <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 rounded-xl bg-white/95 px-8 text-center">
+            <span className="material-symbols-outlined animate-spin text-[40px] text-primary">progress_activity</span>
+            <p className="font-label-lg text-label-lg text-on-surface">{mode === "auto" ? "Generating your report…" : "Creating your report…"}</p>
+            <p className="text-body-sm text-on-surface-variant">{(mode === "auto" ? AUTO_GENERATE_STAGES : TEMPLATE_STAGES)[stageIndex]}</p>
+            {mode === "auto" && screenshots.length > 8 && (
+              <p className="text-[11px] text-on-surface-variant">
+                {screenshots.length} screenshots can take a minute or two — please don&apos;t close this window.
+              </p>
+            )}
+          </div>
+        )}
+
         <h2 className="font-headline-sm text-headline-sm text-on-surface">Create New Report</h2>
 
         <div className="mt-3 flex rounded-full border border-outline-variant bg-surface-container-lowest p-0.5 text-body-sm">
@@ -140,7 +179,7 @@ export default function CreateReportModal({ onClose }) {
             <input
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder={mode === "auto" ? "Let AI suggest one from your screenshots" : "Defaults to the template's title"}
+              placeholder="Defaults to {Client}_{Month}_Report"
               className="w-full rounded-md border border-outline-variant px-3 py-2 text-body-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary"
             />
           </div>
