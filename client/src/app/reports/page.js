@@ -1,6 +1,5 @@
-import React from "react";
-import Reports from "@/components/clients/Reports";
+import ReportsDashboard from "@/components/reports/ReportsDashboard";
 
 export default function ReportsPage() {
-  return <Reports />;
+  return <ReportsDashboard />;
 }
