@@ -37,6 +37,14 @@ export const restoreAgreementDraft = async (id) => apiClient(`/agreement-drafts/
 
 export const updateAgreementStatus = async (id, status) => apiClient(`/agreement-drafts/${id}/status`, { method: "PUT", body: { status } });
 
+// ── AI-fill (Gemini reads an accepted proposal, fills Schedule A) ───────
+
+export const aiFillFromProposal = async (id, file) => {
+  const formData = new FormData();
+  formData.append("file", file);
+  return apiClient(`/agreement-drafts/${id}/ai-fill`, { method: "POST", body: formData });
+};
+
 // ── Export / signed copy ─────────────────────────────────────────────────
 
 export const exportAgreementDraft = async (id, { pdfBlob, docxBlob, fileNameBase }) => {

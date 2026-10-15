@@ -6,7 +6,8 @@ import { wrapUpload } from "../middleware/multerUpload.js";
 import { cacheRoute } from "../middleware/cacheRoute.js";
 import { invalidateCache } from "../utils/serverCache.js";
 import { requireAdmin } from "../middleware/auth.js";
-import { getMasterAgreementTemplate, interpolateAgreementDocument } from "../utils/agreementTemplates.js";
+import { getMasterAgreementTemplate, interpolateAgreementDocument, applyScheduleAExtraction } from "../utils/agreementTemplates.js";
+import { extractScheduleADetails } from "../utils/geminiAgreement.js";
 
 const router = express.Router();
 
@@ -38,6 +39,18 @@ const signedCopyUpload = multer({
   fileFilter: (req, file, cb) => {
     if (["application/pdf", "image/png", "image/jpeg", "image/jpg"].includes(file.mimetype)) return cb(null, true);
     cb(new Error("Only a PDF, PNG, or JPG file is allowed"), false);
+  },
+});
+
+// The accepted proposal, read by Gemini to auto-fill Schedule A (see
+// geminiAgreement.js) — same accepted formats as a signed copy, since this
+// is also often a phone photo or a PDF export of a Doc/Slides proposal.
+const proposalUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 20 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    if (["application/pdf", "image/png", "image/jpeg", "image/jpg", "image/webp"].includes(file.mimetype)) return cb(null, true);
+    cb(new Error("Only a PDF, PNG, JPG, or WebP file is allowed"), false);
   },
 });
 
@@ -270,7 +283,14 @@ router.get("/agreement-drafts/:id", async (req, res) => {
     // Email/WhatsApp actions target the latest exported PDF.
     const agreement = await Agreement.findByPk(req.params.id, {
       include: [
-        { model: Client, as: "client", attributes: ["id", "name", "legalName", "contactPersonName", "email", "phoneNumber", "whatsappNumber", "address", "gstin", "logo"] },
+        {
+          model: Client,
+          as: "client",
+          attributes: [
+            "id", "name", "legalName", "contactPersonName", "email", "phoneNumber", "whatsappNumber",
+            "address", "gstin", "logo", "website", "industry", "servicesSelected", "clientSince",
+          ],
+        },
         { model: Document, as: "exports" },
       ],
       // `order` inside an include only sorts eager-loaded *singular*
@@ -371,6 +391,37 @@ router.put("/agreement-drafts/:id", async (req, res) => {
   } catch (error) {
     console.error("Error saving agreement:", error);
     res.status(500).json({ success: false, message: "Error saving agreement", error: error.message });
+  }
+});
+
+// Reads an uploaded proposal (PDF or screenshot) with Gemini and merges
+// whatever Schedule A details it finds into the agreement's CURRENT
+// documentData — not a new draft, so this is meant to be used while
+// editing, any number of times (e.g. the client sends a revised proposal
+// later). Only cells Gemini actually found a value for are touched; see
+// applyScheduleAExtraction's own header comment for why that matters.
+router.post("/agreement-drafts/:id/ai-fill", wrapUpload(proposalUpload.single("file")), async (req, res) => {
+  try {
+    const { Agreement } = req.app.locals.models;
+    const agreement = await Agreement.findByPk(req.params.id);
+    if (!agreement) return res.status(404).json({ success: false, message: "Agreement not found" });
+    if (!req.file) return res.status(400).json({ success: false, message: "A proposal file is required" });
+
+    const extracted = await extractScheduleADetails(req.file.buffer, req.file.mimetype);
+    const documentData = applyScheduleAExtraction(parseJsonField(agreement.documentData), extracted);
+
+    await agreement.update({
+      documentData: JSON.stringify(documentData),
+      revision: agreement.revision + 1,
+      updatedBy: req.user?.name || agreement.updatedBy,
+    });
+
+    await logActivity(req.app.locals.models, agreement.id, "ai_filled_from_proposal", req.user, { fileName: req.file.originalname, fields: Object.keys(extracted) });
+    await invalidateCache("agreement-drafts");
+    res.json({ success: true, message: "Schedule A updated from the proposal", data: serializeAgreement(agreement) });
+  } catch (error) {
+    console.error("Error AI-filling agreement from proposal:", error);
+    res.status(500).json({ success: false, message: error.message || "Could not read the proposal", error: error.message });
   }
 });
 

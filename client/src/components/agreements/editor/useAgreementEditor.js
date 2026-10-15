@@ -7,6 +7,7 @@ import {
   finalizeAgreementDraft,
   exportAgreementDraft,
   uploadSignedCopy,
+  aiFillFromProposal,
   fetchAgreementVersions,
   restoreAgreementVersion,
   fetchAgreementActivity,
@@ -154,6 +155,23 @@ export function useAgreementEditor(agreementId) {
     [agreementId]
   );
 
+  // Gemini reads the uploaded proposal server-side and merges whatever it
+  // finds straight into the agreement's current documentData (see
+  // agreementBuilderRoutes.js's POST .../ai-fill + applyScheduleAExtraction)
+  // — synced back into the live editor the same way restoreVersion is,
+  // since this changes the document out from under whatever's currently
+  // open, same as a version restore does.
+  const aiFill = useCallback(
+    async (file) => {
+      const res = await aiFillFromProposal(agreementId, file);
+      setDocumentDataState(res.data.documentData);
+      revisionRef.current = res.data.revision;
+      setIsDirty(false);
+      return res.data;
+    },
+    [agreementId]
+  );
+
   const loadVersions = useCallback(async () => {
     const res = await fetchAgreementVersions(agreementId);
     return res.data;
@@ -191,6 +209,7 @@ export function useAgreementEditor(agreementId) {
     exportError,
     exportAgreement,
     uploadSigned,
+    aiFill,
     loadVersions,
     restoreVersion,
     loadActivity,

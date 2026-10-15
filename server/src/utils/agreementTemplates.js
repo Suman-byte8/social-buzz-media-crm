@@ -365,3 +365,89 @@ export function interpolateAgreementDocument(doc, values) {
   walk(doc);
   return doc;
 }
+
+// Finds the table immediately following a given heading's text (e.g.
+// "A1. Services") in the document's top-level content — the layout
+// servicesTable()/feesTable()/adBudgetTable()/accessTable() above always
+// produce exactly one heading node followed by exactly one table node, so
+// this is reliable as long as the agreement hasn't had that structure
+// torn apart by hand (a reasonable assumption for AI-fill, meant to run
+// right after creation, before heavy manual editing).
+function findTableAfterHeading(doc, headingText) {
+  const content = doc.content || [];
+  const headingIndex = content.findIndex((node) => node.type === "heading" && (node.content || []).some((c) => c.text === headingText));
+  if (headingIndex === -1) return null;
+  for (let i = headingIndex + 1; i < content.length; i++) {
+    if (content[i].type === "table") return content[i];
+    if (content[i].type === "heading") break; // ran into the next section first
+  }
+  return null;
+}
+
+// Overwrites one cell's content with a single plain text run — used only
+// for cells AI-fill actually has a value for; every other cell (including
+// ones the proposal didn't mention) is left exactly as the template had
+// it, so this never erases a field the user already filled in by hand.
+function setCellText(table, rowIndex, colIndex, value) {
+  // No value found for this field (Gemini either didn't address it or
+  // explicitly omitted it per its own instructions not to guess) — leave
+  // the cell untouched rather than clearing whatever the template/user
+  // already had there. yesNo(false) still reaches here as the real string
+  // "No", so an explicit "not included" IS written; only a genuinely
+  // absent field is skipped.
+  if (!value) return;
+  const row = table?.content?.[rowIndex];
+  const cell = row?.content?.[colIndex];
+  if (!cell) return;
+  cell.content = [para(value)];
+}
+
+function yesNo(value) {
+  if (value === true) return "Yes";
+  if (value === false) return "No";
+  return null;
+}
+
+// Merges Gemini's extracted Schedule A fields (see geminiAgreement.js)
+// into an existing agreement's documentData, in place, cell-by-cell — only
+// touching cells a value was actually found for. Row/column positions here
+// match servicesTable()/feesTable()/adBudgetTable()/accessTable() exactly
+// (row 0 is always the header row in each).
+export function applyScheduleAExtraction(doc, extracted) {
+  const services = findTableAfterHeading(doc, "A1. Services");
+  if (services) {
+    setCellText(services, 1, 1, yesNo(extracted.socialMediaIncluded));
+    setCellText(services, 1, 2, extracted.socialMediaDeliverables);
+    setCellText(services, 2, 1, yesNo(extracted.localSeoIncluded));
+    setCellText(services, 2, 2, extracted.localSeoDeliverables);
+    setCellText(services, 3, 1, yesNo(extracted.paidAdsIncluded));
+    setCellText(services, 3, 2, extracted.paidAdsDeliverables);
+    setCellText(services, 4, 2, extracted.addOns);
+  }
+
+  const fees = findTableAfterHeading(doc, "A2. Fees");
+  if (fees) {
+    setCellText(fees, 1, 2, extracted.monthlyRetainer);
+    setCellText(fees, 3, 2, extracted.oneTimeSetupFee);
+    setCellText(fees, 4, 2, extracted.addOnsFee);
+    setCellText(fees, 5, 2, extracted.gstTerms);
+  }
+
+  const adBudget = findTableAfterHeading(doc, "A3. Ad budget and term");
+  if (adBudget) {
+    const budgetLine = [extracted.monthlyAdBudget, extracted.adPlatforms ? `on ${extracted.adPlatforms}` : null].filter(Boolean).join(" ");
+    setCellText(adBudget, 1, 1, budgetLine || null);
+    setCellText(adBudget, 2, 1, extracted.startDate);
+    setCellText(adBudget, 3, 1, extracted.minimumTermMonths ? `${extracted.minimumTermMonths} months` : null);
+    setCellText(adBudget, 6, 1, extracted.currency);
+  }
+
+  const access = findTableAfterHeading(doc, "A4. Access and contacts");
+  if (access) {
+    setCellText(access, 1, 1, extracted.accountsToShare);
+    setCellText(access, 2, 1, extracted.clientApprover);
+    setCellText(access, 3, 1, extracted.agencyAccountManager);
+  }
+
+  return doc;
+}

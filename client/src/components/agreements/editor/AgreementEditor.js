@@ -10,6 +10,7 @@ import EditorToolbar from "./EditorToolbar";
 import PlaceholderSidebar from "./PlaceholderSidebar";
 import VersionHistoryPanel from "./VersionHistoryPanel";
 import ActivityLogPanel from "./ActivityLogPanel";
+import AiFillModal from "./AiFillModal";
 import AgreementEmailButton from "@/components/agreements/AgreementEmailButton";
 import { paginateAgreementContent } from "@/lib/agreementPagination";
 import { tiptapJsonToDocxBlob } from "@/lib/tiptapToDocx";
@@ -31,6 +32,8 @@ function safeFileName(name) {
   return (name || "Agreement").replace(/[\\/:*?"<>|]/g, "_");
 }
 
+const Divider = () => <div className="mx-1 h-6 w-px shrink-0 bg-outline-variant" />;
+
 export default function AgreementEditor({ agreementId }) {
   const router = useRouter();
   const data = useAgreementEditor(agreementId);
@@ -38,6 +41,7 @@ export default function AgreementEditor({ agreementId }) {
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
   const [versionsOpen, setVersionsOpen] = useState(false);
   const [activityOpen, setActivityOpen] = useState(false);
+  const [aiFillOpen, setAiFillOpen] = useState(false);
   const [isSavingTemplate, setIsSavingTemplate] = useState(false);
   const signedCopyInputRef = useRef(null);
 
@@ -203,7 +207,8 @@ export default function AgreementEditor({ agreementId }) {
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-[#EAE8E4]">
-      <div className="flex flex-wrap items-center gap-2 border-b border-outline-variant bg-surface px-4 py-2">
+      <div className="flex flex-wrap items-center gap-2 border-b border-outline-variant bg-surface px-4 py-2.5">
+        {/* Identity group: where am I, what is this */}
         <button type="button" onClick={handleBack} title="Back to agreements" className="rounded p-1.5 text-on-surface-variant hover:bg-surface-variant">
           <span className="material-symbols-outlined text-[20px]">arrow_back</span>
         </button>
@@ -212,20 +217,38 @@ export default function AgreementEditor({ agreementId }) {
           onChange={(e) => data.setTitle(e.target.value)}
           className="min-w-[160px] max-w-[320px] rounded px-2 py-1 font-title-md text-title-md text-on-surface outline-none hover:bg-surface-variant focus:bg-surface-variant"
         />
-        {data.agreement?.client?.name && <span className="rounded-full bg-primary/10 px-3 py-1 font-label-sm text-label-sm text-primary">{data.agreement.client.name}</span>}
-        <span className="rounded-full bg-surface-variant px-3 py-1 font-label-sm text-label-sm text-on-surface-variant">{data.agreement?.agreementNumber}</span>
-        <span className="rounded-full border border-outline-variant px-3 py-1 font-label-sm text-label-sm capitalize text-on-surface-variant">{data.agreement?.status?.replace(/_/g, " ")}</span>
-
+        <div className="flex items-center gap-1.5">
+          {data.agreement?.client?.name && <span className="rounded-full bg-primary/10 px-3 py-1 font-label-sm text-label-sm text-primary">{data.agreement.client.name}</span>}
+          <span className="rounded-full bg-surface-variant px-3 py-1 font-label-sm text-label-sm text-on-surface-variant">{data.agreement?.agreementNumber}</span>
+          <span className="rounded-full border border-outline-variant px-3 py-1 font-label-sm text-label-sm capitalize text-on-surface-variant">{data.agreement?.status?.replace(/_/g, " ")}</span>
+        </div>
         <span className={`font-label-sm text-label-sm ${data.saveStatus === "error" || data.saveStatus === "conflict" ? "text-red-600" : "text-on-surface-variant"}`}>
           {SAVE_STATUS_LABEL[data.saveStatus]}
         </span>
 
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex items-center gap-1.5">
+          {/* AI group — set apart with its own accent, it's the headline action */}
+          <button
+            type="button"
+            onClick={() => setAiFillOpen(true)}
+            title="Fill Schedule A from a proposal using Gemini"
+            className="flex items-center gap-1.5 rounded-md bg-indigo-50 px-3 py-1.5 font-label-md text-label-md text-indigo-700 hover:bg-indigo-100"
+          >
+            <span className="material-symbols-outlined text-[16px]">auto_awesome</span>
+            AI-fill Schedule A
+          </button>
+
+          <Divider />
+
+          {/* Share group */}
           {latestExport && <AgreementEmailButton agreement={latestExport} client={data.agreement?.client} />}
           <button type="button" onClick={handleShareWhatsApp} title="Share via WhatsApp" className="rounded p-1.5 text-on-surface-variant hover:bg-surface-variant">
             <span className="material-symbols-outlined text-[20px]">share</span>
           </button>
 
+          <Divider />
+
+          {/* Signature / lifecycle group */}
           <input
             ref={signedCopyInputRef}
             type="file"
@@ -240,14 +263,15 @@ export default function AgreementEditor({ agreementId }) {
           <button
             type="button"
             onClick={() => signedCopyInputRef.current?.click()}
+            title="Upload a signed copy — the only way to mark this Signed"
             className="rounded-md border border-outline-variant px-3 py-1.5 font-label-md text-label-md text-on-surface hover:bg-surface-variant"
           >
             Upload signed copy
           </button>
-
           <button
             type="button"
             onClick={handleFinalize}
+            title="Snapshot a version and freeze the client details used"
             className="rounded-md border border-outline-variant px-3 py-1.5 font-label-md text-label-md text-on-surface hover:bg-surface-variant"
           >
             Finalize
@@ -300,6 +324,9 @@ export default function AgreementEditor({ agreementId }) {
             )}
           </div>
 
+          <Divider />
+
+          {/* Export / save group */}
           <div className="relative">
             <button
               type="button"
@@ -371,6 +398,7 @@ export default function AgreementEditor({ agreementId }) {
 
       <VersionHistoryPanel open={versionsOpen} onClose={() => setVersionsOpen(false)} loadVersions={data.loadVersions} onRestore={data.restoreVersion} />
       <ActivityLogPanel open={activityOpen} onClose={() => setActivityOpen(false)} loadActivity={data.loadActivity} />
+      <AiFillModal open={aiFillOpen} onClose={() => setAiFillOpen(false)} onFill={data.aiFill} />
     </div>
   );
 }

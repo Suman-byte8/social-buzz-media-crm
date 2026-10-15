@@ -2,9 +2,18 @@
 import React, { useState } from "react";
 
 const btnClass = (active) =>
-  `flex h-8 min-w-8 items-center justify-center rounded px-1.5 text-body-sm ${
-    active ? "bg-primary/10 text-primary" : "text-on-surface-variant hover:bg-surface-variant"
+  `flex h-8 w-8 items-center justify-center rounded-md transition-colors ${
+    active ? "bg-primary text-white" : "text-on-surface-variant hover:bg-white hover:text-on-surface"
   }`;
+
+// Groups related buttons into a single pill-shaped container (consistent
+// Google-Docs/Notion-style toolbar grouping) instead of a flat row of
+// icons separated only by thin dividers — makes the toolbar's logical
+// sections ("text style", "alignment", "lists", ...) visually obvious at
+// a glance rather than something you have to parse icon-by-icon.
+function ToolbarGroup({ children }) {
+  return <div className="flex items-center gap-0.5 rounded-lg bg-surface-container-lowest p-1">{children}</div>;
+}
 
 // A plain formatting toolbar bound to a live Tiptap `editor` instance —
 // every button is a direct `editor.chain().focus().<command>().run()` call,
@@ -37,8 +46,10 @@ export default function EditorToolbar({ editor }) {
     editor.view.dispatch(tr);
   };
 
+  const tableActive = editor.isActive("table");
+
   return (
-    <div className="flex flex-wrap items-center gap-1 border-b border-outline-variant bg-surface px-3 py-2">
+    <div className="flex flex-wrap items-center gap-2 border-b border-outline-variant bg-surface px-3 py-2">
       <select
         value={editor.isActive("heading", { level: 1 }) ? "h1" : editor.isActive("heading", { level: 2 }) ? "h2" : editor.isActive("heading", { level: 3 }) ? "h3" : "p"}
         onChange={(e) => {
@@ -46,7 +57,7 @@ export default function EditorToolbar({ editor }) {
           if (value === "p") editor.chain().focus().setParagraph().run();
           else editor.chain().focus().setHeading({ level: parseInt(value.slice(1)) }).run();
         }}
-        className="h-8 rounded border border-outline-variant px-1.5 text-body-sm text-on-surface"
+        className="h-9 rounded-lg border border-outline-variant bg-white px-2 text-body-sm text-on-surface"
       >
         <option value="p">Body text</option>
         <option value="h1">Title</option>
@@ -54,97 +65,88 @@ export default function EditorToolbar({ editor }) {
         <option value="h3">Subheading</option>
       </select>
 
-      <div className="mx-1 h-5 w-px bg-outline-variant" />
-
-      <button type="button" title="Bold (Ctrl+B)" onClick={() => editor.chain().focus().toggleBold().run()} className={btnClass(editor.isActive("bold"))}>
-        <span className="material-symbols-outlined text-[18px]">format_bold</span>
-      </button>
-      <button type="button" title="Italic (Ctrl+I)" onClick={() => editor.chain().focus().toggleItalic().run()} className={btnClass(editor.isActive("italic"))}>
-        <span className="material-symbols-outlined text-[18px]">format_italic</span>
-      </button>
-      <button type="button" title="Underline (Ctrl+U)" onClick={() => editor.chain().focus().toggleUnderline().run()} className={btnClass(editor.isActive("underline"))}>
-        <span className="material-symbols-outlined text-[18px]">format_underlined</span>
-      </button>
-      <button type="button" title="Strikethrough" onClick={() => editor.chain().focus().toggleStrike().run()} className={btnClass(editor.isActive("strike"))}>
-        <span className="material-symbols-outlined text-[18px]">strikethrough_s</span>
-      </button>
-
-      <div className="mx-1 h-5 w-px bg-outline-variant" />
-
-      {["left", "center", "right", "justify"].map((align) => (
-        <button
-          key={align}
-          type="button"
-          title={`Align ${align}`}
-          onClick={() => editor.chain().focus().setTextAlign(align).run()}
-          className={btnClass(editor.isActive({ textAlign: align }))}
-        >
-          <span className="material-symbols-outlined text-[18px]">{`format_align_${align}`}</span>
+      <ToolbarGroup>
+        <button type="button" title="Bold (Ctrl+B)" onClick={() => editor.chain().focus().toggleBold().run()} className={btnClass(editor.isActive("bold"))}>
+          <span className="material-symbols-outlined text-[18px]">format_bold</span>
         </button>
-      ))}
+        <button type="button" title="Italic (Ctrl+I)" onClick={() => editor.chain().focus().toggleItalic().run()} className={btnClass(editor.isActive("italic"))}>
+          <span className="material-symbols-outlined text-[18px]">format_italic</span>
+        </button>
+        <button type="button" title="Underline (Ctrl+U)" onClick={() => editor.chain().focus().toggleUnderline().run()} className={btnClass(editor.isActive("underline"))}>
+          <span className="material-symbols-outlined text-[18px]">format_underlined</span>
+        </button>
+        <button type="button" title="Strikethrough" onClick={() => editor.chain().focus().toggleStrike().run()} className={btnClass(editor.isActive("strike"))}>
+          <span className="material-symbols-outlined text-[18px]">strikethrough_s</span>
+        </button>
+      </ToolbarGroup>
 
-      <div className="mx-1 h-5 w-px bg-outline-variant" />
-
-      <button
-        type="button"
-        title="Bulleted list"
-        onClick={() => editor.chain().focus().toggleBulletList().run()}
-        className={btnClass(editor.isActive("bulletList"))}
-      >
-        <span className="material-symbols-outlined text-[18px]">format_list_bulleted</span>
-      </button>
-      <button
-        type="button"
-        title="Numbered list"
-        onClick={() => editor.chain().focus().toggleOrderedList().run()}
-        className={btnClass(editor.isActive("orderedList"))}
-      >
-        <span className="material-symbols-outlined text-[18px]">format_list_numbered</span>
-      </button>
-
-      <div className="mx-1 h-5 w-px bg-outline-variant" />
-
-      <button
-        type="button"
-        title="Insert table"
-        onClick={() => editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()}
-        className={btnClass(false)}
-      >
-        <span className="material-symbols-outlined text-[18px]">table</span>
-      </button>
-      {editor.isActive("table") && (
-        <>
-          <button type="button" title="Add row" onClick={() => editor.chain().focus().addRowAfter().run()} className={btnClass(false)}>
-            <span className="material-symbols-outlined text-[18px]">table_rows</span>
+      <ToolbarGroup>
+        {["left", "center", "right", "justify"].map((align) => (
+          <button
+            key={align}
+            type="button"
+            title={`Align ${align}`}
+            onClick={() => editor.chain().focus().setTextAlign(align).run()}
+            className={btnClass(editor.isActive({ textAlign: align }))}
+          >
+            <span className="material-symbols-outlined text-[18px]">{`format_align_${align}`}</span>
           </button>
-          <button type="button" title="Add column" onClick={() => editor.chain().focus().addColumnAfter().run()} className={btnClass(false)}>
-            <span className="material-symbols-outlined text-[18px]">view_column</span>
-          </button>
-          <button type="button" title="Delete table" onClick={() => editor.chain().focus().deleteTable().run()} className={btnClass(false)}>
-            <span className="material-symbols-outlined text-[18px] text-red-600">delete</span>
-          </button>
-        </>
-      )}
+        ))}
+      </ToolbarGroup>
 
-      <div className="mx-1 h-5 w-px bg-outline-variant" />
+      <ToolbarGroup>
+        <button type="button" title="Bulleted list" onClick={() => editor.chain().focus().toggleBulletList().run()} className={btnClass(editor.isActive("bulletList"))}>
+          <span className="material-symbols-outlined text-[18px]">format_list_bulleted</span>
+        </button>
+        <button type="button" title="Numbered list" onClick={() => editor.chain().focus().toggleOrderedList().run()} className={btnClass(editor.isActive("orderedList"))}>
+          <span className="material-symbols-outlined text-[18px]">format_list_numbered</span>
+        </button>
+      </ToolbarGroup>
 
-      <button type="button" title="Undo (Ctrl+Z)" onClick={() => editor.chain().focus().undo().run()} disabled={!editor.can().undo()} className={`${btnClass(false)} disabled:opacity-30`}>
-        <span className="material-symbols-outlined text-[18px]">undo</span>
-      </button>
-      <button type="button" title="Redo (Ctrl+Shift+Z)" onClick={() => editor.chain().focus().redo().run()} disabled={!editor.can().redo()} className={`${btnClass(false)} disabled:opacity-30`}>
-        <span className="material-symbols-outlined text-[18px]">redo</span>
-      </button>
-      <button
-        type="button"
-        title="Clear formatting"
-        onClick={() => editor.chain().focus().clearNodes().unsetAllMarks().run()}
-        className={btnClass(false)}
-      >
-        <span className="material-symbols-outlined text-[18px]">format_clear</span>
-      </button>
+      <ToolbarGroup>
+        <button
+          type="button"
+          title="Insert table"
+          onClick={() => editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()}
+          className={btnClass(tableActive)}
+        >
+          <span className="material-symbols-outlined text-[18px]">table</span>
+        </button>
+        {tableActive && (
+          <>
+            <button type="button" title="Add row" onClick={() => editor.chain().focus().addRowAfter().run()} className={btnClass(false)}>
+              <span className="material-symbols-outlined text-[18px]">table_rows</span>
+            </button>
+            <button type="button" title="Add column" onClick={() => editor.chain().focus().addColumnAfter().run()} className={btnClass(false)}>
+              <span className="material-symbols-outlined text-[18px]">view_column</span>
+            </button>
+            <button type="button" title="Delete table" onClick={() => editor.chain().focus().deleteTable().run()} className="flex h-8 w-8 items-center justify-center rounded-md text-red-600 hover:bg-red-50">
+              <span className="material-symbols-outlined text-[18px]">delete</span>
+            </button>
+          </>
+        )}
+      </ToolbarGroup>
+
+      <ToolbarGroup>
+        <button type="button" title="Undo (Ctrl+Z)" onClick={() => editor.chain().focus().undo().run()} disabled={!editor.can().undo()} className={`${btnClass(false)} disabled:opacity-30`}>
+          <span className="material-symbols-outlined text-[18px]">undo</span>
+        </button>
+        <button type="button" title="Redo (Ctrl+Shift+Z)" onClick={() => editor.chain().focus().redo().run()} disabled={!editor.can().redo()} className={`${btnClass(false)} disabled:opacity-30`}>
+          <span className="material-symbols-outlined text-[18px]">redo</span>
+        </button>
+        <button type="button" title="Clear formatting" onClick={() => editor.chain().focus().clearNodes().unsetAllMarks().run()} className={btnClass(false)}>
+          <span className="material-symbols-outlined text-[18px]">format_clear</span>
+        </button>
+      </ToolbarGroup>
 
       <div className="relative ml-auto">
-        <button type="button" onClick={() => setFindOpen((p) => !p)} className="flex items-center gap-1 rounded border border-outline-variant px-2 py-1.5 text-body-sm text-on-surface hover:bg-surface-variant">
+        <button
+          type="button"
+          onClick={() => setFindOpen((p) => !p)}
+          className={`flex items-center gap-1.5 rounded-lg px-3 py-2 text-body-sm font-medium transition-colors ${
+            findOpen ? "bg-primary/10 text-primary" : "text-on-surface-variant hover:bg-surface-container-lowest"
+          }`}
+        >
           <span className="material-symbols-outlined text-[16px]">find_replace</span>
           Find &amp; replace
         </button>
