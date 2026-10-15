@@ -1,0 +1,376 @@
+"use client";
+import React, { useState, useCallback, useEffect, useRef } from "react";
+import { useRouter } from "next/navigation";
+import { useEditor, EditorContent } from "@tiptap/react";
+import StarterKit from "@tiptap/starter-kit";
+import { TableKit } from "@tiptap/extension-table";
+import TextAlign from "@tiptap/extension-text-align";
+import { useAgreementEditor } from "./useAgreementEditor";
+import EditorToolbar from "./EditorToolbar";
+import PlaceholderSidebar from "./PlaceholderSidebar";
+import VersionHistoryPanel from "./VersionHistoryPanel";
+import ActivityLogPanel from "./ActivityLogPanel";
+import AgreementEmailButton from "@/components/agreements/AgreementEmailButton";
+import { paginateAgreementContent } from "@/lib/agreementPagination";
+import { tiptapJsonToDocxBlob } from "@/lib/tiptapToDocx";
+import { getNodesPdfBlob, exportNodesToPdf } from "@/lib/Pdfexport";
+import { shareFileNatively, buildWhatsAppUrl } from "@/lib/documentShare";
+import { saveAgreementTemplate } from "@/services/agreementService";
+
+const SAVE_STATUS_LABEL = {
+  idle: "",
+  saving: "Saving…",
+  saved: "Saved",
+  error: "Save failed — retrying",
+  conflict: "Changed elsewhere — reload to see the latest",
+};
+
+const EMPTY_DOC = { type: "doc", content: [{ type: "paragraph", content: [] }] };
+
+function safeFileName(name) {
+  return (name || "Agreement").replace(/[\\/:*?"<>|]/g, "_");
+}
+
+export default function AgreementEditor({ agreementId }) {
+  const router = useRouter();
+  const data = useAgreementEditor(agreementId);
+  const [moreMenuOpen, setMoreMenuOpen] = useState(false);
+  const [exportMenuOpen, setExportMenuOpen] = useState(false);
+  const [versionsOpen, setVersionsOpen] = useState(false);
+  const [activityOpen, setActivityOpen] = useState(false);
+  const [isSavingTemplate, setIsSavingTemplate] = useState(false);
+  const signedCopyInputRef = useRef(null);
+
+  const editor = useEditor({
+    extensions: [StarterKit, TableKit.configure({ resizable: false }), TextAlign.configure({ types: ["heading", "paragraph"] })],
+    content: EMPTY_DOC,
+    onUpdate: ({ editor: ed }) => {
+      data.setDocumentData(ed.getJSON());
+    },
+    // Avoids a Next.js hydration mismatch — Tiptap's own documented flag
+    // for this (contentEditable's rendered output can't be trusted to
+    // match server-rendered HTML exactly).
+    immediatelyRender: false,
+  });
+
+  // Pushes the loaded (or version-restored) document into the live editor.
+  // Guarded by a string comparison so this never fights with onUpdate —
+  // once the editor's own content matches, this is a no-op.
+  useEffect(() => {
+    if (!editor || !data.documentData) return;
+    const current = JSON.stringify(editor.getJSON());
+    const incoming = JSON.stringify(data.documentData);
+    if (current !== incoming) {
+      editor.commands.setContent(data.documentData);
+    }
+  }, [editor, data.documentData]);
+
+  const handleBack = useCallback(() => {
+    if (data.isDirty && !window.confirm("You have unsaved changes. Leave anyway?")) return;
+    router.push("/agreements");
+  }, [data.isDirty, router]);
+
+  // Builds both export files from the live editor, used by Download PDF,
+  // Download DOCX, and "Export to Drive" alike so there's one source of
+  // truth for how a page gets captured.
+  const buildExportBlobs = useCallback(
+    async ({ pdf = true, docx = true } = {}) => {
+      let pdfBlob = null;
+      if (pdf) {
+        const html = editor.view.dom.innerHTML;
+        const { pageNodes, cleanup } = paginateAgreementContent(html, { agreementNumber: data.agreement?.agreementNumber });
+        try {
+          pdfBlob = await getNodesPdfBlob(pageNodes, { orientation: "portrait" });
+        } finally {
+          cleanup();
+        }
+      }
+      const docxBlob = docx ? await tiptapJsonToDocxBlob(editor.getJSON(), { title: data.title }) : null;
+      return { pdfBlob, docxBlob };
+    },
+    [editor, data.agreement, data.title]
+  );
+
+  const handleDownloadPdf = useCallback(async () => {
+    const html = editor.view.dom.innerHTML;
+    const { pageNodes, cleanup } = paginateAgreementContent(html, { agreementNumber: data.agreement?.agreementNumber });
+    try {
+      await exportNodesToPdf(pageNodes, `${safeFileName(data.title)}.pdf`, { orientation: "portrait" });
+    } finally {
+      cleanup();
+    }
+  }, [editor, data.agreement, data.title]);
+
+  const handleDownloadDocx = useCallback(async () => {
+    const blob = await tiptapJsonToDocxBlob(editor.getJSON(), { title: data.title });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${safeFileName(data.title)}.docx`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  }, [editor, data.title]);
+
+  const handleExportToDrive = useCallback(async () => {
+    try {
+      const { pdfBlob, docxBlob } = await buildExportBlobs();
+      await data.exportAgreement({ pdfBlob, docxBlob });
+      window.alert("Agreement exported and saved to the client's Google Drive folder.");
+    } catch (err) {
+      window.alert(err.message || "Failed to export the agreement");
+    }
+  }, [buildExportBlobs, data]);
+
+  const handleFinalize = useCallback(async () => {
+    if (!window.confirm("Finalize this agreement? This saves a version snapshot and freezes the client details used.")) return;
+    try {
+      await data.finalize();
+      window.alert("Agreement finalized.");
+    } catch (err) {
+      window.alert(err.message || "Failed to finalize the agreement");
+    }
+  }, [data]);
+
+  const handleShareWhatsApp = useCallback(async () => {
+    const latestExport = data.agreement?.exports?.[0];
+    if (!latestExport) {
+      window.alert("Export the agreement first — WhatsApp needs a PDF to share.");
+      return;
+    }
+    const phone = data.agreement?.client?.whatsappNumber || data.agreement?.client?.phoneNumber;
+    if (!phone) {
+      window.alert("No WhatsApp or phone number on file for this client.");
+      return;
+    }
+    const { pdfBlob } = await buildExportBlobs({ docx: false });
+    const message = `Hi, please find the agreement "${data.title}" attached.`;
+    const shareResult = await shareFileNatively({ blob: pdfBlob, fileName: `${safeFileName(data.title)}.pdf`, mimeType: "application/pdf", title: data.title, text: message });
+    if (shareResult === "shared" || shareResult === "cancelled") return;
+    // Fallback: a wa.me link with the already-exported file's Drive link —
+    // a wa.me link can only carry text, not an attached blob.
+    window.open(buildWhatsAppUrl(phone, `${message}\n\n${latestExport.webViewLink || ""}`), "_blank");
+  }, [data, buildExportBlobs]);
+
+  const handleSaveAsTemplate = useCallback(async () => {
+    const name = window.prompt("Template name:", `${data.title} Template`);
+    if (!name || !name.trim()) return;
+    setIsSavingTemplate(true);
+    try {
+      await data.save();
+      await saveAgreementTemplate({ agreementId, name: name.trim(), isShared: true });
+      window.alert("Saved as a reusable template.");
+    } catch (err) {
+      window.alert(err.message || "Failed to save template");
+    } finally {
+      setIsSavingTemplate(false);
+    }
+  }, [agreementId, data]);
+
+  const handleUploadSignedCopy = useCallback(
+    async (file) => {
+      try {
+        await data.uploadSigned(file);
+        window.alert("Signed copy uploaded. Status set to Signed.");
+      } catch (err) {
+        window.alert(err.message || "Failed to upload the signed copy");
+      }
+    },
+    [data]
+  );
+
+  if (data.loading) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-[#EAE8E4]">
+        <span className="material-symbols-outlined animate-spin text-[32px] text-on-surface-variant">progress_activity</span>
+      </div>
+    );
+  }
+
+  if (data.loadError || !data.documentData) {
+    return (
+      <div className="flex h-screen flex-col items-center justify-center gap-3 bg-[#EAE8E4]">
+        <p className="text-body-md text-red-700">{data.loadError || "This agreement could not be loaded."}</p>
+        <button onClick={() => router.push("/agreements")} className="rounded-md bg-primary px-4 py-2 text-white">
+          Back to Agreements
+        </button>
+      </div>
+    );
+  }
+
+  const latestExport = data.agreement?.exports?.[0];
+
+  return (
+    <div className="flex h-screen flex-col overflow-hidden bg-[#EAE8E4]">
+      <div className="flex flex-wrap items-center gap-2 border-b border-outline-variant bg-surface px-4 py-2">
+        <button type="button" onClick={handleBack} title="Back to agreements" className="rounded p-1.5 text-on-surface-variant hover:bg-surface-variant">
+          <span className="material-symbols-outlined text-[20px]">arrow_back</span>
+        </button>
+        <input
+          value={data.title}
+          onChange={(e) => data.setTitle(e.target.value)}
+          className="min-w-[160px] max-w-[320px] rounded px-2 py-1 font-title-md text-title-md text-on-surface outline-none hover:bg-surface-variant focus:bg-surface-variant"
+        />
+        {data.agreement?.client?.name && <span className="rounded-full bg-primary/10 px-3 py-1 font-label-sm text-label-sm text-primary">{data.agreement.client.name}</span>}
+        <span className="rounded-full bg-surface-variant px-3 py-1 font-label-sm text-label-sm text-on-surface-variant">{data.agreement?.agreementNumber}</span>
+        <span className="rounded-full border border-outline-variant px-3 py-1 font-label-sm text-label-sm capitalize text-on-surface-variant">{data.agreement?.status?.replace(/_/g, " ")}</span>
+
+        <span className={`font-label-sm text-label-sm ${data.saveStatus === "error" || data.saveStatus === "conflict" ? "text-red-600" : "text-on-surface-variant"}`}>
+          {SAVE_STATUS_LABEL[data.saveStatus]}
+        </span>
+
+        <div className="ml-auto flex items-center gap-2">
+          {latestExport && <AgreementEmailButton agreement={latestExport} client={data.agreement?.client} />}
+          <button type="button" onClick={handleShareWhatsApp} title="Share via WhatsApp" className="rounded p-1.5 text-on-surface-variant hover:bg-surface-variant">
+            <span className="material-symbols-outlined text-[20px]">share</span>
+          </button>
+
+          <input
+            ref={signedCopyInputRef}
+            type="file"
+            accept="application/pdf,image/png,image/jpeg"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) handleUploadSignedCopy(file);
+              e.target.value = "";
+            }}
+          />
+          <button
+            type="button"
+            onClick={() => signedCopyInputRef.current?.click()}
+            className="rounded-md border border-outline-variant px-3 py-1.5 font-label-md text-label-md text-on-surface hover:bg-surface-variant"
+          >
+            Upload signed copy
+          </button>
+
+          <button
+            type="button"
+            onClick={handleFinalize}
+            className="rounded-md border border-outline-variant px-3 py-1.5 font-label-md text-label-md text-on-surface hover:bg-surface-variant"
+          >
+            Finalize
+          </button>
+
+          <div className="relative">
+            <button type="button" onClick={() => setMoreMenuOpen((p) => !p)} title="More" className="rounded p-1.5 text-on-surface-variant hover:bg-surface-variant">
+              <span className="material-symbols-outlined text-[18px]">more_vert</span>
+            </button>
+            {moreMenuOpen && (
+              <>
+                <div className="fixed inset-0 z-10" onClick={() => setMoreMenuOpen(false)} />
+                <div className="absolute right-0 z-20 mt-1 w-52 rounded-lg border border-outline-variant bg-white py-1 shadow-lg">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      handleSaveAsTemplate();
+                      setMoreMenuOpen(false);
+                    }}
+                    disabled={isSavingTemplate}
+                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-body-sm text-on-surface hover:bg-surface-variant disabled:opacity-50"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">bookmark_add</span>
+                    Save as template
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setVersionsOpen(true);
+                      setMoreMenuOpen(false);
+                    }}
+                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-body-sm text-on-surface hover:bg-surface-variant"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">history</span>
+                    Version history
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActivityOpen(true);
+                      setMoreMenuOpen(false);
+                    }}
+                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-body-sm text-on-surface hover:bg-surface-variant"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">receipt_long</span>
+                    Activity
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setExportMenuOpen((p) => !p)}
+              disabled={data.isExporting}
+              className="flex items-center gap-1.5 rounded-md bg-[#4285F4] px-3 py-1.5 font-label-md text-label-md text-white hover:bg-[#3367D6] disabled:opacity-60"
+            >
+              <span className="material-symbols-outlined text-[16px]">{data.isExporting ? "progress_activity" : "picture_as_pdf"}</span>
+              {data.isExporting ? "Exporting…" : "Export"}
+            </button>
+            {exportMenuOpen && (
+              <>
+                <div className="fixed inset-0 z-10" onClick={() => setExportMenuOpen(false)} />
+                <div className="absolute right-0 z-20 mt-1 w-60 rounded-lg border border-outline-variant bg-white py-1 shadow-lg">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      handleDownloadPdf();
+                      setExportMenuOpen(false);
+                    }}
+                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-body-sm text-on-surface hover:bg-surface-variant"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">download</span>
+                    Download PDF
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      handleDownloadDocx();
+                      setExportMenuOpen(false);
+                    }}
+                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-body-sm text-on-surface hover:bg-surface-variant"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">description</span>
+                    Download DOCX
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      handleExportToDrive();
+                      setExportMenuOpen(false);
+                    }}
+                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-body-sm text-on-surface hover:bg-surface-variant"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">cloud_upload</span>
+                    Save to Google Drive
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+
+          <button type="button" onClick={data.save} className="rounded-md border border-outline-variant px-3 py-1.5 font-label-md text-label-md text-on-surface hover:bg-surface-variant">
+            Save
+          </button>
+        </div>
+      </div>
+
+      <EditorToolbar editor={editor} />
+
+      <div className="flex flex-1 overflow-hidden">
+        <div className="flex-1 overflow-y-auto py-10">
+          <div className="sheet agreement-document mx-auto min-h-[297mm] w-[210mm] bg-white p-[20mm] shadow-[0_18px_50px_rgba(26,26,26,.16)]">
+            <EditorContent editor={editor} />
+          </div>
+        </div>
+        <PlaceholderSidebar editor={editor} agreement={data.agreement} />
+      </div>
+
+      <VersionHistoryPanel open={versionsOpen} onClose={() => setVersionsOpen(false)} loadVersions={data.loadVersions} onRestore={data.restoreVersion} />
+      <ActivityLogPanel open={activityOpen} onClose={() => setActivityOpen(false)} loadActivity={data.loadActivity} />
+    </div>
+  );
+}

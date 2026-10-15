@@ -6,6 +6,12 @@ const clientModel = (sequelize) => {
     {
       id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
       name: { type: DataTypes.STRING, allowNull: false },
+      // Agreement-generator fields (see agreementBuilderRoutes.js) — all
+      // optional since most clients predate this and `name` alone is still
+      // fine for everyday CRM use. Only an agreement actually needs these.
+      legalName: { type: DataTypes.STRING, allowNull: true },
+      contactPersonName: { type: DataTypes.STRING, allowNull: true },
+      gstin: { type: DataTypes.STRING, allowNull: true },
       logo: { type: DataTypes.TEXT, allowNull: true },
       industry: { type: DataTypes.STRING, allowNull: true },
       phoneNumber: { type: DataTypes.STRING, allowNull: true },

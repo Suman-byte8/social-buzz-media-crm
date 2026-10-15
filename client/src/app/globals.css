@@ -113,3 +113,67 @@
     background-color: #e32227;
   }
 }
+
+/* Agreement Generator's Tiptap editor (AgreementEditor.js) — plain CSS
+   (not Tailwind utilities) since it targets Tiptap's own ".ProseMirror"
+   root and raw element selectors, not classes this app controls. Mirrors
+   the same look agreementPagination.js's applyBlockStyles() gives the
+   exported PDF, so editing and export look consistent.
+   Sizing matches the source PDF's own generous, Google-Docs-style
+   proportions (roughly 13px/11pt body, 26px title) rather than a denser
+   custom scale — the point of this feature is to match that document's
+   actual look, not invent a new one. */
+.agreement-document .ProseMirror {
+  outline: none;
+  font-size: 13px;
+  line-height: 1.6;
+  color: #1a1a1a;
+}
+.agreement-document .ProseMirror h1 {
+  font-size: 26px;
+  font-weight: 700;
+  margin: 0 0 14px;
+}
+.agreement-document .ProseMirror h2 {
+  font-size: 16px;
+  font-weight: 700;
+  margin: 20px 0 8px;
+}
+.agreement-document .ProseMirror h3 {
+  font-size: 14px;
+  font-weight: 700;
+  margin: 14px 0 6px;
+}
+.agreement-document .ProseMirror p {
+  margin: 0 0 10px;
+}
+.agreement-document .ProseMirror table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 8px 0 16px;
+}
+.agreement-document .ProseMirror th,
+.agreement-document .ProseMirror td {
+  border: 1px solid #d8d4cc;
+  padding: 6px 8px;
+  font-size: 12px;
+  vertical-align: top;
+  text-align: left;
+}
+.agreement-document .ProseMirror th {
+  background: #f5f3ef;
+  font-weight: 700;
+}
+.agreement-document .ProseMirror ul,
+.agreement-document .ProseMirror ol {
+  margin: 0 0 10px;
+  padding-left: 22px;
+  /* Tailwind's preflight reset strips default list markers app-wide —
+     reinstate them here, since this is real document content (the PDF's
+     own numbered "how to use" list) rather than a UI element. */
+  list-style: revert;
+}
+.agreement-document .ProseMirror li {
+  margin: 0 0 4px;
+  display: list-item;
+}

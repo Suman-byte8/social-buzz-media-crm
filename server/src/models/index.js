@@ -14,6 +14,10 @@ import notificationModel from "./Notification.js";
 import serviceModel from "./Service.js";
 import reportModel from "./Report.js";
 import reportTemplateModel from "./ReportTemplate.js";
+import agreementModel from "./Agreement.js";
+import agreementTemplateModel from "./AgreementTemplate.js";
+import agreementVersionModel from "./AgreementVersion.js";
+import agreementActivityLogModel from "./AgreementActivityLog.js";
 
 export const initModels = (sequelize) => {
   const Client = clientModel(sequelize, DataTypes);
@@ -31,6 +35,10 @@ export const initModels = (sequelize) => {
   const Service = serviceModel(sequelize, DataTypes);
   const Report = reportModel(sequelize, DataTypes);
   const ReportTemplate = reportTemplateModel(sequelize, DataTypes);
+  const Agreement = agreementModel(sequelize, DataTypes);
+  const AgreementTemplate = agreementTemplateModel(sequelize, DataTypes);
+  const AgreementVersion = agreementVersionModel(sequelize, DataTypes);
+  const AgreementActivityLog = agreementActivityLogModel(sequelize, DataTypes);
 
   Client.hasMany(Document, { foreignKey: "clientId", as: "documents" });
   Document.belongsTo(Client, { foreignKey: "clientId", as: "client" });
@@ -89,6 +97,29 @@ export const initModels = (sequelize) => {
   ReportTemplate.hasMany(Report, { foreignKey: "templateId", as: "reports", constraints: false });
   Report.belongsTo(ReportTemplate, { foreignKey: "templateId", as: "template", constraints: false });
 
+  // Aliased "agreementDrafts" rather than "agreements" — the existing
+  // upload-based Agreements feature already refers to a client's agreement
+  // *Documents* as "agreements" throughout the UI/API, so reusing that word
+  // here would be ambiguous even though it wouldn't technically collide.
+  Client.hasMany(Agreement, { foreignKey: "clientId", as: "agreementDrafts" });
+  Agreement.belongsTo(Client, { foreignKey: "clientId", as: "client" });
+
+  // A generated agreement's finalized PDF/DOCX exports are ordinary
+  // Document rows (documentType "agreement") — same "export creates a new
+  // Document rather than overwriting" pattern Report.assets uses — so they
+  // appear in the existing Agreements dashboard/tab automatically.
+  Agreement.hasMany(Document, { foreignKey: "agreementId", as: "exports", constraints: false });
+  Document.belongsTo(Agreement, { foreignKey: "agreementId", as: "agreementDraft", constraints: false });
+
+  AgreementTemplate.hasMany(Agreement, { foreignKey: "templateId", as: "agreements", constraints: false });
+  Agreement.belongsTo(AgreementTemplate, { foreignKey: "templateId", as: "template", constraints: false });
+
+  Agreement.hasMany(AgreementVersion, { foreignKey: "agreementId", as: "versions", constraints: false });
+  AgreementVersion.belongsTo(Agreement, { foreignKey: "agreementId", as: "agreement", constraints: false });
+
+  Agreement.hasMany(AgreementActivityLog, { foreignKey: "agreementId", as: "activityLogs", constraints: false });
+  AgreementActivityLog.belongsTo(Agreement, { foreignKey: "agreementId", as: "agreement", constraints: false });
+
   return {
     Client,
     TeamMember,
@@ -105,5 +136,9 @@ export const initModels = (sequelize) => {
     Service,
     Report,
     ReportTemplate,
+    Agreement,
+    AgreementTemplate,
+    AgreementVersion,
+    AgreementActivityLog,
   };
 };
