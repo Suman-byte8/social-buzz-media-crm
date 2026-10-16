@@ -1,19 +1,16 @@
 "use client";
-import React, { useState, useCallback, useEffect, useRef } from "react";
+import React, { useState, useCallback, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { useEditor, EditorContent } from "@tiptap/react";
-import StarterKit from "@tiptap/starter-kit";
-import { TableKit } from "@tiptap/extension-table";
-import TextAlign from "@tiptap/extension-text-align";
 import { useAgreementEditor } from "./useAgreementEditor";
+import AgreementPage from "./AgreementPage";
+import AgreementPageSidebar from "./AgreementPageSidebar";
 import EditorToolbar from "./EditorToolbar";
 import PlaceholderSidebar from "./PlaceholderSidebar";
 import VersionHistoryPanel from "./VersionHistoryPanel";
 import ActivityLogPanel from "./ActivityLogPanel";
 import AiFillModal from "./AiFillModal";
 import AgreementEmailButton from "@/components/agreements/AgreementEmailButton";
-import { paginateAgreementContent } from "@/lib/agreementPagination";
-import { tiptapJsonToDocxBlob } from "@/lib/tiptapToDocx";
+import { tiptapPagesToDocxBlob } from "@/lib/tiptapToDocx";
 import { getNodesPdfBlob, exportNodesToPdf } from "@/lib/Pdfexport";
 import { shareFileNatively, buildWhatsAppUrl } from "@/lib/documentShare";
 import { saveAgreementTemplate } from "@/services/agreementService";
@@ -26,11 +23,13 @@ const SAVE_STATUS_LABEL = {
   conflict: "Changed elsewhere — reload to see the latest",
 };
 
-const EMPTY_DOC = { type: "doc", content: [{ type: "paragraph", content: [] }] };
+const EMPTY_PAGE_DOC = { type: "doc", content: [{ type: "paragraph", content: [] }] };
 
 function safeFileName(name) {
   return (name || "Agreement").replace(/[\\/:*?"<>|]/g, "_");
 }
+
+const genPageId = () => `page-${Date.now()}-${Math.round(Math.random() * 1e6)}`;
 
 const Divider = () => <div className="mx-1 h-6 w-px shrink-0 bg-outline-variant" />;
 
@@ -43,70 +42,104 @@ export default function AgreementEditor({ agreementId }) {
   const [activityOpen, setActivityOpen] = useState(false);
   const [aiFillOpen, setAiFillOpen] = useState(false);
   const [isSavingTemplate, setIsSavingTemplate] = useState(false);
+  const [selectedPageId, setSelectedPageId] = useState(null);
   const signedCopyInputRef = useRef(null);
 
-  const editor = useEditor({
-    extensions: [StarterKit, TableKit.configure({ resizable: false }), TextAlign.configure({ types: ["heading", "paragraph"] })],
-    content: EMPTY_DOC,
-    onUpdate: ({ editor: ed }) => {
-      data.setDocumentData(ed.getJSON());
-    },
-    // Avoids a Next.js hydration mismatch — Tiptap's own documented flag
-    // for this (contentEditable's rendered output can't be trusted to
-    // match server-rendered HTML exactly).
-    immediatelyRender: false,
-  });
+  // One Tiptap editor instance per page (see AgreementPage.js) — kept in
+  // real state (not a ref) so binding the shared toolbar/sidebar to
+  // whichever page is active actually re-renders them. Each page's editor
+  // only fires this once (when its Tiptap instance is created/destroyed),
+  // not on every keystroke, so the extra state updates are cheap.
+  const [pageEditors, setPageEditors] = useState({});
+  const pageDomRefsRef = useRef({});
 
-  // Pushes the loaded (or version-restored) document into the live editor.
-  // Guarded by a string comparison so this never fights with onUpdate —
-  // once the editor's own content matches, this is a no-op.
-  useEffect(() => {
-    if (!editor || !data.documentData) return;
-    const current = JSON.stringify(editor.getJSON());
-    const incoming = JSON.stringify(data.documentData);
-    if (current !== incoming) {
-      editor.commands.setContent(data.documentData);
-    }
-  }, [editor, data.documentData]);
+  const handleEditorReady = useCallback((pageId, editor) => {
+    setPageEditors((prev) => {
+      if (!editor) {
+        if (!(pageId in prev)) return prev;
+        const next = { ...prev };
+        delete next[pageId];
+        return next;
+      }
+      return { ...prev, [pageId]: editor };
+    });
+  }, []);
+
+  const registerPageDomRef = useCallback((pageId, el) => {
+    if (el) pageDomRefsRef.current[pageId] = el;
+    else delete pageDomRefsRef.current[pageId];
+  }, []);
+
+  const pages = useMemo(() => data.documentData?.pages || [], [data.documentData]);
+  // Falls back to the first page until the user explicitly picks another —
+  // derived on every render rather than synced via an effect, so there's
+  // no "initialize once data loads" effect to get wrong.
+  const activePageId = selectedPageId && pages.some((p) => p.id === selectedPageId) ? selectedPageId : pages[0]?.id || null;
+  const activeEditor = activePageId ? pageEditors[activePageId] : null;
+
+  const handlePageContentUpdate = useCallback(
+    (pageId, json) => {
+      data.setDocumentData((prev) => ({
+        ...prev,
+        pages: prev.pages.map((p) => (p.id === pageId ? { ...p, content: json } : p)),
+      }));
+    },
+    [data]
+  );
+
+  const handleAddPage = useCallback(() => {
+    const newPage = { id: genPageId(), content: EMPTY_PAGE_DOC };
+    data.setDocumentData((prev) => ({ ...prev, pages: [...prev.pages, newPage] }));
+    setSelectedPageId(newPage.id);
+  }, [data]);
+
+  const handleDeletePage = useCallback(
+    (pageId) => {
+      data.setDocumentData((prev) => {
+        if (prev.pages.length <= 1) return prev;
+        return { ...prev, pages: prev.pages.filter((p) => p.id !== pageId) };
+      });
+    },
+    [data]
+  );
+
+  const handleReorderPages = useCallback(
+    (fromIndex, toIndex) => {
+      data.setDocumentData((prev) => {
+        const next = [...prev.pages];
+        const [moved] = next.splice(fromIndex, 1);
+        next.splice(toIndex, 0, moved);
+        return { ...prev, pages: next };
+      });
+    },
+    [data]
+  );
 
   const handleBack = useCallback(() => {
     if (data.isDirty && !window.confirm("You have unsaved changes. Leave anyway?")) return;
     router.push("/agreements");
   }, [data.isDirty, router]);
 
-  // Builds both export files from the live editor, used by Download PDF,
-  // Download DOCX, and "Export to Drive" alike so there's one source of
-  // truth for how a page gets captured.
+  // Real page DOM nodes, in the document's current order — no measuring or
+  // auto-splitting needed anymore (that was only ever a stand-in for real
+  // pages, which this editor now has).
+  const orderedPageNodes = useCallback(() => pages.map((p) => pageDomRefsRef.current[p.id]).filter(Boolean), [pages]);
+
   const buildExportBlobs = useCallback(
     async ({ pdf = true, docx = true } = {}) => {
-      let pdfBlob = null;
-      if (pdf) {
-        const html = editor.view.dom.innerHTML;
-        const { pageNodes, cleanup } = paginateAgreementContent(html, { agreementNumber: data.agreement?.agreementNumber });
-        try {
-          pdfBlob = await getNodesPdfBlob(pageNodes, { orientation: "portrait" });
-        } finally {
-          cleanup();
-        }
-      }
-      const docxBlob = docx ? await tiptapJsonToDocxBlob(editor.getJSON(), { title: data.title }) : null;
+      const pdfBlob = pdf ? await getNodesPdfBlob(orderedPageNodes(), { orientation: "portrait" }) : null;
+      const docxBlob = docx ? await tiptapPagesToDocxBlob(pages, { title: data.title }) : null;
       return { pdfBlob, docxBlob };
     },
-    [editor, data.agreement, data.title]
+    [orderedPageNodes, pages, data.title]
   );
 
   const handleDownloadPdf = useCallback(async () => {
-    const html = editor.view.dom.innerHTML;
-    const { pageNodes, cleanup } = paginateAgreementContent(html, { agreementNumber: data.agreement?.agreementNumber });
-    try {
-      await exportNodesToPdf(pageNodes, `${safeFileName(data.title)}.pdf`, { orientation: "portrait" });
-    } finally {
-      cleanup();
-    }
-  }, [editor, data.agreement, data.title]);
+    await exportNodesToPdf(orderedPageNodes(), `${safeFileName(data.title)}.pdf`, { orientation: "portrait" });
+  }, [orderedPageNodes, data.title]);
 
   const handleDownloadDocx = useCallback(async () => {
-    const blob = await tiptapJsonToDocxBlob(editor.getJSON(), { title: data.title });
+    const blob = await tiptapPagesToDocxBlob(pages, { title: data.title });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
@@ -115,7 +148,7 @@ export default function AgreementEditor({ agreementId }) {
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
-  }, [editor, data.title]);
+  }, [pages, data.title]);
 
   const handleExportToDrive = useCallback(async () => {
     try {
@@ -192,7 +225,7 @@ export default function AgreementEditor({ agreementId }) {
     );
   }
 
-  if (data.loadError || !data.documentData) {
+  if (data.loadError || !data.documentData || pages.length === 0) {
     return (
       <div className="flex h-screen flex-col items-center justify-center gap-3 bg-[#EAE8E4]">
         <p className="text-body-md text-red-700">{data.loadError || "This agreement could not be loaded."}</p>
@@ -385,15 +418,37 @@ export default function AgreementEditor({ agreementId }) {
         </div>
       </div>
 
-      <EditorToolbar editor={editor} />
+      <EditorToolbar editor={activeEditor} />
 
       <div className="flex flex-1 overflow-hidden">
+        <AgreementPageSidebar
+          pages={pages}
+          activePageId={activePageId}
+          onSelectPage={setSelectedPageId}
+          onAddPage={handleAddPage}
+          onDeletePage={handleDeletePage}
+          onReorderPages={handleReorderPages}
+        />
+
         <div className="flex-1 overflow-y-auto py-10">
-          <div className="sheet agreement-document mx-auto min-h-[297mm] w-[210mm] bg-white p-[20mm] shadow-[0_18px_50px_rgba(26,26,26,.16)]">
-            <EditorContent editor={editor} />
+          <div className="flex flex-col items-center gap-10">
+            {pages.map((page, index) => (
+              <AgreementPage
+                key={page.id}
+                page={page}
+                index={index}
+                totalPages={pages.length}
+                isActive={page.id === activePageId}
+                onActivate={() => setSelectedPageId(page.id)}
+                onUpdate={handlePageContentUpdate}
+                onEditorReady={handleEditorReady}
+                registerRef={registerPageDomRef}
+              />
+            ))}
           </div>
         </div>
-        <PlaceholderSidebar editor={editor} agreement={data.agreement} />
+
+        <PlaceholderSidebar editor={activeEditor} agreement={data.agreement} />
       </div>
 
       <VersionHistoryPanel open={versionsOpen} onClose={() => setVersionsOpen(false)} loadVersions={data.loadVersions} onRestore={data.restoreVersion} />

@@ -285,34 +285,90 @@ function howToUseSection() {
   ];
 }
 
-export function buildMasterAgreementDocument() {
+// The whole document as one flat list of top-level nodes — kept as a
+// single function so the clause/table content only has to be authored
+// once, then sliced into real A4 pages below. Page breaks are placed at
+// clause/section boundaries rather than trying to reproduce the source
+// PDF's exact (line-wrap-driven) cut points — a user who adds/edits text
+// controls their own page breaks from here on anyway (see "Add page" in
+// the editor), so matching the PDF's incidental breaks isn't meaningful.
+function buildFlatContent() {
+  return [
+    ...howToUseSection(),
+    heading(1, "Digital Marketing Services Agreement"),
+    para(bold("Agreement no. {{agreementNumber}} · Effective date: {{effectiveDate}}")),
+    para("This Agreement is made between:"),
+    partiesTable(),
+    para(
+      'Social Buzz Media (the "Agency") provides digital marketing services. The Client wants the Agency to provide the services described in Schedule A, on the terms below. The Agency and the Client are each a "Party" and together the "Parties".'
+    ),
+    ...clauses(),
+    heading(2, "Signatures"),
+    para("Signed by the authorised representatives of the Parties on the dates below."),
+    signaturesTable(),
+    heading(1, "Schedule A — Services, fees and term"),
+    para("This Schedule sets out what {{clientLegalName}} is buying under Agreement no. {{agreementNumber}}, based on Proposal no. SBM/PROP/[YYYY]/[###]."),
+    heading(2, "A1. Services"),
+    servicesTable(),
+    heading(2, "A2. Fees"),
+    feesTable(),
+    heading(2, "A3. Ad budget and term"),
+    adBudgetTable(),
+    heading(2, "A4. Access and contacts"),
+    accessTable(),
+  ];
+}
+
+// Splits a flat list of top-level nodes into chunks, starting a new chunk
+// right before each node whose heading text matches one in `splitBefore`
+// (the first node always starts chunk 1, regardless of its own text).
+function splitIntoChunks(nodes, splitBefore) {
+  const chunks = [[]];
+  nodes.forEach((node) => {
+    const headingText = node.type === "heading" ? (node.content || []).map((c) => c.text || "").join("") : null;
+    if (headingText && splitBefore.includes(headingText) && chunks[chunks.length - 1].length > 0) {
+      chunks.push([]);
+    }
+    chunks[chunks.length - 1].push(node);
+  });
+  return chunks;
+}
+
+const genPageId = (() => {
+  let n = 1;
+  return () => `page-${n++}`;
+})();
+
+// The 7-page breakdown that roughly matches the source PDF's own page
+// count: cover/how-to-use + clause 1 together, then clauses grouped
+// 2 pages at a time per their natural weight, signatures + Schedule A's
+// first table, then the remaining three Schedule A tables.
+const PAGE_SPLIT_HEADINGS = [
+  "2. Term and renewal",
+  "5. Client responsibilities, approvals and revisions",
+  "8. Confidentiality and data protection",
+  "12. Non-solicitation",
+  "Signatures",
+  "A2. Fees",
+];
+
+export function buildMasterAgreementPages() {
+  const chunks = splitIntoChunks(buildFlatContent(), PAGE_SPLIT_HEADINGS);
   return {
-    type: "doc",
-    content: [
-      ...howToUseSection(),
-      heading(1, "Digital Marketing Services Agreement"),
-      para(bold("Agreement no. {{agreementNumber}} · Effective date: {{effectiveDate}}")),
-      para("This Agreement is made between:"),
-      partiesTable(),
-      para(
-        'Social Buzz Media (the "Agency") provides digital marketing services. The Client wants the Agency to provide the services described in Schedule A, on the terms below. The Agency and the Client are each a "Party" and together the "Parties".'
-      ),
-      ...clauses(),
-      heading(2, "Signatures"),
-      para("Signed by the authorised representatives of the Parties on the dates below."),
-      signaturesTable(),
-      heading(1, "Schedule A — Services, fees and term"),
-      para("This Schedule sets out what {{clientLegalName}} is buying under Agreement no. {{agreementNumber}}, based on Proposal no. SBM/PROP/[YYYY]/[###]."),
-      heading(2, "A1. Services"),
-      servicesTable(),
-      heading(2, "A2. Fees"),
-      feesTable(),
-      heading(2, "A3. Ad budget and term"),
-      adBudgetTable(),
-      heading(2, "A4. Access and contacts"),
-      accessTable(),
-    ],
+    version: 1,
+    pages: chunks.map((content) => ({ id: genPageId(), content: { type: "doc", content } })),
   };
+}
+
+// Normalizes whatever's stored for an agreement's documentData into the
+// current {version, pages: [...]} shape — a defensive upgrade path for any
+// row saved before this multi-page rework (when documentData was a single
+// flat Tiptap doc), not a real migration script, since nothing about the
+// stored JSON-in-TEXT column itself needs to change at the DB level.
+export function normalizeAgreementDocumentData(raw) {
+  if (raw && Array.isArray(raw.pages)) return raw;
+  if (raw && raw.type === "doc") return { version: 1, pages: [{ id: genPageId(), content: raw }] };
+  return { version: 1, pages: [{ id: genPageId(), content: { type: "doc", content: [] } }] };
 }
 
 // The master template, in the same shape GET /agreement-templates (and the
@@ -323,7 +379,7 @@ export const MASTER_AGREEMENT_TEMPLATE = {
   key: "sbm_service_agreement",
   name: "SBM Service Agreement",
   description: "The agency's standard digital marketing services agreement — parties, 14 clauses, signatures, and Schedule A.",
-  documentData: buildMasterAgreementDocument(),
+  documentData: buildMasterAgreementPages(),
 };
 
 export function getMasterAgreementTemplate() {
@@ -366,20 +422,34 @@ export function interpolateAgreementDocument(doc, values) {
   return doc;
 }
 
+// Runs interpolateAgreementDocument over every page's own content — the
+// {{token}} replacement logic itself doesn't care about document shape
+// (it just walks whatever .content array it's given), so this is a thin
+// per-page loop, not a second implementation.
+export function interpolateAgreementPages(documentData, values) {
+  documentData.pages.forEach((page) => {
+    interpolateAgreementDocument(page.content, values);
+  });
+  return documentData;
+}
+
 // Finds the table immediately following a given heading's text (e.g.
-// "A1. Services") in the document's top-level content — the layout
+// "A1. Services") anywhere across the agreement's pages — the layout
 // servicesTable()/feesTable()/adBudgetTable()/accessTable() above always
-// produce exactly one heading node followed by exactly one table node, so
-// this is reliable as long as the agreement hasn't had that structure
-// torn apart by hand (a reasonable assumption for AI-fill, meant to run
-// right after creation, before heavy manual editing).
-function findTableAfterHeading(doc, headingText) {
-  const content = doc.content || [];
-  const headingIndex = content.findIndex((node) => node.type === "heading" && (node.content || []).some((c) => c.text === headingText));
-  if (headingIndex === -1) return null;
-  for (let i = headingIndex + 1; i < content.length; i++) {
-    if (content[i].type === "table") return content[i];
-    if (content[i].type === "heading") break; // ran into the next section first
+// produce exactly one heading node followed by exactly one table node
+// (possibly on different pages from each other now that the template is
+// split across several), so this is reliable as long as the agreement
+// hasn't had that structure torn apart by hand (a reasonable assumption
+// for AI-fill, meant to run right after creation, before heavy editing).
+function findTableAfterHeading(documentData, headingText) {
+  for (const page of documentData.pages) {
+    const content = page.content.content || [];
+    const headingIndex = content.findIndex((node) => node.type === "heading" && (node.content || []).some((c) => c.text === headingText));
+    if (headingIndex === -1) continue;
+    for (let i = headingIndex + 1; i < content.length; i++) {
+      if (content[i].type === "table") return content[i];
+      if (content[i].type === "heading") break;
+    }
   }
   return null;
 }
@@ -413,8 +483,8 @@ function yesNo(value) {
 // touching cells a value was actually found for. Row/column positions here
 // match servicesTable()/feesTable()/adBudgetTable()/accessTable() exactly
 // (row 0 is always the header row in each).
-export function applyScheduleAExtraction(doc, extracted) {
-  const services = findTableAfterHeading(doc, "A1. Services");
+export function applyScheduleAExtraction(documentData, extracted) {
+  const services = findTableAfterHeading(documentData, "A1. Services");
   if (services) {
     setCellText(services, 1, 1, yesNo(extracted.socialMediaIncluded));
     setCellText(services, 1, 2, extracted.socialMediaDeliverables);
@@ -425,7 +495,7 @@ export function applyScheduleAExtraction(doc, extracted) {
     setCellText(services, 4, 2, extracted.addOns);
   }
 
-  const fees = findTableAfterHeading(doc, "A2. Fees");
+  const fees = findTableAfterHeading(documentData, "A2. Fees");
   if (fees) {
     setCellText(fees, 1, 2, extracted.monthlyRetainer);
     setCellText(fees, 3, 2, extracted.oneTimeSetupFee);
@@ -433,7 +503,7 @@ export function applyScheduleAExtraction(doc, extracted) {
     setCellText(fees, 5, 2, extracted.gstTerms);
   }
 
-  const adBudget = findTableAfterHeading(doc, "A3. Ad budget and term");
+  const adBudget = findTableAfterHeading(documentData, "A3. Ad budget and term");
   if (adBudget) {
     const budgetLine = [extracted.monthlyAdBudget, extracted.adPlatforms ? `on ${extracted.adPlatforms}` : null].filter(Boolean).join(" ");
     setCellText(adBudget, 1, 1, budgetLine || null);
@@ -442,12 +512,12 @@ export function applyScheduleAExtraction(doc, extracted) {
     setCellText(adBudget, 6, 1, extracted.currency);
   }
 
-  const access = findTableAfterHeading(doc, "A4. Access and contacts");
+  const access = findTableAfterHeading(documentData, "A4. Access and contacts");
   if (access) {
     setCellText(access, 1, 1, extracted.accountsToShare);
     setCellText(access, 2, 1, extracted.clientApprover);
     setCellText(access, 3, 1, extracted.agencyAccountManager);
   }
 
-  return doc;
+  return documentData;
 }

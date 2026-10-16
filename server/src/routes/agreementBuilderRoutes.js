@@ -6,7 +6,7 @@ import { wrapUpload } from "../middleware/multerUpload.js";
 import { cacheRoute } from "../middleware/cacheRoute.js";
 import { invalidateCache } from "../utils/serverCache.js";
 import { requireAdmin } from "../middleware/auth.js";
-import { getMasterAgreementTemplate, interpolateAgreementDocument, applyScheduleAExtraction } from "../utils/agreementTemplates.js";
+import { getMasterAgreementTemplate, interpolateAgreementPages, applyScheduleAExtraction, normalizeAgreementDocumentData } from "../utils/agreementTemplates.js";
 import { extractScheduleADetails } from "../utils/geminiAgreement.js";
 
 const router = express.Router();
@@ -66,11 +66,14 @@ const parseJsonField = (raw, fallback = null) => {
 // Serializes an Agreement row for the API response — documentData and
 // clientDataSnapshot come back as real objects, not JSON strings, same
 // parse-before-send convention reportRoutes.js's serializeReport follows.
+// normalizeAgreementDocumentData upgrades any row saved before the
+// multi-page rework (a single flat Tiptap doc) into {version, pages: [...]}
+// on the way out, so the client never has to special-case the old shape.
 const serializeAgreement = (agreement) => {
   const json = agreement.toJSON ? agreement.toJSON() : agreement;
   return {
     ...json,
-    documentData: parseJsonField(json.documentData, { type: "doc", content: [] }),
+    documentData: normalizeAgreementDocumentData(parseJsonField(json.documentData, null)),
     clientDataSnapshot: parseJsonField(json.clientDataSnapshot, null),
   };
 };
@@ -323,7 +326,7 @@ router.post("/agreement-drafts", async (req, res) => {
     if (templateId) {
       const template = await AgreementTemplate.findByPk(parseInt(templateId));
       if (!template) return res.status(404).json({ success: false, message: "Template not found" });
-      baseDocumentData = parseJsonField(template.documentData);
+      baseDocumentData = normalizeAgreementDocumentData(parseJsonField(template.documentData));
       resolvedTemplateId = template.id;
     } else {
       baseDocumentData = getMasterAgreementTemplate().documentData;
@@ -335,7 +338,7 @@ router.post("/agreement-drafts", async (req, res) => {
     const result = await sequelize.transaction(async (transaction) => {
       const agreementNumber = await generateAgreementNumber(Agreement, transaction);
       const values = buildInterpolationValues(clientRecord, agencySetting, { agreementNumber, effectiveDate });
-      const documentData = interpolateAgreementDocument(baseDocumentData, values);
+      const documentData = interpolateAgreementPages(baseDocumentData, values);
 
       return Agreement.create(
         {

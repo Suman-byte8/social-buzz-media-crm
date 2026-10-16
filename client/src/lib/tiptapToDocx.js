@@ -3,7 +3,7 @@
 // toolbar actually produce (see agreementTemplates.js / EditorToolbar.js) —
 // to the `docx` package's own document model, producing a genuinely
 // editable .docx client-side. No server dependency: `docx` is pure JS.
-import { Document, Paragraph, TextRun, HeadingLevel, Table, TableRow, TableCell, Packer, WidthType, BorderStyle, AlignmentType } from "docx";
+import { Document, Paragraph, TextRun, HeadingLevel, Table, TableRow, TableCell, Packer, WidthType, BorderStyle, AlignmentType, PageBreak } from "docx";
 
 const HEADING_LEVELS = { 1: HeadingLevel.HEADING_1, 2: HeadingLevel.HEADING_2, 3: HeadingLevel.HEADING_3 };
 
@@ -85,17 +85,37 @@ function blockFromNode(node) {
   return null;
 }
 
-export async function tiptapJsonToDocxBlob(doc, { title } = {}) {
-  const children = (doc?.content || []).flatMap((node) => {
+function blocksFromDoc(doc) {
+  return (doc?.content || []).flatMap((node) => {
     const result = blockFromNode(node);
     if (!result) return [];
     return Array.isArray(result) ? result : [result];
+  });
+}
+
+export async function tiptapJsonToDocxBlob(doc, { title } = {}) {
+  const document = new Document({
+    title: title || "Agreement",
+    sections: [{ properties: {}, children: blocksFromDoc(doc) }],
+  });
+  return Packer.toBlob(document);
+}
+
+// Same conversion, but for the editor's real page array (see
+// AgreementPage.js) — each page's content becomes its own run of blocks,
+// separated by a real Word page break so the exported .docx keeps the same
+// page boundaries the user actually set up in the editor, not Word's own
+// automatic reflow.
+export async function tiptapPagesToDocxBlob(pages, { title } = {}) {
+  const children = (pages || []).flatMap((page, index) => {
+    const blocks = blocksFromDoc(page.content);
+    if (index === 0) return blocks;
+    return [new Paragraph({ children: [new PageBreak()] }), ...blocks];
   });
 
   const document = new Document({
     title: title || "Agreement",
     sections: [{ properties: {}, children }],
   });
-
   return Packer.toBlob(document);
 }
