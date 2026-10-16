@@ -1,13 +1,30 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import MeetingNoteModal from "@/components/meetings/MeetingNoteModal";
+import NoteAttachments from "@/components/meetings/NoteAttachments";
 import {
   fetchMeetingNotes,
   deleteMeetingNote,
 } from "@/redux/slices/meetingNotesSlice";
 import { fetchClients } from "@/redux/slices/clientsSlice";
+import { fetchNoteAttachments, deleteNoteAttachment } from "@/redux/slices/documentsSlice";
+
+// Groups a flat note-attachment list (screenshot dump / documents / image
+// links, all documentType "note") by noteId and then by noteAttachmentKind
+// — same grouping Notes.js (the per-client tab) uses, so a note's
+// attachments render identically wherever it's viewed.
+const groupAttachmentsByNote = (attachments) => {
+  const byNote = {};
+  attachments.forEach((doc) => {
+    if (!doc.noteId) return;
+    if (!byNote[doc.noteId]) byNote[doc.noteId] = { screenshot: [], document: [], image_link: [] };
+    const bucket = byNote[doc.noteId][doc.noteAttachmentKind];
+    if (bucket) bucket.push(doc);
+  });
+  return byNote;
+};
 
 const meetingTypeConfig = {
   client_sync: {
@@ -42,14 +59,25 @@ export default function MeetingNotesPage() {
   const [editingNote, setEditingNote] = useState(null);
   const [deleteLoading, setDeleteLoading] = useState({});
 
+  // Keyed by clientId exactly as dispatched below — null (the "All Clients"
+  // state) is a valid key too, since fetchNoteAttachments(null) omits
+  // clientId from its query and returns every client's note attachments.
+  const noteAttachments = useSelector((state) => state.documents.noteAttachmentsByClient[selectedClientId] || []);
+
   useEffect(() => {
     dispatch(fetchClients({ limit: 100 }));
     dispatch(fetchMeetingNotes());
+    dispatch(fetchNoteAttachments(null));
   }, [dispatch]);
 
+  const attachmentsByNote = useMemo(() => groupAttachmentsByNote(noteAttachments), [noteAttachments]);
+
+  // Also handles switching back to "-- All Clients --" (clientId === null)
+  // — both fetchMeetingNotes and fetchNoteAttachments treat a falsy
+  // clientId as "every client," so this one call covers both directions.
   const loadNotesByClient = (clientId) => {
-    if (!clientId) return;
     dispatch(fetchMeetingNotes(clientId));
+    dispatch(fetchNoteAttachments(clientId));
   };
 
   const handleClientChange = (e) => {
@@ -62,7 +90,7 @@ export default function MeetingNotesPage() {
 
   const handleResetFilter = () => {
     setSelectedClientId(null);
-    loadNotes();
+    loadNotesByClient(null);
   };
 
   const handleSuccess = () => {
@@ -90,8 +118,9 @@ export default function MeetingNotesPage() {
     setModalOpen(true);
   };
 
-  const loadNotes = () => {
-    dispatch(fetchMeetingNotes());
+  const handleDeleteAttachment = (id) => {
+    if (!window.confirm("Delete this attachment? It will be moved to the Drive trash.")) return;
+    dispatch(deleteNoteAttachment({ id, clientId: selectedClientId }));
   };
 
   const getClientName = (clientId) => {
@@ -382,6 +411,11 @@ export default function MeetingNotesPage() {
                         <strong>{getClientName(note.clientId)}</strong>
                       </span>
                     </div>
+
+                    <NoteAttachments
+                      attachments={attachmentsByNote[note.id] || { screenshot: [], document: [], image_link: [] }}
+                      onDelete={handleDeleteAttachment}
+                    />
                   </div>
                 </div>
               );

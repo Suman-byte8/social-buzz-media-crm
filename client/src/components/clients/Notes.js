@@ -4,8 +4,8 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchMeetingNotes, deleteMeetingNote } from "@/redux/slices/meetingNotesSlice";
 import { fetchNoteAttachments, deleteNoteAttachment } from "@/redux/slices/documentsSlice";
-import { getAssetUrl } from "@/services/apiClient";
 import MeetingNoteModal from "@/components/meetings/MeetingNoteModal";
+import NoteAttachments from "@/components/meetings/NoteAttachments";
 
 const meetingTypeLabels = {
   client_sync: "Client Sync",
@@ -69,12 +69,6 @@ const groupAttachmentsByNote = (attachments) => {
     if (bucket) bucket.push(doc);
   });
   return byNote;
-};
-
-const formatFileSize = (bytes) => {
-  if (!bytes) return "";
-  if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-  return `${(bytes / 1024).toFixed(0)} KB`;
 };
 
 export default function Notes({ client, clientId }) {
@@ -193,96 +187,7 @@ export default function Notes({ client, clientId }) {
                     </a>
                   )}
 
-                  {attachments.document.length > 0 && (
-                    <div className="mt-3">
-                      <h3 className="font-label-md text-label-md text-on-surface-variant mb-1.5 flex items-center gap-1.5">
-                        <span className="material-symbols-outlined text-[16px]">attach_file</span>
-                        Documents
-                      </h3>
-                      <div className="flex flex-wrap gap-2">
-                        {attachments.document.map((doc) => (
-                          <a
-                            key={doc.id}
-                            href={getAssetUrl(`/api/documents/${doc.id}/stream`)}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="group inline-flex items-center gap-1.5 pl-2.5 pr-1.5 py-1 bg-surface-container rounded-full text-label-sm font-label-sm text-on-surface hover:bg-surface-variant transition-colors"
-                          >
-                            <span className="material-symbols-outlined text-[14px]">description</span>
-                            {doc.fileName}
-                            {doc.fileSize ? <span className="text-tertiary">({formatFileSize(doc.fileSize)})</span> : null}
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.preventDefault();
-                                handleDeleteAttachment(doc.id);
-                              }}
-                              className="p-0.5 rounded-full opacity-0 group-hover:opacity-100 hover:bg-red-100 hover:text-red-600 transition-colors"
-                              title="Delete"
-                            >
-                              <span className="material-symbols-outlined text-[14px]">close</span>
-                            </button>
-                          </a>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {(attachments.screenshot.length > 0 || attachments.image_link.length > 0) && (
-                    <div className="mt-3 space-y-3">
-                      {attachments.screenshot.length > 0 && (
-                        <div>
-                          <h3 className="font-label-md text-label-md text-on-surface-variant mb-1.5 flex items-center gap-1.5">
-                            <span className="material-symbols-outlined text-[16px]">content_paste</span>
-                            Screenshot Dump
-                          </h3>
-                          <div className="grid grid-cols-4 sm:grid-cols-6 lg:grid-cols-8 gap-2">
-                            {attachments.screenshot.map((doc) => (
-                              <div key={doc.id} className="relative group aspect-square rounded-md border border-outline-variant overflow-hidden bg-surface-container-lowest">
-                                <a href={getAssetUrl(`/api/documents/${doc.id}/stream`)} target="_blank" rel="noopener noreferrer">
-                                  <img src={getAssetUrl(`/api/documents/${doc.id}/stream`)} alt={doc.fileName} loading="lazy" className="w-full h-full object-cover" />
-                                </a>
-                                <button
-                                  type="button"
-                                  onClick={() => handleDeleteAttachment(doc.id)}
-                                  className="absolute top-1 right-1 p-1 rounded-full bg-black/60 text-white opacity-0 group-hover:opacity-100 transition-opacity"
-                                  title="Delete"
-                                >
-                                  <span className="material-symbols-outlined text-[14px]">close</span>
-                                </button>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
-                      {attachments.image_link.length > 0 && (
-                        <div>
-                          <h3 className="font-label-md text-label-md text-on-surface-variant mb-1.5 flex items-center gap-1.5">
-                            <span className="material-symbols-outlined text-[16px]">image</span>
-                            Image Links
-                          </h3>
-                          <div className="grid grid-cols-4 sm:grid-cols-6 lg:grid-cols-8 gap-2">
-                            {attachments.image_link.map((doc) => (
-                              <div key={doc.id} className="relative group aspect-square rounded-md border border-outline-variant overflow-hidden bg-surface-container-lowest">
-                                <a href={getAssetUrl(`/api/documents/${doc.id}/stream`)} target="_blank" rel="noopener noreferrer" title={doc.linkUrl}>
-                                  <img src={getAssetUrl(`/api/documents/${doc.id}/stream`)} alt={doc.fileName} loading="lazy" className="w-full h-full object-cover" />
-                                </a>
-                                <button
-                                  type="button"
-                                  onClick={() => handleDeleteAttachment(doc.id)}
-                                  className="absolute top-1 right-1 p-1 rounded-full bg-black/60 text-white opacity-0 group-hover:opacity-100 transition-opacity"
-                                  title="Delete"
-                                >
-                                  <span className="material-symbols-outlined text-[14px]">close</span>
-                                </button>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
+                  <NoteAttachments attachments={attachments} onDelete={handleDeleteAttachment} />
                 </article>
               );
             })}
