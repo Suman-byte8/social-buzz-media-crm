@@ -1,6 +1,9 @@
 "use client";
-import React, { useState, useCallback, useRef, useMemo } from "react";
+import React, { useState, useCallback, useRef, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useDispatch, useSelector } from "react-redux";
+import { fetchSettings } from "@/redux/slices/settingsSlice";
+import { getAssetUrl } from "@/services/apiClient";
 import { useAgreementEditor } from "./useAgreementEditor";
 import AgreementPage from "./AgreementPage";
 import AgreementPageSidebar from "./AgreementPageSidebar";
@@ -35,7 +38,14 @@ const Divider = () => <div className="mx-1 h-6 w-px shrink-0 bg-outline-variant"
 
 export default function AgreementEditor({ agreementId }) {
   const router = useRouter();
+  const dispatch = useDispatch();
   const data = useAgreementEditor(agreementId);
+  const agencyLogo = useSelector((s) => s.settings.data?.logo);
+  const logoSrc = agencyLogo ? getAssetUrl(agencyLogo) : null;
+
+  useEffect(() => {
+    dispatch(fetchSettings());
+  }, [dispatch]);
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
   const [versionsOpen, setVersionsOpen] = useState(false);
@@ -457,6 +467,7 @@ export default function AgreementEditor({ agreementId }) {
                 onUpdate={handlePageContentUpdate}
                 onEditorReady={handleEditorReady}
                 registerRef={registerPageDomRef}
+                logoSrc={logoSrc}
               />
             ))}
           </div>

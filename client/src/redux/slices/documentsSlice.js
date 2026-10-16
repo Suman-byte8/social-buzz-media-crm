@@ -376,6 +376,11 @@ const initialState = {
   agreementsTotalPages: 1,
   agreementsCurrentPage: 1,
   agreementsTotalItems: 0,
+  // Same split as agreements* above — only populated when fetchProposals is
+  // called with page/limit (the admin Proposals page).
+  proposalsTotalPages: 1,
+  proposalsCurrentPage: 1,
+  proposalsTotalItems: 0,
   loading: false,
   loadingProposals: false,
   loadingInvoiceDocuments: false,
@@ -431,6 +436,9 @@ const documentsSlice = createSlice({
       .addCase(fetchProposals.fulfilled, (state, action) => {
         state.loadingProposals = false;
         state.proposals = action.payload.data || [];
+        state.proposalsTotalPages = action.payload.pagination?.totalPages || 1;
+        state.proposalsCurrentPage = action.payload.pagination?.page || 1;
+        state.proposalsTotalItems = action.payload.pagination?.total || action.payload.data?.length || 0;
       })
       .addCase(fetchProposals.rejected, (state, action) => {
         state.loadingProposals = false;
