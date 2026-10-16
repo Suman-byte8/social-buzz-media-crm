@@ -44,10 +44,22 @@ export const fetchDocumentBlob = async (id) => {
 
 // ── Proposals ────────────────────────────────────────────────────────────
 
-export const fetchProposals = async (clientId) => {
-  const params = new URLSearchParams({ documentType: "proposal" });
-  if (clientId) params.append("clientId", clientId);
-  const response = await apiClient(`/documents?${params.toString()}`);
+// Accepts either a bare clientId (existing callers — e.g. a client
+// profile's Proposals tab wanting its one client's full, unpaginated list)
+// or a params object ({ clientId, status, search, page, limit } — the
+// admin Proposals page's paginated/searchable view), same dual-signature
+// convention fetchAgreements below uses.
+export const fetchProposals = async (paramsOrClientId) => {
+  const params =
+    paramsOrClientId && typeof paramsOrClientId === "object" ? paramsOrClientId : { clientId: paramsOrClientId };
+  const query = new URLSearchParams();
+  if (params.clientId) query.append("clientId", params.clientId);
+  if (params.status) query.append("status", params.status);
+  if (params.search) query.append("search", params.search);
+  if (params.page) query.append("page", params.page);
+  if (params.limit) query.append("limit", params.limit);
+  const queryString = query.toString();
+  const response = await apiClient(`/proposals${queryString ? `?${queryString}` : ""}`);
   return response;
 };
 

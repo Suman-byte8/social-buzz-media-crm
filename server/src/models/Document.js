@@ -55,6 +55,12 @@ const documentModel = (sequelize) => {
       // to its editable Agreement draft; a manually-uploaded agreement
       // (the pre-existing /agreements/upload flow) leaves this null.
       agreementId: { type: DataTypes.INTEGER, allowNull: true },
+      // Soft reference (no FK constraint, same as agreementId) — only set
+      // when this Document is a generated proposal's exported PDF/DOCX (see
+      // proposalBuilderRoutes.js's export endpoint). Ties the export back
+      // to its editable Proposal draft; a manually-uploaded proposal (the
+      // pre-existing /proposals/upload flow) leaves this null.
+      proposalId: { type: DataTypes.INTEGER, allowNull: true },
       uploadedBy: { type: DataTypes.STRING, allowNull: true },
       description: { type: DataTypes.TEXT, allowNull: true },
       // Agreement-specific fields
@@ -90,6 +96,7 @@ const documentModel = (sequelize) => {
         { fields: ["teamMemberId"] },
         { fields: ["reportId"] },
         { fields: ["agreementId"] },
+        { fields: ["proposalId"] },
         { fields: ["documentType"] },
         { fields: ["status"] },
       ],

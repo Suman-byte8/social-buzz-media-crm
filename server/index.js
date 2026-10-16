@@ -166,6 +166,7 @@ import notificationRoutes from "./src/routes/notificationRoutes.js";
 import serviceRoutes from "./src/routes/serviceRoutes.js";
 import reportRoutes from "./src/routes/reportRoutes.js";
 import agreementBuilderRoutes from "./src/routes/agreementBuilderRoutes.js";
+import proposalBuilderRoutes from "./src/routes/proposalBuilderRoutes.js";
 import authRoutes from "./src/routes/authRoutes.js";
 import { startKeepAlivePing } from "./src/utils/keepAlive.js";
 import { authenticate } from "./src/middleware/auth.js";
@@ -202,6 +203,7 @@ app.use("/api", notificationRoutes);
 app.use("/api", serviceRoutes);
 app.use("/api", reportRoutes);
 app.use("/api", agreementBuilderRoutes);
+app.use("/api", proposalBuilderRoutes);
 
 app.get("/", (req, res) => {
   res.json({

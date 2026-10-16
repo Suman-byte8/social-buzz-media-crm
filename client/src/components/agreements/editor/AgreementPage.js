@@ -14,7 +14,7 @@ const EMPTY_DOC = { type: "doc", content: [{ type: "paragraph", content: [] }] }
 // rendered page nodes already on screen (via pageRefsRef in
 // AgreementEditor.js) instead of needing a second off-screen render pass
 // or a synthetic measure-and-split step.
-export default function AgreementPage({ page, index, totalPages, isActive, onActivate, onUpdate, onEditorReady, registerRef }) {
+export default function AgreementPage({ page, index, totalPages, isActive, onActivate, onUpdate, onEditorReady, registerRef, logoSrc }) {
   const editor = useEditor({
     extensions: [StarterKit, TableKit.configure({ resizable: false }), TextAlign.configure({ types: ["heading", "paragraph"] })],
     content: page.content || EMPTY_DOC,
@@ -57,6 +57,16 @@ export default function AgreementPage({ page, index, totalPages, isActive, onAct
         ref={(el) => registerRef(page.id, el)}
         className={`sheet agreement-document relative min-h-[297mm] w-[210mm] bg-white p-[20mm] shadow-[0_18px_50px_rgba(26,26,26,.16)] ${isActive ? "ring-2 ring-primary" : ""}`}
       >
+        {/* Only the first page gets the agency logo — a letterhead on every
+            page wasn't wanted; this mirrors the Report Builder's own
+            cover-only logo precedent. Placed in normal flow (not absolutely
+            positioned over the content) so it reserves real space above the
+            title instead of risking an overlap with whatever text happens
+            to start the document. */}
+        {index === 0 && logoSrc && (
+          // eslint-disable-next-line @next/next/no-img-element -- fixed real-world mm sizing on a print-style A4 sheet, not a responsive viewport image next/image optimizes for.
+          <img src={logoSrc} alt="Agency logo" className="mb-[8mm] block max-h-[15mm] max-w-[50mm] object-contain" />
+        )}
         <EditorContent editor={editor} />
         <div className="pointer-events-none absolute bottom-[8mm] right-[20mm] text-[9px] text-[#6E6A65]">
           Page {index + 1} of {totalPages}

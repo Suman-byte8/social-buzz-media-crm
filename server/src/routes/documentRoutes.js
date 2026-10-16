@@ -1000,6 +1000,59 @@ router.get("/agreements", requireAdmin, cacheRoute("documents", 120), async (req
   }
 });
 
+// Mirrors GET /agreements exactly, for documentType "proposal" — gives the
+// top-level Proposals dashboard the same clientId/status/search/page/limit
+// querying the Agreements page already has (the per-client ProposalTab's
+// own fetchProposals(clientId) call keeps working unchanged against this
+// same route, since omitting status/search/page/limit just returns that
+// client's full unpaginated list, same as before).
+router.get("/proposals", requireAdmin, cacheRoute("documents", 120), async (req, res) => {
+  try {
+    const { Document } = req.app.locals.models;
+    const { clientId, status, search, page, limit } = req.query;
+
+    const where = { documentType: "proposal" };
+    if (clientId) where.clientId = parseInt(clientId);
+    if (status) where.status = status;
+    if (search) {
+      where[Op.or] = [
+        { fileName: { [Op.iLike]: `%${search}%` } },
+        { description: { [Op.iLike]: `%${search}%` } },
+      ];
+    }
+
+    const queryOptions = { where, order: [["createdAt", "DESC"]] };
+
+    if (limit) {
+      const parsedLimit = parseInt(limit);
+      const parsedPage = parseInt(page) || 1;
+      queryOptions.limit = parsedLimit;
+      queryOptions.offset = (parsedPage - 1) * parsedLimit;
+
+      const { count, rows } = await Document.findAndCountAll(queryOptions);
+      return res.json({
+        success: true,
+        data: rows,
+        pagination: {
+          total: count,
+          page: parsedPage,
+          limit: parsedLimit,
+          totalPages: Math.ceil(count / parsedLimit),
+        },
+      });
+    }
+
+    const proposals = await Document.findAll(queryOptions);
+    res.json({ success: true, data: proposals });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Error fetching proposals",
+      error: error.message,
+    });
+  }
+});
+
 router.get("/agreements/:id", requireAdmin, async (req, res) => {
   try {
     const { Document } = req.app.locals.models;

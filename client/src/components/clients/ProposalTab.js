@@ -2,7 +2,9 @@
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
+import { useRouter } from "next/navigation";
 import { fetchProposals, uploadProposal, deleteProposal } from "@/redux/slices/documentsSlice";
+import GenerateProposalModal from "@/components/proposals/GenerateProposalModal";
 
 const MAX_FILE_SIZE = 2 * 1024 * 1024;
 
@@ -18,6 +20,7 @@ const formatDate = (dateStr) => {
 
 export default function ProposalTab({ client, clientId }) {
   const dispatch = useDispatch();
+  const router = useRouter();
   const { proposals, loadingProposals } = useSelector((state) => state.documents);
   const fileInputRef = useRef(null);
 
@@ -26,6 +29,7 @@ export default function ProposalTab({ client, clientId }) {
   const [selectedFile, setSelectedFile] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
+  const [generateModalOpen, setGenerateModalOpen] = useState(false);
 
   useEffect(() => {
     if (clientId) {
@@ -98,7 +102,16 @@ export default function ProposalTab({ client, clientId }) {
           kept in step so both Documents-tab columns read as one system). */}
       <div className="flex flex-col gap-4 bg-white rounded-t-xl p-card-padding border border-b-0 border-outline-variant shadow-card">
         <div className="flex flex-wrap justify-between items-center gap-3">
-          <h2 className="font-title-lg text-title-lg text-on-surface shrink-0">Proposals</h2>
+          <div className="flex items-center gap-2 shrink-0">
+            <h2 className="font-title-lg text-title-lg text-on-surface">Proposals</h2>
+            <button
+              onClick={() => setGenerateModalOpen(true)}
+              className="px-4 py-2 rounded-lg bg-primary text-white font-label-md text-label-md hover:bg-primary/90 transition-colors shadow-sm flex items-center gap-2"
+            >
+              <span className="material-symbols-outlined text-[18px]">auto_awesome</span>
+              Generate Proposal
+            </button>
+          </div>
           <div className="relative w-full sm:w-64 shrink-0">
             <span
               className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-tertiary-fixed-dim"
@@ -197,9 +210,19 @@ export default function ProposalTab({ client, clientId }) {
                           </span>
                         </div>
                         <div className="min-w-0">
-                          <p className="font-body-sm text-body-sm font-medium text-on-background truncate" title={proposal.fileName}>
-                            {proposal.fileName}
-                          </p>
+                          <div className="flex items-center gap-1.5">
+                            <p className="font-body-sm text-body-sm font-medium text-on-background truncate" title={proposal.fileName}>
+                              {proposal.fileName}
+                            </p>
+                            {proposal.proposalId && (
+                              <span
+                                title="Generated with the Proposal Generator — click the editor icon to keep editing it"
+                                className="shrink-0 rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary"
+                              >
+                                Generated
+                              </span>
+                            )}
+                          </div>
                           {proposal.description && (
                             <p className="font-label-sm text-label-sm text-tertiary truncate" title={proposal.description}>
                               {proposal.description}
@@ -216,6 +239,15 @@ export default function ProposalTab({ client, clientId }) {
                     </td>
                     <td className="py-4 px-6">
                       <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        {proposal.proposalId && (
+                          <button
+                            onClick={() => router.push(`/proposals/${proposal.proposalId}/edit`)}
+                            className="p-2 text-on-surface-variant hover:text-primary hover:bg-surface-variant rounded transition-colors"
+                            title="Open in Proposal Editor"
+                          >
+                            <span className="material-symbols-outlined text-[20px]">edit_document</span>
+                          </button>
+                        )}
                         {(proposal.webViewLink || proposal.googleUserContentLink) && (
                           <a
                             href={proposal.webViewLink || proposal.googleUserContentLink}
@@ -249,6 +281,8 @@ export default function ProposalTab({ client, clientId }) {
           </table>
         </div>
       </div>
+
+      {generateModalOpen && <GenerateProposalModal onClose={() => setGenerateModalOpen(false)} defaultClientId={clientId} />}
     </section>
   );
 }
