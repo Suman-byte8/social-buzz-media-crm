@@ -12,6 +12,7 @@ import notificationsReducer from './slices/notificationsSlice';
 import servicesReducer from './slices/servicesSlice';
 import reportsReducer from './slices/reportsSlice';
 import agreementsReducer from './slices/agreementsSlice';
+import proposalsReducer from './slices/proposalsSlice';
 
 export const store = configureStore({
   reducer: {
@@ -28,6 +29,7 @@ export const store = configureStore({
     services: servicesReducer,
     reports: reportsReducer,
     agreements: agreementsReducer,
+    proposals: proposalsReducer,
   },
   devTools: process.env.NODE_ENV !== 'production',
 });

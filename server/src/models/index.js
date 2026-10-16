@@ -18,6 +18,10 @@ import agreementModel from "./Agreement.js";
 import agreementTemplateModel from "./AgreementTemplate.js";
 import agreementVersionModel from "./AgreementVersion.js";
 import agreementActivityLogModel from "./AgreementActivityLog.js";
+import proposalModel from "./Proposal.js";
+import proposalTemplateModel from "./ProposalTemplate.js";
+import proposalVersionModel from "./ProposalVersion.js";
+import proposalActivityLogModel from "./ProposalActivityLog.js";
 
 export const initModels = (sequelize) => {
   const Client = clientModel(sequelize, DataTypes);
@@ -39,6 +43,10 @@ export const initModels = (sequelize) => {
   const AgreementTemplate = agreementTemplateModel(sequelize, DataTypes);
   const AgreementVersion = agreementVersionModel(sequelize, DataTypes);
   const AgreementActivityLog = agreementActivityLogModel(sequelize, DataTypes);
+  const Proposal = proposalModel(sequelize, DataTypes);
+  const ProposalTemplate = proposalTemplateModel(sequelize, DataTypes);
+  const ProposalVersion = proposalVersionModel(sequelize, DataTypes);
+  const ProposalActivityLog = proposalActivityLogModel(sequelize, DataTypes);
 
   Client.hasMany(Document, { foreignKey: "clientId", as: "documents" });
   Document.belongsTo(Client, { foreignKey: "clientId", as: "client" });
@@ -120,6 +128,29 @@ export const initModels = (sequelize) => {
   Agreement.hasMany(AgreementActivityLog, { foreignKey: "agreementId", as: "activityLogs", constraints: false });
   AgreementActivityLog.belongsTo(Agreement, { foreignKey: "agreementId", as: "agreement", constraints: false });
 
+  // Aliased "proposalDrafts" rather than "proposals" — Client already has a
+  // real `proposals` TEXT column (a legacy free-text field), and Sequelize
+  // refuses an association alias that collides with an existing attribute
+  // (same reason Agreement's own association is "agreementDrafts").
+  Client.hasMany(Proposal, { foreignKey: "clientId", as: "proposalDrafts" });
+  Proposal.belongsTo(Client, { foreignKey: "clientId", as: "client" });
+
+  // A generated proposal's finalized PDF/DOCX exports are ordinary Document
+  // rows (documentType "proposal") — same "export creates a new Document"
+  // pattern Agreement.exports uses — so they appear in the existing
+  // ProposalTab dashboard automatically.
+  Proposal.hasMany(Document, { foreignKey: "proposalId", as: "exports", constraints: false });
+  Document.belongsTo(Proposal, { foreignKey: "proposalId", as: "proposalDraft", constraints: false });
+
+  ProposalTemplate.hasMany(Proposal, { foreignKey: "templateId", as: "proposals", constraints: false });
+  Proposal.belongsTo(ProposalTemplate, { foreignKey: "templateId", as: "template", constraints: false });
+
+  Proposal.hasMany(ProposalVersion, { foreignKey: "proposalId", as: "versions", constraints: false });
+  ProposalVersion.belongsTo(Proposal, { foreignKey: "proposalId", as: "proposal", constraints: false });
+
+  Proposal.hasMany(ProposalActivityLog, { foreignKey: "proposalId", as: "activityLogs", constraints: false });
+  ProposalActivityLog.belongsTo(Proposal, { foreignKey: "proposalId", as: "proposal", constraints: false });
+
   return {
     Client,
     TeamMember,
@@ -140,5 +171,9 @@ export const initModels = (sequelize) => {
     AgreementTemplate,
     AgreementVersion,
     AgreementActivityLog,
+    Proposal,
+    ProposalTemplate,
+    ProposalVersion,
+    ProposalActivityLog,
   };
 };
