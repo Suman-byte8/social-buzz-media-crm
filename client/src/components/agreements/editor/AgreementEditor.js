@@ -462,7 +462,7 @@ export default function AgreementEditor({ agreementId }) {
           </div>
         </div>
 
-        <PlaceholderSidebar editor={activeEditor} agreement={data.agreement} />
+        <PlaceholderSidebar editor={activeEditor} agreement={data.agreement} pages={pages} pageEditors={pageEditors} onSelectPage={setSelectedPageId} />
       </div>
 
       <VersionHistoryPanel open={versionsOpen} onClose={() => setVersionsOpen(false)} loadVersions={data.loadVersions} onRestore={data.restoreVersion} />
