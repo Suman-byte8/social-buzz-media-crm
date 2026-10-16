@@ -171,23 +171,37 @@ export default function AgreementEditor({ agreementId }) {
   }, [data]);
 
   const handleShareWhatsApp = useCallback(async () => {
-    const latestExport = data.agreement?.exports?.[0];
-    if (!latestExport) {
-      window.alert("Export the agreement first — WhatsApp needs a PDF to share.");
-      return;
-    }
     const phone = data.agreement?.client?.whatsappNumber || data.agreement?.client?.phoneNumber;
     if (!phone) {
       window.alert("No WhatsApp or phone number on file for this client.");
       return;
     }
+    // Always build a fresh PDF from the current pages — this never needs a
+    // prior Drive export to exist, same as "Download PDF".
     const { pdfBlob } = await buildExportBlobs({ docx: false });
     const message = `Hi, please find the agreement "${data.title}" attached.`;
     const shareResult = await shareFileNatively({ blob: pdfBlob, fileName: `${safeFileName(data.title)}.pdf`, mimeType: "application/pdf", title: data.title, text: message });
     if (shareResult === "shared" || shareResult === "cancelled") return;
-    // Fallback: a wa.me link with the already-exported file's Drive link —
-    // a wa.me link can only carry text, not an attached blob.
-    window.open(buildWhatsAppUrl(phone, `${message}\n\n${latestExport.webViewLink || ""}`), "_blank");
+
+    // Native file-share isn't supported on this browser (e.g. desktop
+    // Firefox) — a wa.me link can only carry text, not an attached file. If
+    // a Drive export already exists, link straight to it; otherwise
+    // download the PDF we just built so the user can attach it by hand.
+    const latestExport = data.agreement?.exports?.[0];
+    if (latestExport?.webViewLink) {
+      window.open(buildWhatsAppUrl(phone, `${message}\n\n${latestExport.webViewLink}`), "_blank");
+      return;
+    }
+    const url = URL.createObjectURL(pdfBlob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${safeFileName(data.title)}.pdf`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    window.open(buildWhatsAppUrl(phone, message), "_blank");
+    window.alert("Downloaded the PDF — attach it to the WhatsApp chat that just opened.");
   }, [data, buildExportBlobs]);
 
   const handleSaveAsTemplate = useCallback(async () => {
