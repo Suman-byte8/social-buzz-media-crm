@@ -197,7 +197,13 @@ async function getCandidateModels(apiKey) {
 // frequently overloaded under free-tier demand (503) or rate-limited (429);
 // either case is better handled by trying the next candidate than failing
 // the whole report generation.
-async function callGemini(parts, schema) {
+//
+// Exported so other Gemini-backed features (e.g. geminiAgreement.js's
+// proposal-extraction) reuse the exact same model-discovery/fallback
+// machinery instead of duplicating it — model availability shifts fast
+// enough (see this file's own history) that there should be exactly one
+// place that logic lives.
+export async function callGemini(parts, schema) {
   const apiKey = getApiKey();
   const candidates = await getCandidateModels(apiKey);
 

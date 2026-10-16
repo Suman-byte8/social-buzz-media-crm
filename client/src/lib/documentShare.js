@@ -1,6 +1,9 @@
 // Shared helpers for sharing an actual file via WhatsApp instead of a link
-// — used by the invoice builder (useInvoiceActions.js). Agreements are
-// email-only (see agreementEmail.js) and don't need these.
+// — used by the invoice builder (useInvoiceActions.js) and the generated-
+// agreement editor (AgreementEditor.js). The older upload-only Agreements
+// flow (agreementEmail.js) stays email-only — that's a separate, simpler
+// feature with its own already-settled design, not something this file
+// needs to touch.
 
 /**
  * Attempts to hand `blob` to the OS/browser's native share sheet (Web Share

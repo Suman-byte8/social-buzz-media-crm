@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { useRouter } from "next/navigation";
 import StatusBadge from "@/components/ui/StatusBadge";
 import AgreementEmailButton from "./AgreementEmailButton";
 import { getAssetUrl } from "@/services/apiClient";
@@ -36,6 +37,7 @@ export default function AgreementsTable({
   // the other columns instead of forcing a horizontal scrollbar.
   hideClientColumn = false,
 }) {
+  const router = useRouter();
   const columnCount = hideClientColumn ? 5 : 6;
   return (
     <div className="bg-white rounded-b-xl border border-outline-variant shadow-card overflow-hidden">
@@ -92,15 +94,25 @@ export default function AgreementsTable({
                             "anyone with the link" permission happens to be
                             set, which isn't guaranteed (see logo-proxy, which
                             already fixed this same issue for agency logos). */}
-                        <a
-                          href={getAssetUrl(`/api/documents/${agreement.id}/stream`)}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="font-title-md text-title-md text-on-surface hover:text-primary transition-colors truncate block"
-                          title={agreement.fileName}
-                        >
-                          {agreement.fileName}
-                        </a>
+                        <div className="flex items-center gap-1.5">
+                          <a
+                            href={getAssetUrl(`/api/documents/${agreement.id}/stream`)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="font-title-md text-title-md text-on-surface hover:text-primary transition-colors truncate block"
+                            title={agreement.fileName}
+                          >
+                            {agreement.fileName}
+                          </a>
+                          {agreement.agreementId && (
+                            <span
+                              title="Generated with the Agreement Generator — click the editor icon to keep editing it"
+                              className="shrink-0 rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary"
+                            >
+                              Generated
+                            </span>
+                          )}
+                        </div>
                         <p className="text-xs text-secondary truncate" title={agreement.description}>
                           {agreement.description || "No description provided"}
                         </p>
@@ -135,6 +147,15 @@ export default function AgreementsTable({
                         <span className="material-symbols-outlined text-[20px]">visibility</span>
                       </button>
                       <AgreementEmailButton agreement={agreement} client={client} />
+                      {agreement.agreementId && (
+                        <button
+                          onClick={() => router.push(`/agreements/${agreement.agreementId}/edit`)}
+                          className="p-1.5 text-secondary hover:text-primary hover:bg-gray-100 rounded transition-colors"
+                          title="Open in Agreement Editor"
+                        >
+                          <span className="material-symbols-outlined text-[20px]">edit_document</span>
+                        </button>
+                      )}
                       <button
                         onClick={() => onEdit(agreement)}
                         className="p-1.5 text-secondary hover:text-primary hover:bg-gray-100 rounded transition-colors"

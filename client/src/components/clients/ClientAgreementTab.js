@@ -5,6 +5,7 @@ import { useDispatch, useSelector } from "react-redux";
 import AgreementUploadModal from "@/components/agreements/AgreementUploadModal";
 import AgreementViewModal from "@/components/agreements/AgreementViewModal";
 import AgreementsTable from "@/components/agreements/AgreementsTable";
+import GenerateAgreementModal from "@/components/agreements/GenerateAgreementModal";
 import { fetchAgreements, deleteAgreement } from "@/redux/slices/documentsSlice";
 
 export default function ClientAgreementTab({ client, clientId }) {
@@ -12,6 +13,7 @@ export default function ClientAgreementTab({ client, clientId }) {
   const { agreements, loadingAgreements, error } = useSelector((state) => state.documents);
 
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
+  const [generateModalOpen, setGenerateModalOpen] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [viewModalOpen, setViewModalOpen] = useState(false);
   const [editingAgreement, setEditingAgreement] = useState(null);
@@ -64,13 +66,22 @@ export default function ClientAgreementTab({ client, clientId }) {
             Signed contracts for {client?.name || "this client"}, stored on Google Drive.
           </p>
         </div>
-        <button
-          onClick={() => setUploadModalOpen(true)}
-          className="px-4 py-2 rounded-lg bg-primary text-white font-label-md text-label-md hover:bg-primary/90 transition-colors shadow-sm flex items-center gap-2 self-start sm:self-auto"
-        >
-          <span className="material-symbols-outlined text-[18px]">upload_file</span>
-          Upload Agreement
-        </button>
+        <div className="flex gap-2 self-start sm:self-auto">
+          <button
+            onClick={() => setGenerateModalOpen(true)}
+            className="px-4 py-2 rounded-lg bg-primary text-white font-label-md text-label-md hover:bg-primary/90 transition-colors shadow-sm flex items-center gap-2"
+          >
+            <span className="material-symbols-outlined text-[18px]">auto_awesome</span>
+            Generate Agreement
+          </button>
+          <button
+            onClick={() => setUploadModalOpen(true)}
+            className="px-4 py-2 rounded-lg border border-outline-variant text-on-surface font-label-md text-label-md hover:bg-surface-variant transition-colors flex items-center gap-2"
+          >
+            <span className="material-symbols-outlined text-[18px]">upload_file</span>
+            Upload Agreement
+          </button>
+        </div>
       </div>
 
       {error && (
@@ -119,6 +130,8 @@ export default function ClientAgreementTab({ client, clientId }) {
         agreement={viewingAgreement}
         clients={clientsForLookup}
       />
+
+      {generateModalOpen && <GenerateAgreementModal onClose={() => setGenerateModalOpen(false)} defaultClientId={clientId} />}
     </section>
   );
 }

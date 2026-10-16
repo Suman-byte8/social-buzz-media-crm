@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import AgreementUploadModal from "@/components/agreements/AgreementUploadModal";
 import AgreementViewModal from "@/components/agreements/AgreementViewModal";
+import GenerateAgreementModal from "@/components/agreements/GenerateAgreementModal";
 import AgreementsToolbar from "@/components/agreements/AgreementsToolbar";
 import AgreementsFilters from "@/components/agreements/AgreementsFilters";
 import AgreementsTable from "@/components/agreements/AgreementsTable";
@@ -31,6 +32,7 @@ export default function AgreementsPage() {
   const [page, setPage] = useState(1);
 
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
+  const [generateModalOpen, setGenerateModalOpen] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [viewModalOpen, setViewModalOpen] = useState(false);
   const [editingAgreement, setEditingAgreement] = useState(null);
@@ -103,7 +105,7 @@ export default function AgreementsPage() {
   return (
     <RequireAdmin>
     <main className="flex-1 p-6 lg:p-8 max-w-[1600px] mx-auto w-full">
-      <AgreementsToolbar onUpload={() => setUploadModalOpen(true)} />
+      <AgreementsToolbar onUpload={() => setUploadModalOpen(true)} onGenerate={() => setGenerateModalOpen(true)} />
 
       <AgreementsFilters
         search={search}
@@ -169,6 +171,8 @@ export default function AgreementsPage() {
         agreement={viewingAgreement}
         clients={clients}
       />
+
+      {generateModalOpen && <GenerateAgreementModal onClose={() => setGenerateModalOpen(false)} />}
     </main>
     </RequireAdmin>
   );

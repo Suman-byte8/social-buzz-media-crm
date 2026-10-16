@@ -49,6 +49,12 @@ const documentModel = (sequelize) => {
       // existing type ClientFilesTab's Reports tab already lists, so an
       // exported report shows up there automatically.
       reportId: { type: DataTypes.INTEGER, allowNull: true },
+      // Soft reference (no FK constraint, same as reportId) — only set when
+      // this Document is a generated agreement's exported PDF/DOCX (see
+      // agreementBuilderRoutes.js's export endpoint). Ties the export back
+      // to its editable Agreement draft; a manually-uploaded agreement
+      // (the pre-existing /agreements/upload flow) leaves this null.
+      agreementId: { type: DataTypes.INTEGER, allowNull: true },
       uploadedBy: { type: DataTypes.STRING, allowNull: true },
       description: { type: DataTypes.TEXT, allowNull: true },
       // Agreement-specific fields
@@ -83,6 +89,7 @@ const documentModel = (sequelize) => {
         { fields: ["noteId"] },
         { fields: ["teamMemberId"] },
         { fields: ["reportId"] },
+        { fields: ["agreementId"] },
         { fields: ["documentType"] },
         { fields: ["status"] },
       ],
