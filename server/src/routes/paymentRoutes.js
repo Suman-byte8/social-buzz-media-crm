@@ -432,6 +432,108 @@ router.get("/invoices/:id", async (req, res) => {
   }
 });
 
+// The Invoice Builder's "Sync to Payments": an idempotent upsert keyed by
+// invoice number. First sync creates the ledger invoice (issued); every
+// later sync of the same number — even after a page reload — updates that
+// same invoice instead of creating a duplicate. Refuses (with a clear
+// reason) only when updating would be unsafe: the number belongs to a
+// different client, the invoice was voided, or payments have already been
+// applied to it.
+router.post("/invoices/sync", async (req, res) => {
+  try {
+    const models = req.app.locals.models;
+    const { Invoice, InvoiceLineItem, Client } = models;
+    const { clientId, invoiceNumber, invoiceDate, dueDate, lineItems, discountPaise, taxRateBasisPoints, roundToRupee, notes } = req.body;
+
+    const number = typeof invoiceNumber === "string" ? invoiceNumber.trim() : "";
+    if (!clientId) return res.status(400).json({ success: false, message: "Select a client before syncing." });
+    if (!dueDate) return res.status(400).json({ success: false, message: "A due date is required." });
+    const validLines = Array.isArray(lineItems)
+      ? lineItems.filter((l) => l && l.description && Number.isInteger(l.quantity) && l.quantity > 0 && Number.isInteger(l.unitPricePaise) && l.unitPricePaise >= 0)
+      : [];
+    if (validLines.length === 0) return res.status(400).json({ success: false, message: "Add at least one line item with an amount." });
+
+    const clientRecord = await Client.findByPk(parseInt(clientId));
+    if (!clientRecord) return res.status(404).json({ success: false, message: "Client not found" });
+
+    const totals = computeInvoiceTotals({ lineItems: validLines, discountPaise: discountPaise || 0, taxRateBasisPoints: taxRateBasisPoints || 0, roundToRupee: Boolean(roundToRupee) });
+    const existing = number ? await Invoice.findOne({ where: { invoiceNumber: number } }) : null;
+
+    if (existing) {
+      if (existing.clientId !== clientRecord.id) {
+        return res.status(409).json({ success: false, message: `Invoice number "${number}" already belongs to a different client — change the number and sync again.` });
+      }
+      if (existing.status === "void") {
+        return res.status(409).json({ success: false, message: `Invoice "${number}" was voided in Payments — use a new invoice number.` });
+      }
+      if (existing.amountPaidPaise > 0) {
+        return res.status(409).json({
+          success: false,
+          message: `Invoice "${number}" already has payments recorded against it, so its amounts are locked. Void it in Payments and sync under a new number to change it.`,
+        });
+      }
+
+      await Invoice.sequelize.transaction(async (transaction) => {
+        await InvoiceLineItem.destroy({ where: { invoiceId: existing.id }, transaction });
+        for (const [index, item] of validLines.entries()) {
+          await InvoiceLineItem.create(
+            { invoiceId: existing.id, description: item.description, quantity: item.quantity, unitPricePaise: item.unitPricePaise, lineTotalPaise: item.quantity * item.unitPricePaise, sortOrder: index },
+            { transaction }
+          );
+        }
+        await existing.update(
+          {
+            ...totals,
+            status: existing.status === "draft" ? "issued" : existing.status,
+            invoiceDate: invoiceDate || existing.invoiceDate,
+            dueDate,
+            notes: notes !== undefined ? notes : existing.notes,
+            revision: existing.revision + 1,
+            updatedBy: req.user?.name || existing.updatedBy,
+          },
+          { transaction }
+        );
+      });
+
+      await logActivity(models, { clientId: existing.clientId, invoiceId: existing.id, action: "invoice_synced", user: req.user, amountPaise: existing.totalPaise, metadata: { source: "invoice_builder" } });
+      await invalidateCache("payments");
+      return res.json({ success: true, created: false, message: `Updated ${existing.invoiceNumber} in Payments`, data: serializeInvoice(existing) });
+    }
+
+    const created = await Invoice.sequelize.transaction(async (transaction) => {
+      const assignedNumber = number || (await generateInvoiceNumber(Invoice, transaction));
+      const inv = await Invoice.create(
+        {
+          clientId: clientRecord.id,
+          invoiceNumber: assignedNumber,
+          status: "issued",
+          invoiceDate: invoiceDate || todayISO(),
+          dueDate,
+          ...totals,
+          notes: notes || null,
+          createdBy: req.user?.name || null,
+          updatedBy: req.user?.name || null,
+        },
+        { transaction }
+      );
+      for (const [index, item] of validLines.entries()) {
+        await InvoiceLineItem.create(
+          { invoiceId: inv.id, description: item.description, quantity: item.quantity, unitPricePaise: item.unitPricePaise, lineTotalPaise: item.quantity * item.unitPricePaise, sortOrder: index },
+          { transaction }
+        );
+      }
+      return inv;
+    });
+
+    await logActivity(models, { clientId: created.clientId, invoiceId: created.id, action: "invoice_created", user: req.user, amountPaise: created.totalPaise, metadata: { source: "invoice_builder" } });
+    await invalidateCache("payments");
+    res.status(201).json({ success: true, created: true, message: `Added ${created.invoiceNumber} to Payments`, data: serializeInvoice(created) });
+  } catch (error) {
+    console.error("Error syncing invoice:", error);
+    res.status(500).json({ success: false, message: error.message || "Error syncing invoice" });
+  }
+});
+
 // Creates an invoice — manual (clientId + lineItems supplied directly) or
 // seeded from the client's billing config when billingConfigId is given and
 // lineItems is omitted. Starts as "draft" unless issueImmediately is set.
@@ -541,7 +643,7 @@ router.put("/invoices/:id", async (req, res) => {
       return res.status(400).json({ success: false, message: "This invoice has payments applied to it — void and duplicate it to correct it instead." });
     }
 
-    const { expectedRevision, lineItems, discountPaise, taxRateBasisPoints, invoiceDate, dueDate, notes, termsText } = req.body;
+    const { expectedRevision, lineItems, discountPaise, taxRateBasisPoints, roundToRupee, invoiceDate, dueDate, notes, termsText } = req.body;
     if (expectedRevision !== undefined && parseInt(expectedRevision) !== invoice.revision) {
       return res.status(409).json({ success: false, message: "This invoice was changed elsewhere since you opened it.", data: serializeInvoice(invoice) });
     }
@@ -567,6 +669,7 @@ router.put("/invoices/:id", async (req, res) => {
           lineItems,
           discountPaise: discountPaise !== undefined ? discountPaise : invoice.discountPaise,
           taxRateBasisPoints: taxRateBasisPoints !== undefined ? taxRateBasisPoints : fallbackTaxRateBasisPoints,
+          roundToRupee: roundToRupee !== undefined ? Boolean(roundToRupee) : invoice.roundOffPaise !== 0,
         });
       }
       await invoice.update(
@@ -646,6 +749,7 @@ router.post("/invoices/:id/duplicate", async (req, res) => {
           subtotalPaise: source.subtotalPaise,
           discountPaise: source.discountPaise,
           taxPaise: source.taxPaise,
+          roundOffPaise: source.roundOffPaise,
           totalPaise: source.totalPaise,
           notes: source.notes,
           termsText: source.termsText,

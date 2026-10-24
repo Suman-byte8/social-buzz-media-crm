@@ -12,12 +12,17 @@ const todayISO = () => new Date().toISOString().slice(0, 10);
 // discountPaise is applied before tax; taxRateBasisPoints is e.g. 1800 for
 // 18.00% (basis points = percent * 100, so the whole computation stays in
 // integers: taxableAmount * rateBasisPoints / 10000).
-export function computeInvoiceTotals({ lineItems, discountPaise = 0, taxRateBasisPoints = 0 }) {
+// roundToRupee mirrors the Invoice Builder's "Round off" toggle: the grand
+// total is rounded to the nearest whole rupee and the difference is kept as
+// its own roundOffPaise line, so the ledger total matches the printed PDF.
+export function computeInvoiceTotals({ lineItems, discountPaise = 0, taxRateBasisPoints = 0, roundToRupee = false }) {
   const subtotalPaise = lineItems.reduce((sum, item) => sum + item.quantity * item.unitPricePaise, 0);
   const taxableAmount = Math.max(subtotalPaise - discountPaise, 0);
   const taxPaise = Math.round((taxableAmount * taxRateBasisPoints) / 10000);
-  const totalPaise = taxableAmount + taxPaise;
-  return { subtotalPaise, discountPaise, taxPaise, totalPaise };
+  const grossPaise = taxableAmount + taxPaise;
+  const roundOffPaise = roundToRupee ? Math.round(grossPaise / 100) * 100 - grossPaise : 0;
+  const totalPaise = grossPaise + roundOffPaise;
+  return { subtotalPaise, discountPaise, taxPaise, roundOffPaise, totalPaise };
 }
 
 // ── Invoice status machine ──────────────────────────────────────────────

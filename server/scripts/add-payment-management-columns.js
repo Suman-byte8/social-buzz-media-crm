@@ -45,6 +45,11 @@ async function main() {
   await sequelize.query(`CREATE INDEX IF NOT EXISTS "documents_invoice_id" ON "documents" ("invoiceId");`);
   console.log("[add-payment-management-columns] Ensured index on documents.invoiceId");
 
+  // invoices is created by sequelize.sync() on first boot, but sync never
+  // adds columns to an existing table — roundOffPaise was added later.
+  await sequelize.query(`ALTER TABLE IF EXISTS "invoices" ADD COLUMN IF NOT EXISTS "roundOffPaise" INTEGER NOT NULL DEFAULT 0;`);
+  console.log('[add-payment-management-columns] Ensured "roundOffPaise" column on invoices');
+
   // ALTER TYPE ... ADD VALUE cannot run inside a multi-statement transaction
   // block in older Postgres, so each is issued as its own query.
   await sequelize.query(`ALTER TYPE "enum_documents_documentType" ADD VALUE IF NOT EXISTS 'invoice_record';`);

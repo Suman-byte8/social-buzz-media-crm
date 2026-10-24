@@ -63,6 +63,9 @@ const InvoiceDocument = forwardRef(function InvoiceDocument({ invoice, client },
         <div className="flex justify-between"><span>Subtotal</span><span>{formatRupees(invoice.subtotalPaise)}</span></div>
         <div className="flex justify-between"><span>Discount</span><span>-{formatRupees(invoice.discountPaise)}</span></div>
         <div className="flex justify-between"><span>Tax</span><span>{formatRupees(invoice.taxPaise)}</span></div>
+        {invoice.roundOffPaise ? (
+          <div className="flex justify-between"><span>Round off</span><span>{formatRupees(invoice.roundOffPaise)}</span></div>
+        ) : null}
         <div className="flex justify-between border-t border-[#1A1A1A] pt-1 font-semibold"><span>Total</span><span>{formatRupees(invoice.totalPaise)}</span></div>
         <div className="flex justify-between"><span>Paid</span><span>{formatRupees(invoice.amountPaidPaise)}</span></div>
         <div className="flex justify-between font-semibold"><span>Balance Due</span><span>{formatRupees(balance)}</span></div>

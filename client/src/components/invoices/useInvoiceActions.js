@@ -6,7 +6,8 @@ import { uploadInvoiceToDrive, sendDocumentEmail } from "@/services/clientServic
 import { exportInvoiceToPdf, getInvoicePdfBlob } from "@/lib/Pdfexport";
 import { API_BASE_URL } from "@/services/apiClient";
 import { shareFileNatively, buildWhatsAppUrl } from "@/lib/documentShare";
-import { createInvoice, updateInvoice } from "@/services/paymentService";
+import { syncInvoice } from "@/services/paymentService";
+import { invalidatePaymentsCaches } from "@/redux/slices/paymentsSlice";
 
 const MONTHS = { jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5, jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11 };
 
@@ -33,6 +34,25 @@ function parseFreeTextDate(text) {
   return Number.isNaN(fallback.getTime()) ? null : fallback.toISOString().slice(0, 10);
 }
 
+// Turns the builder's on-screen rows into ledger line items. Any row with
+// an amount counts — a blank description falls back to "Item N" rather than
+// silently dropping the row (the default rows ship with amounts but no
+// description). The ledger stores whole-number quantities, so a fractional
+// quantity (e.g. 1.5 hours) is folded into a single line priced at the
+// row's exact total, keeping the amount identical to the PDF.
+function toLedgerLineItems(rows) {
+  return (rows || [])
+    .map((r, index) => ({ ...r, position: index + 1 }))
+    .filter((r) => (r.qty || 0) > 0 && (r.rate || 0) > 0)
+    .map((r) => {
+      const description = r.desc?.trim() || `Item ${r.position}`;
+      if (Number.isInteger(r.qty)) {
+        return { description, quantity: r.qty, unitPricePaise: Math.round(r.rate * 100) };
+      }
+      return { description: `${description} (${r.qty} × ₹${r.rate})`, quantity: 1, unitPricePaise: Math.round(r.qty * r.rate * 100) };
+    });
+}
+
 export function useInvoiceActions({
   invoiceSheetRef,
   reportPageRefs,
@@ -44,6 +64,7 @@ export function useInvoiceActions({
   rows,
   discount,
   gstRate,
+  roundOff,
   selectedClientId,
   selectedClient,
 }) {
@@ -51,76 +72,69 @@ export function useInvoiceActions({
   const [isSavingToDrive, setIsSavingToDrive] = useState(false);
   const [isSharing, setIsSharing] = useState(false);
 
-  // Tracks the Payments-ledger Invoice this builder session is keeping in
-  // sync, so a second "Save to Drive" on the same invoice updates it
-  // instead of creating a duplicate. Reset whenever the selected client
-  // changes — a different client means a genuinely different invoice.
+  // Sync state shown in the toolbar. syncMessage is the outcome of the most
+  // recent attempt — the success summary or the exact reason it failed.
   const [syncStatus, setSyncStatus] = useState("idle"); // idle | syncing | synced | error
-  const [syncError, setSyncError] = useState("");
-  const syncedInvoiceIdRef = useRef(null);
+  const [syncMessage, setSyncMessage] = useState("");
   const syncedClientIdRef = useRef(null);
 
   useEffect(() => {
     if (syncedClientIdRef.current && syncedClientIdRef.current !== selectedClientId) {
-      syncedInvoiceIdRef.current = null;
       setSyncStatus("idle");
-      setSyncError("");
+      setSyncMessage("");
     }
     syncedClientIdRef.current = selectedClientId;
   }, [selectedClientId]);
 
-  // Creates (first time) or updates (every time after) the real, persisted
-  // Invoice record behind this on-screen document, so it shows up in the
-  // Payments module's dues/overdue/outstanding tracking immediately —
-  // never just the exported PDF. Non-fatal on failure: the caller still
-  // gets its PDF either way, just with a visible warning that the ledger
-  // wasn't updated.
+  // Pushes the on-screen invoice into the Payments ledger via the
+  // idempotent POST /invoices/sync (keyed by invoice number): first sync
+  // creates it, every later sync of the same number updates it — including
+  // after a page reload. Never throws; resolves { ok, data, message } so
+  // callers report the real outcome instead of reading stale state.
   const syncToPayments = useCallback(async () => {
-    if (!selectedClientId) return null;
-    const validRows = (rows || []).filter((r) => r.desc?.trim() && r.qty > 0 && r.rate > 0);
-    if (validRows.length === 0) {
+    const fail = (message) => {
       setSyncStatus("error");
-      setSyncError("Add at least one priced line item to sync this invoice to Payments.");
-      return null;
-    }
+      setSyncMessage(message);
+      return { ok: false, data: null, message };
+    };
+
+    if (!selectedClientId) return fail("Select a client first.");
+    const lineItems = toLedgerLineItems(rows);
+    if (lineItems.length === 0) return fail("Add at least one line item with a quantity and rate.");
     const parsedDueDate = parseFreeTextDate(dueDate);
-    if (!parsedDueDate) {
-      setSyncStatus("error");
-      setSyncError(`Could not read the due date "${dueDate}" as a date — try a format like "07 Sep 2026".`);
-      return null;
-    }
-    const parsedInvoiceDate = parseFreeTextDate(issuedDate);
+    if (!parsedDueDate) return fail(`Couldn't read the due date "${dueDate}" — use a format like "07 Sep 2026".`);
 
     setSyncStatus("syncing");
-    setSyncError("");
+    setSyncMessage("");
     try {
-      const payload = {
-        invoiceDate: parsedInvoiceDate || undefined,
+      const result = await syncInvoice({
+        clientId: selectedClientId,
+        invoiceNumber,
+        invoiceDate: parseFreeTextDate(issuedDate) || undefined,
         dueDate: parsedDueDate,
-        lineItems: validRows.map((r) => ({ description: r.desc.trim(), quantity: r.qty, unitPricePaise: Math.round(r.rate * 100) })),
+        lineItems,
         discountPaise: Math.round((discount || 0) * 100),
         taxRateBasisPoints: Math.round((gstRate || 0) * 100),
-      };
-      const result = syncedInvoiceIdRef.current
-        ? await updateInvoice(syncedInvoiceIdRef.current, payload)
-        : await createInvoice({ clientId: selectedClientId, invoiceNumber, issueImmediately: true, ...payload });
+        roundToRupee: Boolean(roundOff),
+      });
 
-      syncedInvoiceIdRef.current = result.data.id;
+      // The Payments page caches its overview/table briefly — drop that so
+      // the next visit shows this invoice immediately.
+      invalidatePaymentsCaches();
       setSyncStatus("synced");
-      // flushSync forces this state update to commit and re-render before
-      // we return — the caller captures invoiceSheetRef.current into a PDF
-      // right after this resolves, so the on-screen number (part of the
-      // printed sheet itself) must already match what's now in the ledger.
+      setSyncMessage(result.message);
+      // Only when the server had to assign a number (blank field): flushSync
+      // commits it to the on-screen sheet before any PDF capture that follows.
       if (onInvoiceNumberSync && result.data.invoiceNumber !== invoiceNumber) {
         flushSync(() => onInvoiceNumberSync(result.data.invoiceNumber));
       }
-      return result.data;
+      return { ok: true, data: result.data, message: result.message };
     } catch (err) {
-      setSyncStatus("error");
-      setSyncError(err.message || "Failed to sync this invoice to Payments.");
-      return null;
+      return fail(err.message || "Failed to sync this invoice to Payments.");
     }
-  }, [selectedClientId, rows, dueDate, issuedDate, discount, gstRate, invoiceNumber, onInvoiceNumberSync]);
+  }, [selectedClientId, rows, dueDate, issuedDate, discount, gstRate, roundOff, invoiceNumber, onInvoiceNumberSync]);
+
+  const handleSyncToPayments = useCallback(() => syncToPayments(), [syncToPayments]);
 
   // reportPageRefs.current can briefly contain nulls (a page unmounting/
   // remounting as the image layout recomputes) — filter those out right
@@ -154,13 +168,13 @@ export function useInvoiceActions({
       // PDF below is captured, so the saved file and the Payments record
       // always agree on the same number.
       const syncResult = await syncToPayments();
-      const effectiveNumber = syncResult?.invoiceNumber || invoiceNumber;
+      const effectiveNumber = syncResult.data?.invoiceNumber || invoiceNumber;
       const pdfBlob = await getInvoicePdfBlob(invoiceSheetRef.current, getReportPageNodes());
       await uploadInvoiceToDrive(pdfBlob, selectedClientId, effectiveNumber);
       alert(
-        syncResult
-          ? "Invoice saved to Google Drive and synced to Payments."
-          : `Invoice saved to Google Drive. ${syncError || "It was not synced to Payments."}`
+        syncResult.ok
+          ? `Invoice saved to Google Drive. ${syncResult.message}.`
+          : `Invoice saved to Google Drive, but not synced to Payments: ${syncResult.message}`
       );
     } catch (e) {
       console.error("Google Drive upload failed:", e);
@@ -168,7 +182,7 @@ export function useInvoiceActions({
     } finally {
       setIsSavingToDrive(false);
     }
-  }, [invoiceSheetRef, invoiceNumber, selectedClientId, getReportPageNodes, syncToPayments, syncError]);
+  }, [invoiceSheetRef, invoiceNumber, selectedClientId, getReportPageNodes, syncToPayments]);
 
   // Uploads the invoice (+ any report pages) and returns the created
   // Document record (id, fileName, ...), used by both the WhatsApp and
@@ -222,7 +236,7 @@ export function useInvoiceActions({
       setIsSharing(true);
       try {
         const syncResult = await syncToPayments();
-        const effectiveNumber = syncResult?.invoiceNumber || invoiceNumber;
+        const effectiveNumber = syncResult.data?.invoiceNumber || invoiceNumber;
         const fileName = `Invoice-${effectiveNumber || "draft"}.pdf`;
         const pdfBlob = await getInvoicePdfBlob(invoiceSheetRef.current, getReportPageNodes());
 
@@ -291,7 +305,7 @@ export function useInvoiceActions({
     setIsSharing(true);
     try {
       const syncResult = await syncToPayments();
-      const effectiveNumber = syncResult?.invoiceNumber || invoiceNumber;
+      const effectiveNumber = syncResult.data?.invoiceNumber || invoiceNumber;
       const fileName = `Invoice-${effectiveNumber || "draft"}.pdf`;
       const pdfBlob = await getInvoicePdfBlob(invoiceSheetRef.current, getReportPageNodes());
       const subject = `Invoice ${effectiveNumber} from Social Buzz Media`;
@@ -351,7 +365,8 @@ export function useInvoiceActions({
     isSavingToDrive,
     isSharing,
     syncStatus,
-    syncError,
+    syncMessage,
+    handleSyncToPayments,
     handleSavePdf,
     handleSaveToDrive,
     handleSendWhatsApp,

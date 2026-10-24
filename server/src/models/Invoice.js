@@ -37,6 +37,9 @@ const invoiceModel = (sequelize) => {
       subtotalPaise: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 0 },
       discountPaise: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 0 },
       taxPaise: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 0 },
+      // Rounding adjustment (within ±50 paise) applied after tax when an
+      // invoice is rounded to the nearest rupee — see computeInvoiceTotals.
+      roundOffPaise: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 0 },
       totalPaise: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 0 },
       // Transactionally-maintained cache, recomputed from PaymentAllocation
       // rows by recomputeInvoiceFromAllocations() on every allocation

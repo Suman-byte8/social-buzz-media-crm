@@ -86,6 +86,15 @@ export default function PaymentsPage() {
             <p className="font-body-sm text-body-sm text-on-surface-variant mt-1">Billing, invoices, collections, dues, and advances across every client.</p>
           </div>
           <div className="flex gap-2">
+            <button
+              onClick={refreshTable}
+              disabled={loadingClients || loadingOverview}
+              title="Reload the latest figures, including invoices just synced from the Invoice Builder"
+              className="px-4 py-2 border border-outline-variant text-on-surface rounded-lg font-label-md text-label-md hover:bg-surface-variant transition-colors flex items-center gap-2 disabled:opacity-60"
+            >
+              <span className={`material-symbols-outlined text-[18px] ${loadingClients || loadingOverview ? "animate-spin" : ""}`}>refresh</span>
+              Refresh
+            </button>
             <button onClick={() => setRecurringOpen(true)} className="px-4 py-2 border border-outline-variant text-on-surface rounded-lg font-label-md text-label-md hover:bg-surface-variant transition-colors flex items-center gap-2">
               <span className="material-symbols-outlined text-[18px]">autorenew</span>
               Recurring Invoices

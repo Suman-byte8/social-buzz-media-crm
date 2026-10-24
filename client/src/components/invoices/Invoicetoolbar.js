@@ -1,5 +1,6 @@
 "use client";
 import React from "react";
+import Link from "next/link";
 import ShareMenu from "@/components/ui/ShareMenu";
 
 // This is the actual Google Drive triangle logo. The previous version used
@@ -54,15 +55,10 @@ export default function InvoiceToolbar({
   onSendWhatsApp,
   onSendEmail,
   syncStatus,
-  syncError,
+  syncMessage,
+  onSyncToPayments,
 }) {
-  const SYNC_META = {
-    idle: null,
-    syncing: { label: "Syncing to Payments…", className: "text-white/70" },
-    synced: { label: "Synced to Payments", className: "text-emerald-300" },
-    error: { label: syncError || "Not synced to Payments", className: "text-amber-300" },
-  };
-  const syncMeta = SYNC_META[syncStatus];
+  const isSyncing = syncStatus === "syncing";
   return (
     <div className="no-print sticky top-0 z-30 bg-ink text-white">
       <div className="mx-auto flex max-w-[210mm] flex-wrap items-center gap-x-5 gap-y-3 px-5 py-3">
@@ -168,15 +164,37 @@ export default function InvoiceToolbar({
           onSendEmail={onSendEmail}
         />
 
-        {syncMeta && (
-          <span className={`flex items-center gap-1.5 text-[11px] font-medium ${syncMeta.className}`} title={syncStatus === "error" ? syncError : undefined}>
-            <span className={`material-symbols-outlined text-[14px] ${syncStatus === "syncing" ? "animate-spin" : ""}`}>
-              {syncStatus === "syncing" ? "progress_activity" : syncStatus === "synced" ? "check_circle" : "warning"}
-            </span>
-            {syncMeta.label}
-          </span>
-        )}
+        <button
+          type="button"
+          onClick={onSyncToPayments}
+          disabled={isSyncing || !selectedClientId}
+          title={
+            selectedClientId
+              ? "Add this invoice to Payments (or update it if already added) so its amounts count toward the client's outstanding and overdue totals"
+              : "Select a client above to enable syncing"
+          }
+          className="flex items-center gap-1.5 rounded bg-emerald-600 px-3 py-1.5 text-[12px] font-semibold tracking-wide hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-white/60 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          <span className={`material-symbols-outlined text-[16px] ${isSyncing ? "animate-spin" : ""}`}>{isSyncing ? "progress_activity" : "sync"}</span>
+          {isSyncing ? "Syncing…" : "Sync to Payments"}
+        </button>
       </div>
+
+      {(syncStatus === "synced" || syncStatus === "error") && syncMessage && (
+        <div className={`border-t border-white/10 ${syncStatus === "synced" ? "bg-emerald-900/40" : "bg-amber-900/40"}`}>
+          <div className="mx-auto flex max-w-[210mm] items-center gap-2 px-5 py-1.5 text-[12px]">
+            <span className={`material-symbols-outlined text-[16px] ${syncStatus === "synced" ? "text-emerald-300" : "text-amber-300"}`}>
+              {syncStatus === "synced" ? "check_circle" : "warning"}
+            </span>
+            <span className="text-white/90">{syncMessage}</span>
+            {syncStatus === "synced" && (
+              <Link href="/payments" className="ml-auto font-semibold text-emerald-300 underline-offset-2 hover:underline">
+                View in Payments →
+              </Link>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -148,7 +148,7 @@ export default function InvoiceBuilder() {
   const balance = totals.grand - (advancePaid || 0);
   const amountInWords = numberToIndianWords(totals.grand);
 
-  const { isSavingPdf, isSavingToDrive, isSharing, syncStatus, syncError, handleSavePdf, handleSaveToDrive, handleSendWhatsApp, handleSendEmail } =
+  const { isSavingPdf, isSavingToDrive, isSharing, syncStatus, syncMessage, handleSyncToPayments, handleSavePdf, handleSaveToDrive, handleSendWhatsApp, handleSendEmail } =
     useInvoiceActions({
       invoiceSheetRef,
       reportPageRefs,
@@ -160,6 +160,7 @@ export default function InvoiceBuilder() {
       rows,
       discount: totals.discount,
       gstRate: gstMode === "none" ? 0 : gstRate,
+      roundOff,
       selectedClientId,
       selectedClient,
     });
@@ -186,7 +187,8 @@ export default function InvoiceBuilder() {
         onSendWhatsApp={handleSendWhatsApp}
         onSendEmail={handleSendEmail}
         syncStatus={syncStatus}
-        syncError={syncError}
+        syncMessage={syncMessage}
+        onSyncToPayments={handleSyncToPayments}
       />
 
       <main className="my-8 overflow-x-auto">
