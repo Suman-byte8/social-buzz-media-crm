@@ -279,10 +279,33 @@ export async function getOverviewTotals(models, { dateFrom, dateTo } = {}) {
   const totalRefunded = await models.Refund.sum("amountPaise");
   const advanceBalance = Math.max(parseInt(advanceRow[0]?.unallocated || 0, 10) - (totalRefunded || 0), 0);
 
+  // Simple per-client math shown on the Payments page: each client is either
+  // in Due (invoiced > received) or in Advance (received > invoiced). Summed
+  // per client so one client's advance never hides another client's due.
+  const perClient = await models.Invoice.sequelize.query(
+    `SELECT COALESCE(SUM(GREATEST(b - c, 0)), 0) AS "due", COALESCE(SUM(GREATEST(c - b, 0)), 0) AS "advance"
+     FROM (
+       SELECT cid, SUM(b) AS b, SUM(c) AS c FROM (
+         SELECT "clientId" AS cid, "totalPaise" AS b, 0 AS c FROM invoices
+         WHERE status <> 'void'
+           AND (CAST(:dateFrom AS DATE) IS NULL OR "invoiceDate" >= CAST(:dateFrom AS DATE))
+           AND (CAST(:dateTo AS DATE) IS NULL OR "invoiceDate" <= CAST(:dateTo AS DATE))
+         UNION ALL
+         SELECT "clientId", 0, "amountPaise" FROM payments
+         WHERE status = 'confirmed'
+           AND (CAST(:dateFrom AS DATE) IS NULL OR "paymentDate" >= CAST(:dateFrom AS DATE))
+           AND (CAST(:dateTo AS DATE) IS NULL OR "paymentDate" <= CAST(:dateTo AS DATE))
+       ) x GROUP BY cid
+     ) t`,
+    { type: QueryTypes.SELECT, replacements: { dateFrom: dateFrom || null, dateTo: dateTo || null } }
+  );
+
   return {
     totalClients,
     totalBilled: totalBilled || 0,
     totalCollected: totalCollected || 0,
+    simpleDue: parseInt(perClient[0]?.due || 0, 10),
+    simpleAdvance: parseInt(perClient[0]?.advance || 0, 10),
     totalOutstanding,
     overdueAmount,
     advanceBalance,

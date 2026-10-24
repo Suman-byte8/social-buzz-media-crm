@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import RequireAdmin from "@/components/auth/RequireAdmin";
-import MetricsGrid from "@/components/dashboard/MetricsGrid";
+import ClientFinancialProfile, { KpiCard } from "@/components/payments/ClientFinancialProfile";
 import PaymentsFilters from "@/components/payments/PaymentsFilters";
 import ClientPaymentsTable from "@/components/payments/ClientPaymentsTable";
 import ClientPaymentDrawer from "@/components/payments/ClientPaymentDrawer";
@@ -57,6 +57,8 @@ export default function PaymentsPage() {
   const [sortDir, setSortDir] = useState("ASC");
   const [page, setPage] = useState(1);
 
+  const [selectedClient, setSelectedClient] = useState(null); // { id, name } — swaps the top section to that client's figures
+  const [profileReloadKey, setProfileReloadKey] = useState(0);
   const [drawerClientId, setDrawerClientId] = useState(null);
   const [drawerOptions, setDrawerOptions] = useState({});
   const [quickPaymentClient, setQuickPaymentClient] = useState(null);
@@ -88,6 +90,7 @@ export default function PaymentsPage() {
     invalidatePaymentsCaches();
     dispatch(fetchClientPayments(tableParams));
     dispatch(fetchPaymentsOverview({ dateFrom, dateTo }));
+    setProfileReloadKey((k) => k + 1);
   };
 
   const periodLabel = month && month !== "custom" ? new Date(`${month}-01T00:00:00`).toLocaleDateString("en-IN", { month: "long", year: "numeric" }) : dateFrom || dateTo ? "Selected range" : null;
@@ -107,17 +110,17 @@ export default function PaymentsPage() {
     setDrawerOptions(options);
   };
 
-  const metrics = overview
-    ? [
-        { title: "Total Clients", value: String(overview.totalClients), icon: "group" },
-        { title: "Total Billed", value: formatRupees(overview.totalBilled), icon: "receipt_long", change: periodLabel || "All time", changeType: "neutral" },
-        { title: "Total Collected", value: formatRupees(overview.totalCollected), icon: "payments", change: periodLabel || "All time", changeType: "neutral" },
-        { title: "Outstanding", value: formatRupees(overview.totalOutstanding), icon: "pending_actions" },
-        { title: "Overdue", value: formatRupees(overview.overdueAmount), icon: "warning", changeType: overview.overdueAmount > 0 ? "negative" : "neutral" },
-        { title: "Advance Balance", value: formatRupees(overview.advanceBalance), icon: "account_balance_wallet" },
-        { title: "Net Receivable", value: formatRupees(overview.netReceivable), icon: "trending_up" },
-      ]
-    : [];
+  const selectClient = (row) => {
+    setSelectedClient({ id: row.id, name: row.name });
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const period = periodLabel || "All time";
+  // Kept deliberately simple: Due = Invoiced − Received (never below zero).
+  // Summed per client on the server; Advance = Received − Invoiced for clients who overpaid.
+  const totalDue = overview?.simpleDue ?? 0;
+  const totalAdvance = overview?.simpleAdvance ?? 0;
+  const collectionRate = overview?.totalBilled ? Math.round((Math.min(overview.totalCollected, overview.totalBilled) / overview.totalBilled) * 1000) / 10 : 0;
 
   return (
     <RequireAdmin>
@@ -148,9 +151,44 @@ export default function PaymentsPage() {
           </div>
         </div>
 
-        <div className="mb-6">
-          <MetricsGrid metrics={metrics} loading={loadingOverview} />
-        </div>
+        {selectedClient ? (
+          <ClientFinancialProfile
+            clientId={selectedClient.id}
+            reloadKey={profileReloadKey}
+            onClose={() => setSelectedClient(null)}
+            onOpenDrawer={(options) => openDrawer(selectedClient, options)}
+            onRecordPayment={() => setQuickPaymentClient(selectedClient)}
+          />
+        ) : (
+          <div className="mb-6 space-y-3">
+            {loadingOverview && !overview ? (
+              <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-3">
+                {Array.from({ length: 7 }).map((_, i) => <div key={i} className="h-[104px] rounded-xl bg-surface-variant animate-pulse" />)}
+              </div>
+            ) : overview ? (
+              <>
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                  <KpiCard label="Clients" icon="group" value={String(overview.totalClients)} sub="Select a client below for their figures" />
+                  <KpiCard label="Total Invoiced" icon="receipt_long" value={formatRupees(overview.totalBilled)} sub={period} />
+                  <KpiCard label="Received" icon="check_circle" value={formatRupees(overview.totalCollected)} sub={period} />
+                  <KpiCard label="Due" icon="error" tone={totalDue > 0 ? "danger" : "default"} value={formatRupees(totalDue)} sub="Invoiced − Received" />
+                  <KpiCard label="Advance Paid" icon="account_balance_wallet" tone={totalAdvance > 0 ? "accent" : "default"} value={formatRupees(totalAdvance)} sub="Received − Invoiced" />
+                </div>
+                <div className="bg-white rounded-xl border border-outline-variant shadow-card p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-sm font-semibold text-on-surface">Collection rate · {period}</p>
+                    <span className="px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 text-[11px] font-semibold">{collectionRate}% collected</span>
+                  </div>
+                  <div className="h-3 w-full rounded-full bg-red-200 overflow-hidden"><div className="h-full bg-indigo-600" style={{ width: `${collectionRate}%` }} /></div>
+                  <div className="mt-2 flex flex-wrap justify-between gap-2 text-[12px] text-on-surface-variant">
+                    <span>Received {formatRupees(overview.totalCollected)} of {formatRupees(overview.totalBilled)} invoiced</span>
+                    <span>Due {formatRupees(totalDue)}</span>
+                  </div>
+                </div>
+              </>
+            ) : null}
+          </div>
+        )}
 
         <PaymentsFilters
           search={search}
@@ -171,7 +209,7 @@ export default function PaymentsPage() {
           sortBy={sortBy}
           sortDir={sortDir}
           onSort={handleSort}
-          onSelectClient={(row) => openDrawer(row)}
+          onSelectClient={selectClient}
           onRecordPayment={(row) => setQuickPaymentClient(row)}
           onNewInvoice={(row) => openDrawer(row, { initialTab: "Invoices", autoAddInvoice: true })}
         />

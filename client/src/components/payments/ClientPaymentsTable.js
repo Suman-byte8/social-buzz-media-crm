@@ -15,11 +15,11 @@ const STATUS_META = {
 
 const SORTABLE_COLUMNS = [
   { key: "name", label: "Client" },
-  { key: "totalBilled", label: "Billed" },
-  { key: "totalOutstanding", label: "Outstanding" },
-  { key: "totalOverdue", label: "Overdue" },
-  { key: "advanceBalance", label: "Advance" },
+  { key: "totalBilled", label: "Invoiced" },
 ];
+
+const dueOf = (row) => Math.max((row.totalBilled || 0) - (row.totalCollected || 0), 0);
+const advanceOf = (row) => Math.max((row.totalCollected || 0) - (row.totalBilled || 0), 0);
 
 function SortableHeader({ column, sortBy, sortDir, onSort }) {
   const active = sortBy === column.key;
@@ -44,12 +44,12 @@ export default function ClientPaymentsTable({ rows, loading, sortBy, sortDir, on
     <div className="bg-white rounded-b-xl border border-outline-variant shadow-card overflow-hidden">
       <table className="w-full text-left border-collapse table-fixed">
         <colgroup>
-          <col className="w-[22%]" />
+          <col className="w-[24%]" />
           <col className="w-[13%]" />
           <col className="w-[13%]" />
           <col className="w-[13%]" />
           <col className="w-[13%]" />
-          <col className="w-[14%]" />
+          <col className="w-[12%]" />
           <col className="w-[12%]" />
         </colgroup>
         <thead>
@@ -57,6 +57,9 @@ export default function ClientPaymentsTable({ rows, loading, sortBy, sortDir, on
             {SORTABLE_COLUMNS.map((col) => (
               <SortableHeader key={col.key} column={col} sortBy={sortBy} sortDir={sortDir} onSort={onSort} />
             ))}
+            <th className="py-3 px-4 font-label-sm text-label-sm text-secondary uppercase tracking-wider">Received</th>
+            <th className="py-3 px-4 font-label-sm text-label-sm text-secondary uppercase tracking-wider">Due</th>
+            <th className="py-3 px-4 font-label-sm text-label-sm text-secondary uppercase tracking-wider">Advance</th>
             <th className="py-3 px-4 font-label-sm text-label-sm text-secondary uppercase tracking-wider">Status</th>
             <th className="py-3 px-4 font-label-sm text-label-sm text-secondary uppercase tracking-wider text-right">Actions</th>
           </tr>
@@ -88,22 +91,15 @@ export default function ClientPaymentsTable({ rows, loading, sortBy, sortDir, on
                     </button>
                   </td>
                   <td className="py-4 px-4 text-on-surface whitespace-nowrap">{formatRupees(row.totalBilled)}</td>
+                  <td className="py-4 px-4 whitespace-nowrap text-emerald-700">{formatRupees(row.totalCollected)}</td>
                   <td className="py-4 px-4 whitespace-nowrap">
-                    <span className={row.totalOutstanding > 0 ? "text-on-surface font-medium" : "text-secondary"}>{formatRupees(row.totalOutstanding)}</span>
+                    <span className={dueOf(row) > 0 ? "text-red-700 font-medium" : "text-secondary"}>{formatRupees(dueOf(row))}</span>
                   </td>
                   <td className="py-4 px-4 whitespace-nowrap">
-                    <span className={row.totalOverdue > 0 ? "text-red-700 font-medium" : "text-secondary"}>{formatRupees(row.totalOverdue)}</span>
-                  </td>
-                  <td className="py-4 px-4 whitespace-nowrap">
-                    <span className={row.advanceBalance > 0 ? "text-emerald-700 font-medium" : "text-secondary"}>{formatRupees(row.advanceBalance)}</span>
+                    <span className={advanceOf(row) > 0 ? "text-indigo-700 font-medium" : "text-secondary"}>{formatRupees(advanceOf(row))}</span>
                   </td>
                   <td className="py-4 px-4">
-                    <div className="flex flex-wrap items-center gap-1">
-                      <StatusBadge status={row.status?.primary} color={meta.color} showDot />
-                      {row.status?.hasAdvance && row.status?.primary !== "Overdue" && (
-                        <span title="Has available advance credit" className="material-symbols-outlined text-[16px] text-emerald-600">account_balance_wallet</span>
-                      )}
-                    </div>
+                    <StatusBadge status={row.status?.primary} color={meta.color} showDot />
                   </td>
                   <td className="py-4 px-4 text-right">
                     <ActionsMenu
