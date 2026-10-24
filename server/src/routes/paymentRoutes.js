@@ -398,6 +398,24 @@ router.get("/invoices/outstanding", async (req, res) => {
   }
 });
 
+// A non-transactional peek at the next sequential invoice number, for a
+// caller (the Invoice Builder) that wants to show a real, properly-
+// formatted number before the invoice itself actually exists yet. It's a
+// suggestion, not a reservation — POST /invoices still assigns the
+// authoritative number transactionally at creation time, and gracefully
+// handles the rare case where this peeked number was taken in the meantime.
+// Must stay registered above GET /invoices/:id, or Express matches
+// "next-number" as an :id.
+router.get("/invoices/next-number", async (req, res) => {
+  try {
+    const { Invoice } = req.app.locals.models;
+    const invoiceNumber = await generateInvoiceNumber(Invoice, null);
+    res.json({ success: true, data: { invoiceNumber } });
+  } catch (error) {
+    res.status(500).json({ success: false, message: "Error generating invoice number", error: error.message });
+  }
+});
+
 router.get("/invoices/:id", async (req, res) => {
   try {
     const { Invoice, Client, InvoiceLineItem } = req.app.locals.models;
@@ -414,27 +432,9 @@ router.get("/invoices/:id", async (req, res) => {
   }
 });
 
-// Creates a draft invoice — manual (clientId + lineItems supplied directly)
-// or seeded from the client's billing config when billingConfigId is given
-// and lineItems is omitted. Always starts as "draft"; POST .../issue is a
-// separate, explicit step.
-// A non-transactional peek at the next sequential invoice number, for a
-// caller (the Invoice Builder) that wants to show a real, properly-
-// formatted number before the invoice itself actually exists yet. It's a
-// suggestion, not a reservation — POST /invoices still assigns the
-// authoritative number transactionally at creation time, and gracefully
-// handles the rare case where this peeked number was taken in the meantime
-// (see its own duplicate-number handling below).
-router.get("/invoices/next-number", async (req, res) => {
-  try {
-    const { Invoice } = req.app.locals.models;
-    const invoiceNumber = await generateInvoiceNumber(Invoice, null);
-    res.json({ success: true, data: { invoiceNumber } });
-  } catch (error) {
-    res.status(500).json({ success: false, message: "Error generating invoice number", error: error.message });
-  }
-});
-
+// Creates an invoice — manual (clientId + lineItems supplied directly) or
+// seeded from the client's billing config when billingConfigId is given and
+// lineItems is omitted. Starts as "draft" unless issueImmediately is set.
 router.post("/invoices", async (req, res) => {
   try {
     const { Invoice, InvoiceLineItem, Client, ClientBillingConfig, ClientBillingPlanItem } = req.app.locals.models;
