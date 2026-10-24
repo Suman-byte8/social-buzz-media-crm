@@ -61,11 +61,18 @@ const documentModel = (sequelize) => {
       // to its editable Proposal draft; a manually-uploaded proposal (the
       // pre-existing /proposals/upload flow) leaves this null.
       proposalId: { type: DataTypes.INTEGER, allowNull: true },
+      // Soft reference (no FK constraint, same as agreementId/proposalId) —
+      // only set when this Document is an exported Payment Management
+      // invoice PDF or payment receipt PDF (see paymentRoutes.js's export
+      // endpoints). Distinct from the older, unrelated documentType
+      // "invoice" used by the client-side-only Invoice Builder, which never
+      // sets this column.
+      invoiceId: { type: DataTypes.INTEGER, allowNull: true },
       uploadedBy: { type: DataTypes.STRING, allowNull: true },
       description: { type: DataTypes.TEXT, allowNull: true },
       // Agreement-specific fields
       documentType: {
-        type: DataTypes.ENUM("agreement", "proposal", "invoice", "report", "content_calendar", "brand_kit", "creative", "strategy", "lead", "note", "salary_slip", "report_asset", "other"),
+        type: DataTypes.ENUM("agreement", "proposal", "invoice", "invoice_record", "payment_receipt", "report", "content_calendar", "brand_kit", "creative", "strategy", "lead", "note", "salary_slip", "report_asset", "other"),
         allowNull: true,
         defaultValue: "other",
       },
@@ -97,6 +104,7 @@ const documentModel = (sequelize) => {
         { fields: ["reportId"] },
         { fields: ["agreementId"] },
         { fields: ["proposalId"] },
+        { fields: ["invoiceId"] },
         { fields: ["documentType"] },
         { fields: ["status"] },
       ],

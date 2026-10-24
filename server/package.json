@@ -24,6 +24,7 @@
     "migrate:report-builder-columns": "node scripts/add-report-builder-columns.js",
     "migrate:agreement-builder-columns": "node scripts/add-agreement-builder-columns.js",
     "migrate:proposal-builder-columns": "node scripts/add-proposal-builder-columns.js",
+    "migrate:payment-management-columns": "node scripts/add-payment-management-columns.js",
     "seed:users": "node scripts/seed-users.js",
     "seed:services": "node scripts/seed-services.js"
   },

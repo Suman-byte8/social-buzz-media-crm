@@ -22,6 +22,15 @@ import proposalModel from "./Proposal.js";
 import proposalTemplateModel from "./ProposalTemplate.js";
 import proposalVersionModel from "./ProposalVersion.js";
 import proposalActivityLogModel from "./ProposalActivityLog.js";
+import invoiceModel from "./Invoice.js";
+import invoiceLineItemModel from "./InvoiceLineItem.js";
+import clientBillingConfigModel from "./ClientBillingConfig.js";
+import clientBillingPlanItemModel from "./ClientBillingPlanItem.js";
+import paymentModel from "./Payment.js";
+import paymentAllocationModel from "./PaymentAllocation.js";
+import refundModel from "./Refund.js";
+import paymentReminderModel from "./PaymentReminder.js";
+import paymentActivityLogModel from "./PaymentActivityLog.js";
 
 export const initModels = (sequelize) => {
   const Client = clientModel(sequelize, DataTypes);
@@ -47,6 +56,15 @@ export const initModels = (sequelize) => {
   const ProposalTemplate = proposalTemplateModel(sequelize, DataTypes);
   const ProposalVersion = proposalVersionModel(sequelize, DataTypes);
   const ProposalActivityLog = proposalActivityLogModel(sequelize, DataTypes);
+  const Invoice = invoiceModel(sequelize, DataTypes);
+  const InvoiceLineItem = invoiceLineItemModel(sequelize, DataTypes);
+  const ClientBillingConfig = clientBillingConfigModel(sequelize, DataTypes);
+  const ClientBillingPlanItem = clientBillingPlanItemModel(sequelize, DataTypes);
+  const Payment = paymentModel(sequelize, DataTypes);
+  const PaymentAllocation = paymentAllocationModel(sequelize, DataTypes);
+  const Refund = refundModel(sequelize, DataTypes);
+  const PaymentReminder = paymentReminderModel(sequelize, DataTypes);
+  const PaymentActivityLog = paymentActivityLogModel(sequelize, DataTypes);
 
   Client.hasMany(Document, { foreignKey: "clientId", as: "documents" });
   Document.belongsTo(Client, { foreignKey: "clientId", as: "client" });
@@ -151,6 +169,57 @@ export const initModels = (sequelize) => {
   Proposal.hasMany(ProposalActivityLog, { foreignKey: "proposalId", as: "activityLogs", constraints: false });
   ProposalActivityLog.belongsTo(Proposal, { foreignKey: "proposalId", as: "proposal", constraints: false });
 
+  // ── Payment Management ──────────────────────────────────────────────
+  // Aliased "invoiceRecords" rather than "invoices" — Client already has a
+  // real `invoices` TEXT column (a legacy free-text tag field, unrelated to
+  // this module), same collision already solved for `proposals`/`reports`.
+  Client.hasMany(Invoice, { foreignKey: "clientId", as: "invoiceRecords" });
+  Invoice.belongsTo(Client, { foreignKey: "clientId", as: "client" });
+
+  Invoice.hasMany(InvoiceLineItem, { foreignKey: "invoiceId", as: "lineItems" });
+  InvoiceLineItem.belongsTo(Invoice, { foreignKey: "invoiceId", as: "invoice" });
+
+  // 1:1 — ClientBillingConfig.clientId is unique at the DB level.
+  Client.hasOne(ClientBillingConfig, { foreignKey: "clientId", as: "billingConfig" });
+  ClientBillingConfig.belongsTo(Client, { foreignKey: "clientId", as: "client" });
+
+  ClientBillingConfig.hasMany(ClientBillingPlanItem, { foreignKey: "billingConfigId", as: "planItems" });
+  ClientBillingPlanItem.belongsTo(ClientBillingConfig, { foreignKey: "billingConfigId", as: "billingConfig" });
+
+  // Soft reference — an invoice generated from a recurring plan carries
+  // billingConfigId; an ad-hoc invoice leaves it null.
+  ClientBillingConfig.hasMany(Invoice, { foreignKey: "billingConfigId", as: "invoices", constraints: false });
+  Invoice.belongsTo(ClientBillingConfig, { foreignKey: "billingConfigId", as: "billingConfig", constraints: false });
+
+  Client.hasMany(Payment, { foreignKey: "clientId", as: "payments" });
+  Payment.belongsTo(Client, { foreignKey: "clientId", as: "client" });
+
+  Payment.hasMany(PaymentAllocation, { foreignKey: "paymentId", as: "allocations" });
+  PaymentAllocation.belongsTo(Payment, { foreignKey: "paymentId", as: "payment" });
+
+  // Soft reference — invoiceId is null for an unallocated (advance) slice.
+  Invoice.hasMany(PaymentAllocation, { foreignKey: "invoiceId", as: "allocations", constraints: false });
+  PaymentAllocation.belongsTo(Invoice, { foreignKey: "invoiceId", as: "invoice", constraints: false });
+
+  Payment.belongsTo(Document, { foreignKey: "attachmentDocumentId", as: "attachment", constraints: false });
+
+  Client.hasMany(Refund, { foreignKey: "clientId", as: "refunds" });
+  Refund.belongsTo(Client, { foreignKey: "clientId", as: "client" });
+  Refund.belongsTo(Payment, { foreignKey: "relatedPaymentId", as: "relatedPayment", constraints: false });
+
+  Client.hasMany(PaymentReminder, { foreignKey: "clientId", as: "paymentReminders" });
+  PaymentReminder.belongsTo(Client, { foreignKey: "clientId", as: "client" });
+  Invoice.hasMany(PaymentReminder, { foreignKey: "invoiceId", as: "reminders" });
+  PaymentReminder.belongsTo(Invoice, { foreignKey: "invoiceId", as: "invoice" });
+
+  Client.hasMany(PaymentActivityLog, { foreignKey: "clientId", as: "paymentActivityLogs", constraints: false });
+  PaymentActivityLog.belongsTo(Client, { foreignKey: "clientId", as: "client", constraints: false });
+
+  // An exported invoice/receipt PDF is an ordinary Document row (same
+  // "export creates a new Document" pattern Agreement/Proposal exports use).
+  Invoice.hasMany(Document, { foreignKey: "invoiceId", as: "exports", constraints: false });
+  Document.belongsTo(Invoice, { foreignKey: "invoiceId", as: "invoiceRecord", constraints: false });
+
   return {
     Client,
     TeamMember,
@@ -175,5 +244,14 @@ export const initModels = (sequelize) => {
     ProposalTemplate,
     ProposalVersion,
     ProposalActivityLog,
+    Invoice,
+    InvoiceLineItem,
+    ClientBillingConfig,
+    ClientBillingPlanItem,
+    Payment,
+    PaymentAllocation,
+    Refund,
+    PaymentReminder,
+    PaymentActivityLog,
   };
 };

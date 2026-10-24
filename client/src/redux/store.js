@@ -13,6 +13,7 @@ import servicesReducer from './slices/servicesSlice';
 import reportsReducer from './slices/reportsSlice';
 import agreementsReducer from './slices/agreementsSlice';
 import proposalsReducer from './slices/proposalsSlice';
+import paymentsReducer from './slices/paymentsSlice';
 
 export const store = configureStore({
   reducer: {
@@ -30,6 +31,7 @@ export const store = configureStore({
     reports: reportsReducer,
     agreements: agreementsReducer,
     proposals: proposalsReducer,
+    payments: paymentsReducer,
   },
   devTools: process.env.NODE_ENV !== 'production',
 });
