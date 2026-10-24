@@ -2,6 +2,7 @@
 
 import React from "react";
 import StatusBadge from "@/components/ui/StatusBadge";
+import ActionsMenu from "./ActionsMenu";
 import { formatRupees } from "@/lib/formatCurrency";
 
 const STATUS_META = {
@@ -12,13 +13,33 @@ const STATUS_META = {
   "No Billing Configured": { color: "gray" },
 };
 
-const formatDate = (dateStr) => {
-  if (!dateStr) return "—";
-  return new Date(dateStr).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-};
+const SORTABLE_COLUMNS = [
+  { key: "name", label: "Client" },
+  { key: "totalBilled", label: "Billed" },
+  { key: "totalOutstanding", label: "Outstanding" },
+  { key: "totalOverdue", label: "Overdue" },
+  { key: "advanceBalance", label: "Advance" },
+];
 
-// Mirrors agreements/AgreementsTable.js's table-with-row-actions shape.
-export default function ClientPaymentsTable({ rows, loading, onSelectClient, onRecordPayment, onCreateInvoice }) {
+function SortableHeader({ column, sortBy, sortDir, onSort }) {
+  const active = sortBy === column.key;
+  return (
+    <th className="py-3 px-4 font-label-sm text-label-sm text-secondary uppercase tracking-wider">
+      <button type="button" onClick={() => onSort(column.key)} className="flex items-center gap-0.5 hover:text-on-surface">
+        {column.label}
+        <span className={`material-symbols-outlined text-[16px] ${active ? "text-primary" : "text-transparent"}`}>
+          {active && sortDir === "DESC" ? "arrow_downward" : "arrow_upward"}
+        </span>
+      </button>
+    </th>
+  );
+}
+
+// Row actions are a single labeled "Actions" menu (see ActionsMenu.js)
+// instead of a row of bare icon buttons — unambiguous without hovering for
+// a tooltip. Invoice creation lives inside the client's own drawer
+// (Invoices tab) now, not a separate quick-create here.
+export default function ClientPaymentsTable({ rows, loading, sortBy, sortDir, onSort, onSelectClient, onRecordPayment, onNewInvoice }) {
   return (
     <div className="bg-white rounded-b-xl border border-outline-variant shadow-card overflow-hidden">
       <table className="w-full text-left border-collapse table-fixed">
@@ -33,11 +54,9 @@ export default function ClientPaymentsTable({ rows, loading, onSelectClient, onR
         </colgroup>
         <thead>
           <tr className="bg-[#FAFAFA] border-b border-[#F0F0F0]">
-            <th className="py-3 px-4 font-label-sm text-label-sm text-secondary uppercase tracking-wider">Client</th>
-            <th className="py-3 px-4 font-label-sm text-label-sm text-secondary uppercase tracking-wider">Billed</th>
-            <th className="py-3 px-4 font-label-sm text-label-sm text-secondary uppercase tracking-wider">Outstanding</th>
-            <th className="py-3 px-4 font-label-sm text-label-sm text-secondary uppercase tracking-wider">Overdue</th>
-            <th className="py-3 px-4 font-label-sm text-label-sm text-secondary uppercase tracking-wider">Advance</th>
+            {SORTABLE_COLUMNS.map((col) => (
+              <SortableHeader key={col.key} column={col} sortBy={sortBy} sortDir={sortDir} onSort={onSort} />
+            ))}
             <th className="py-3 px-4 font-label-sm text-label-sm text-secondary uppercase tracking-wider">Status</th>
             <th className="py-3 px-4 font-label-sm text-label-sm text-secondary uppercase tracking-wider text-right">Actions</th>
           </tr>
@@ -61,7 +80,7 @@ export default function ClientPaymentsTable({ rows, loading, onSelectClient, onR
             rows.map((row) => {
               const meta = STATUS_META[row.status?.primary] || { color: "gray" };
               return (
-                <tr key={row.id} className="border-b border-[#F0F0F0] hover:bg-[#F9F9F9] transition-colors group">
+                <tr key={row.id} className="border-b border-[#F0F0F0] hover:bg-[#F9F9F9] transition-colors">
                   <td className="py-4 px-4 overflow-hidden">
                     <button type="button" onClick={() => onSelectClient(row)} className="text-left">
                       <p className="font-title-md text-title-md text-on-surface hover:text-primary transition-colors truncate">{row.name}</p>
@@ -87,17 +106,13 @@ export default function ClientPaymentsTable({ rows, loading, onSelectClient, onR
                     </div>
                   </td>
                   <td className="py-4 px-4 text-right">
-                    <div className="flex flex-wrap items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button onClick={() => onRecordPayment(row)} className="p-1.5 text-secondary hover:text-primary hover:bg-gray-100 rounded transition-colors" title="Record Payment">
-                        <span className="material-symbols-outlined text-[20px]">add_card</span>
-                      </button>
-                      <button onClick={() => onCreateInvoice(row)} className="p-1.5 text-secondary hover:text-primary hover:bg-gray-100 rounded transition-colors" title="Create Invoice">
-                        <span className="material-symbols-outlined text-[20px]">receipt_long</span>
-                      </button>
-                      <button onClick={() => onSelectClient(row)} className="p-1.5 text-secondary hover:text-primary hover:bg-gray-100 rounded transition-colors" title="View Details">
-                        <span className="material-symbols-outlined text-[20px]">visibility</span>
-                      </button>
-                    </div>
+                    <ActionsMenu
+                      items={[
+                        { label: "View Details", icon: "visibility", onClick: () => onSelectClient(row) },
+                        { label: "Record Payment", icon: "add_card", onClick: () => onRecordPayment(row) },
+                        { label: "New Invoice", icon: "receipt_long", onClick: () => onNewInvoice(row) },
+                      ]}
+                    />
                   </td>
                 </tr>
               );

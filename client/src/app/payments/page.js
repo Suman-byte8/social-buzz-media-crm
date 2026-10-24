@@ -7,7 +7,6 @@ import MetricsGrid from "@/components/dashboard/MetricsGrid";
 import PaymentsFilters from "@/components/payments/PaymentsFilters";
 import ClientPaymentsTable from "@/components/payments/ClientPaymentsTable";
 import ClientPaymentDrawer from "@/components/payments/ClientPaymentDrawer";
-import InvoiceFormModal from "@/components/payments/InvoiceFormModal";
 import RecordPaymentModal from "@/components/payments/RecordPaymentModal";
 import RecurringBillingPanel from "@/components/payments/RecurringBillingPanel";
 import PaymentsReportsPanel from "@/components/payments/PaymentsReportsPanel";
@@ -25,10 +24,12 @@ export default function PaymentsPage() {
   const [status, setStatus] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+  const [sortBy, setSortBy] = useState("name");
+  const [sortDir, setSortDir] = useState("ASC");
   const [page, setPage] = useState(1);
 
-  const [selectedClientId, setSelectedClientId] = useState(null);
-  const [quickInvoiceClient, setQuickInvoiceClient] = useState(null);
+  const [drawerClientId, setDrawerClientId] = useState(null);
+  const [drawerOptions, setDrawerOptions] = useState({});
   const [quickPaymentClient, setQuickPaymentClient] = useState(null);
   const [recurringOpen, setRecurringOpen] = useState(false);
   const [reportsOpen, setReportsOpen] = useState(false);
@@ -39,14 +40,29 @@ export default function PaymentsPage() {
   }, [dateFrom, dateTo]);
 
   useEffect(() => {
-    dispatch(fetchClientPayments({ search: search || undefined, status: status || undefined, page, limit: LIMIT }));
+    dispatch(fetchClientPayments({ search: search || undefined, status: status || undefined, sortBy, sortDir, page, limit: LIMIT }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search, status, page]);
+  }, [search, status, sortBy, sortDir, page]);
 
   const refreshTable = () => {
     invalidatePaymentsCaches();
-    dispatch(fetchClientPayments({ search: search || undefined, status: status || undefined, page, limit: LIMIT }));
+    dispatch(fetchClientPayments({ search: search || undefined, status: status || undefined, sortBy, sortDir, page, limit: LIMIT }));
     dispatch(fetchPaymentsOverview({ dateFrom, dateTo }));
+  };
+
+  const handleSort = (column) => {
+    if (sortBy === column) {
+      setSortDir((d) => (d === "ASC" ? "DESC" : "ASC"));
+    } else {
+      setSortBy(column);
+      setSortDir("DESC");
+    }
+    setPage(1);
+  };
+
+  const openDrawer = (row, options = {}) => {
+    setDrawerClientId(row.id);
+    setDrawerOptions(options);
   };
 
   const metrics = overview
@@ -99,25 +115,29 @@ export default function PaymentsPage() {
         <ClientPaymentsTable
           rows={clients}
           loading={loadingClients}
-          onSelectClient={(row) => setSelectedClientId(row.id)}
+          sortBy={sortBy}
+          sortDir={sortDir}
+          onSort={handleSort}
+          onSelectClient={(row) => openDrawer(row)}
           onRecordPayment={(row) => setQuickPaymentClient(row)}
-          onCreateInvoice={(row) => setQuickInvoiceClient(row)}
+          onNewInvoice={(row) => openDrawer(row, { initialTab: "Invoices", autoAddInvoice: true })}
         />
 
         <Pagination page={page} limit={LIMIT} totalItems={pagination.total} totalPages={pagination.totalPages} loading={loadingClients} onPageChange={setPage} />
       </main>
 
-      {selectedClientId && <ClientPaymentDrawer clientId={selectedClientId} onClose={() => setSelectedClientId(null)} />}
-
-      {quickInvoiceClient && (
-        <InvoiceFormModal
-          clientId={quickInvoiceClient.id}
-          clientName={quickInvoiceClient.name}
-          billingConfig={quickInvoiceClient.billingConfig}
-          onClose={() => setQuickInvoiceClient(null)}
-          onCreated={refreshTable}
+      {drawerClientId && (
+        <ClientPaymentDrawer
+          clientId={drawerClientId}
+          initialTab={drawerOptions.initialTab}
+          autoAddInvoice={drawerOptions.autoAddInvoice}
+          onClose={() => {
+            setDrawerClientId(null);
+            setDrawerOptions({});
+          }}
         />
       )}
+
       {quickPaymentClient && (
         <RecordPaymentModal clientId={quickPaymentClient.id} clientName={quickPaymentClient.name} onClose={() => setQuickPaymentClient(null)} onRecorded={refreshTable} />
       )}

@@ -5,14 +5,16 @@ import { useDispatch, useSelector } from "react-redux";
 import { fetchClientPaymentDetail, clearClientDetail, invalidatePaymentsCaches } from "@/redux/slices/paymentsSlice";
 import { voidInvoice, duplicateInvoice, reversePayment, applyAdvance, exportInvoicePdf, exportReceiptPdf, fetchPaymentActivity, completeReminder } from "@/services/paymentService";
 import { getNodesPdfBlob } from "@/lib/Pdfexport";
-import { formatRupees } from "@/lib/formatCurrency";
+import { formatRupees, rupeesToPaise } from "@/lib/formatCurrency";
 import StatusBadge from "@/components/ui/StatusBadge";
 import BillingConfigPanel from "./BillingConfigPanel";
-import InvoiceFormModal from "./InvoiceFormModal";
+import InlineInvoiceEditor from "./InlineInvoiceEditor";
 import RecordPaymentModal from "./RecordPaymentModal";
 import PaymentReminderComposer from "./PaymentReminderComposer";
 import InvoiceDocument from "./InvoiceDocument";
 import PaymentReceiptDocument from "./PaymentReceiptDocument";
+import ActionsMenu from "./ActionsMenu";
+import PromptModal from "./PromptModal";
 
 const TABS = ["Overview", "Billing Config", "Invoices", "Payments", "Reminders", "Activity"];
 
@@ -25,15 +27,21 @@ const INVOICE_STATUS_META = {
   void: "gray",
 };
 
-export default function ClientPaymentDrawer({ clientId, onClose }) {
+const daysOverdue = (dueDate) => Math.max(Math.floor((new Date() - new Date(dueDate)) / 86400000), 0);
+
+export default function ClientPaymentDrawer({ clientId, initialTab = "Overview", autoAddInvoice = false, onClose }) {
   const dispatch = useDispatch();
   const { clientDetail, loadingClientDetail } = useSelector((s) => s.payments);
-  const [tab, setTab] = useState("Overview");
-  const [invoiceModalOpen, setInvoiceModalOpen] = useState(false);
+  const [tab, setTab] = useState(initialTab);
+  const [addingInvoice, setAddingInvoice] = useState(autoAddInvoice);
+  const [editingInvoiceId, setEditingInvoiceId] = useState(null);
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
   const [reminderInvoiceId, setReminderInvoiceId] = useState(null);
   const [activity, setActivity] = useState([]);
   const [exportTarget, setExportTarget] = useState(null); // { type: "invoice"|"receipt", data }
+  const [voidTarget, setVoidTarget] = useState(null); // invoice
+  const [reverseTarget, setReverseTarget] = useState(null); // payment
+  const [advanceTarget, setAdvanceTarget] = useState(null); // invoice
   const invoiceDocRef = useRef(null);
   const receiptDocRef = useRef(null);
 
@@ -53,53 +61,6 @@ export default function ClientPaymentDrawer({ clientId, onClose }) {
       fetchPaymentActivity(clientId).then((res) => setActivity(res.data || []));
     }
   }, [tab, clientId]);
-
-  const handleVoidInvoice = async (invoice) => {
-    const reason = window.prompt("Reason for voiding this invoice:");
-    if (!reason || !reason.trim()) return;
-    try {
-      await voidInvoice(invoice.id, reason.trim());
-      reload();
-    } catch (err) {
-      window.alert(err.message || "Failed to void invoice");
-    }
-  };
-
-  const handleDuplicateInvoice = async (invoice) => {
-    try {
-      await duplicateInvoice(invoice.id);
-      reload();
-    } catch (err) {
-      window.alert(err.message || "Failed to duplicate invoice");
-    }
-  };
-
-  const handleReversePayment = async (payment) => {
-    const reason = window.prompt("Reason for reversing this payment:");
-    if (!reason || !reason.trim()) return;
-    try {
-      await reversePayment(payment.id, reason.trim());
-      reload();
-    } catch (err) {
-      window.alert(err.message || "Failed to reverse payment");
-    }
-  };
-
-  const handleApplyAdvance = async (invoice) => {
-    const remaining = invoice.totalPaise - invoice.amountPaidPaise;
-    const available = clientDetail?.summary?.advanceBalance || 0;
-    const defaultAmount = (Math.min(remaining, available) / 100).toFixed(2);
-    const input = window.prompt(`Apply how much advance (₹) to invoice ${invoice.invoiceNumber}? Available: ${formatRupees(available)}`, defaultAmount);
-    if (!input) return;
-    const amountPaise = Math.round(parseFloat(input) * 100);
-    if (!amountPaise || amountPaise <= 0) return;
-    try {
-      await applyAdvance({ clientId, invoiceId: invoice.id, amountPaise });
-      reload();
-    } catch (err) {
-      window.alert(err.message || "Failed to apply advance");
-    }
-  };
 
   const handleExportInvoice = (invoice) => setExportTarget({ type: "invoice", data: invoice });
   const handleExportReceipt = (payment) => setExportTarget({ type: "receipt", data: payment });
@@ -138,6 +99,11 @@ export default function ClientPaymentDrawer({ clientId, onClose }) {
 
   const client = clientDetail?.client;
   const summary = clientDetail?.summary;
+
+  const goToNewInvoice = () => {
+    setTab("Invoices");
+    setAddingInvoice(true);
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end bg-black/40" onClick={onClose}>
@@ -187,7 +153,7 @@ export default function ClientPaymentDrawer({ clientId, onClose }) {
                     </div>
                   ))}
                   <div className="col-span-2 flex gap-2 pt-2">
-                    <button onClick={() => setInvoiceModalOpen(true)} className="flex-1 rounded-md bg-primary px-4 py-2 text-body-sm font-semibold text-white hover:bg-primary/90">New Invoice</button>
+                    <button onClick={goToNewInvoice} className="flex-1 rounded-md bg-primary px-4 py-2 text-body-sm font-semibold text-white hover:bg-primary/90">New Invoice</button>
                     <button onClick={() => setPaymentModalOpen(true)} className="flex-1 rounded-md border border-outline-variant px-4 py-2 text-body-sm hover:bg-surface-variant">Record Payment</button>
                   </div>
                 </div>
@@ -198,47 +164,64 @@ export default function ClientPaymentDrawer({ clientId, onClose }) {
               )}
 
               {tab === "Invoices" && (
-                <div className="space-y-2">
-                  <button onClick={() => setInvoiceModalOpen(true)} className="mb-2 flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-body-sm font-semibold text-white hover:bg-primary/90">
-                    <span className="material-symbols-outlined text-[16px]">add</span>
-                    New Invoice
-                  </button>
+                <div className="space-y-3">
+                  {!addingInvoice && (
+                    <button onClick={() => setAddingInvoice(true)} className="flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-body-sm font-semibold text-white hover:bg-primary/90">
+                      <span className="material-symbols-outlined text-[16px]">add</span>
+                      New Invoice
+                    </button>
+                  )}
+                  {addingInvoice && (
+                    <InlineInvoiceEditor
+                      clientId={clientId}
+                      billingConfig={client?.billingConfig}
+                      onDone={() => {
+                        setAddingInvoice(false);
+                        reload();
+                      }}
+                      onCancel={() => setAddingInvoice(false)}
+                    />
+                  )}
+
                   {(clientDetail.invoices || []).map((inv) => {
+                    if (editingInvoiceId === inv.id) {
+                      return (
+                        <InlineInvoiceEditor
+                          key={inv.id}
+                          clientId={clientId}
+                          invoiceToEdit={inv}
+                          onDone={() => {
+                            setEditingInvoiceId(null);
+                            reload();
+                          }}
+                          onCancel={() => setEditingInvoiceId(null)}
+                        />
+                      );
+                    }
                     const balance = inv.totalPaise - inv.amountPaidPaise;
+                    const overdueLabel = inv.status === "overdue" ? ` · ${daysOverdue(inv.dueDate)} days overdue` : "";
                     return (
                       <div key={inv.id} className="rounded-lg border border-outline-variant p-3">
                         <div className="flex items-center justify-between">
                           <div>
                             <p className="font-medium text-on-surface">{inv.invoiceNumber}</p>
-                            <p className="text-[11px] text-on-surface-variant">{inv.invoiceDate} · due {inv.dueDate}</p>
+                            <p className="text-[11px] text-on-surface-variant">{inv.invoiceDate} · due {inv.dueDate}{overdueLabel}</p>
                           </div>
                           <StatusBadge status={inv.status.replace("_", " ")} color={INVOICE_STATUS_META[inv.status] || "gray"} showDot />
                         </div>
                         <div className="mt-2 flex items-center justify-between text-body-sm">
                           <span>{formatRupees(inv.totalPaise)} {balance > 0 && <span className="text-on-surface-variant">(Due: {formatRupees(balance)})</span>}</span>
-                          <div className="flex gap-1">
-                            {balance > 0 && summary?.advanceBalance > 0 && (
-                              <button onClick={() => handleApplyAdvance(inv)} className="rounded p-1 text-emerald-700 hover:bg-emerald-50" title="Apply advance">
-                                <span className="material-symbols-outlined text-[18px]">account_balance_wallet</span>
-                              </button>
-                            )}
-                            {balance > 0 && (
-                              <button onClick={() => setReminderInvoiceId(inv.id)} className="rounded p-1 text-on-surface-variant hover:bg-surface-variant" title="Send reminder">
-                                <span className="material-symbols-outlined text-[18px]">notifications</span>
-                              </button>
-                            )}
-                            <button onClick={() => handleExportInvoice(inv)} className="rounded p-1 text-on-surface-variant hover:bg-surface-variant" title="Export PDF">
-                              <span className="material-symbols-outlined text-[18px]">picture_as_pdf</span>
-                            </button>
-                            <button onClick={() => handleDuplicateInvoice(inv)} className="rounded p-1 text-on-surface-variant hover:bg-surface-variant" title="Duplicate as draft">
-                              <span className="material-symbols-outlined text-[18px]">content_copy</span>
-                            </button>
-                            {inv.status !== "void" && (
-                              <button onClick={() => handleVoidInvoice(inv)} className="rounded p-1 text-red-600 hover:bg-red-50" title="Void">
-                                <span className="material-symbols-outlined text-[18px]">block</span>
-                              </button>
-                            )}
-                          </div>
+                          <ActionsMenu
+                            label="Actions"
+                            items={[
+                              { label: "Edit", icon: "edit", hidden: inv.status !== "draft", onClick: () => setEditingInvoiceId(inv.id) },
+                              { label: "Apply Advance", icon: "account_balance_wallet", hidden: !(balance > 0 && summary?.advanceBalance > 0), onClick: () => setAdvanceTarget(inv) },
+                              { label: "Send Reminder", icon: "notifications", hidden: !(balance > 0), onClick: () => setReminderInvoiceId(inv.id) },
+                              { label: "Export PDF", icon: "picture_as_pdf", onClick: () => handleExportInvoice(inv) },
+                              { label: "Duplicate as Draft", icon: "content_copy", onClick: async () => { await duplicateInvoice(inv.id); reload(); } },
+                              { label: "Void Invoice", icon: "block", danger: true, hidden: inv.status === "void", onClick: () => setVoidTarget(inv) },
+                            ]}
+                          />
                         </div>
                       </div>
                     );
@@ -258,16 +241,13 @@ export default function ClientPaymentDrawer({ clientId, onClose }) {
                         <p className="font-medium text-on-surface">{formatRupees(p.amountPaise)} <span className="text-[11px] text-on-surface-variant capitalize">({p.method.replace("_", " ")})</span></p>
                         <p className="text-[11px] text-on-surface-variant">{p.paymentDate} {p.referenceNumber ? `· ${p.referenceNumber}` : ""} {p.status === "reversed" ? "· REVERSED" : ""}</p>
                       </div>
-                      <div className="flex gap-1">
-                        <button onClick={() => handleExportReceipt(p)} className="rounded p-1 text-on-surface-variant hover:bg-surface-variant" title="Export receipt PDF">
-                          <span className="material-symbols-outlined text-[18px]">picture_as_pdf</span>
-                        </button>
-                        {p.status === "confirmed" && (
-                          <button onClick={() => handleReversePayment(p)} className="rounded p-1 text-red-600 hover:bg-red-50" title="Reverse">
-                            <span className="material-symbols-outlined text-[18px]">undo</span>
-                          </button>
-                        )}
-                      </div>
+                      <ActionsMenu
+                        label="Actions"
+                        items={[
+                          { label: "Export Receipt", icon: "picture_as_pdf", onClick: () => handleExportReceipt(p) },
+                          { label: "Reverse Payment", icon: "undo", danger: true, hidden: p.status !== "confirmed", onClick: () => setReverseTarget(p) },
+                        ]}
+                      />
                     </div>
                   ))}
                 </div>
@@ -321,20 +301,55 @@ export default function ClientPaymentDrawer({ clientId, onClose }) {
         </div>
       </div>
 
-      {invoiceModalOpen && (
-        <InvoiceFormModal
-          clientId={clientId}
-          clientName={client?.name}
-          billingConfig={client?.billingConfig}
-          onClose={() => setInvoiceModalOpen(false)}
-          onCreated={reload}
-        />
-      )}
       {paymentModalOpen && (
         <RecordPaymentModal clientId={clientId} clientName={client?.name} onClose={() => setPaymentModalOpen(false)} onRecorded={reload} />
       )}
       {reminderInvoiceId && (
         <PaymentReminderComposer invoiceId={reminderInvoiceId} clientId={clientId} onClose={() => setReminderInvoiceId(null)} onSent={reload} />
+      )}
+
+      {voidTarget && (
+        <PromptModal
+          title={`Void ${voidTarget.invoiceNumber}`}
+          label="Reason"
+          type="textarea"
+          confirmLabel="Void Invoice"
+          helperText="This keeps the invoice for audit history but removes it from outstanding/overdue tracking."
+          onConfirm={async (reason) => {
+            await voidInvoice(voidTarget.id, reason);
+            reload();
+          }}
+          onClose={() => setVoidTarget(null)}
+        />
+      )}
+      {reverseTarget && (
+        <PromptModal
+          title="Reverse Payment"
+          label="Reason"
+          type="textarea"
+          confirmLabel="Reverse Payment"
+          helperText={`This un-applies the ${formatRupees(reverseTarget.amountPaise)} payment from any invoices/advance it was allocated to.`}
+          onConfirm={async (reason) => {
+            await reversePayment(reverseTarget.id, reason);
+            reload();
+          }}
+          onClose={() => setReverseTarget(null)}
+        />
+      )}
+      {advanceTarget && (
+        <PromptModal
+          title={`Apply Advance to ${advanceTarget.invoiceNumber}`}
+          label="Amount (₹)"
+          type="number"
+          defaultValue={(Math.min(advanceTarget.totalPaise - advanceTarget.amountPaidPaise, summary?.advanceBalance || 0) / 100).toFixed(2)}
+          confirmLabel="Apply"
+          helperText={`Available advance: ${formatRupees(summary?.advanceBalance || 0)}. This does not record a new payment.`}
+          onConfirm={async (amountRupees) => {
+            await applyAdvance({ clientId, invoiceId: advanceTarget.id, amountPaise: rupeesToPaise(amountRupees) });
+            reload();
+          }}
+          onClose={() => setAdvanceTarget(null)}
+        />
       )}
 
       {/* Off-screen render targets for PDF capture — same pattern every

@@ -132,7 +132,7 @@ router.get("/payments/clients", async (req, res) => {
       rows = rows.filter((r) => r.status.primary.toLowerCase().replace(/\s+/g, "_") === status.toLowerCase().replace(/\s+/g, "_"));
     }
 
-    const sortKey = ["name", "totalOutstanding", "totalOverdue", "lastPaymentDate"].includes(sortBy) ? sortBy : "name";
+    const sortKey = ["name", "totalBilled", "totalOutstanding", "totalOverdue", "advanceBalance", "lastPaymentDate"].includes(sortBy) ? sortBy : "name";
     rows.sort((a, b) => {
       const av = a[sortKey] ?? "";
       const bv = b[sortKey] ?? "";
@@ -159,7 +159,7 @@ router.get("/payments/clients", async (req, res) => {
 router.get("/payments/clients/:clientId", async (req, res) => {
   try {
     const models = req.app.locals.models;
-    const { Client, ClientBillingConfig, ClientBillingPlanItem, Invoice, Payment, PaymentReminder } = models;
+    const { Client, ClientBillingConfig, ClientBillingPlanItem, Invoice, InvoiceLineItem, Payment, PaymentReminder } = models;
     const clientId = parseInt(req.params.clientId);
 
     const client = await Client.findByPk(clientId, {
@@ -169,7 +169,17 @@ router.get("/payments/clients/:clientId", async (req, res) => {
 
     const [summary, invoices, payments, reminders] = await Promise.all([
       getClientFinancialSummary(models, clientId),
-      Invoice.findAll({ where: { clientId }, order: [["invoiceDate", "DESC"]], limit: 50 }),
+      // lineItems included so the Invoices tab's inline "Edit" (draft-only)
+      // can prefill the real stored rows instead of a blank editor. `order`
+      // nested inside an include doesn't reliably sort a hasMany — the
+      // association-qualified top-level form is what actually sorts
+      // lineItems (same fix already verified for Agreement/Proposal exports).
+      Invoice.findAll({
+        where: { clientId },
+        include: [{ model: InvoiceLineItem, as: "lineItems" }],
+        order: [["invoiceDate", "DESC"], [{ model: InvoiceLineItem, as: "lineItems" }, "sortOrder", "ASC"]],
+        limit: 50,
+      }),
       Payment.findAll({ where: { clientId }, order: [["paymentDate", "DESC"]], limit: 50 }),
       PaymentReminder.findAll({ where: { clientId, status: "pending" }, order: [["createdAt", "DESC"]] }),
     ]);
