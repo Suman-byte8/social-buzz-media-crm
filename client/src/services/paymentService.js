@@ -48,6 +48,7 @@ export const fetchOutstandingInvoices = async (params = {}) => {
 };
 
 export const fetchInvoice = async (id) => apiClient(`/invoices/${id}`);
+export const peekNextInvoiceNumber = async () => apiClient("/invoices/next-number");
 export const createInvoice = async (payload) => apiClient("/invoices", { method: "POST", body: payload });
 export const updateInvoice = async (id, payload) => apiClient(`/invoices/${id}`, { method: "PUT", body: payload });
 export const issueInvoice = async (id) => apiClient(`/invoices/${id}/issue`, { method: "POST" });

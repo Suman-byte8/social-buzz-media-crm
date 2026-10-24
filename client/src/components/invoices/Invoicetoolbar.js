@@ -53,7 +53,16 @@ export default function InvoiceToolbar({
   isSharing,
   onSendWhatsApp,
   onSendEmail,
+  syncStatus,
+  syncError,
 }) {
+  const SYNC_META = {
+    idle: null,
+    syncing: { label: "Syncing to Payments…", className: "text-white/70" },
+    synced: { label: "Synced to Payments", className: "text-emerald-300" },
+    error: { label: syncError || "Not synced to Payments", className: "text-amber-300" },
+  };
+  const syncMeta = SYNC_META[syncStatus];
   return (
     <div className="no-print sticky top-0 z-30 bg-ink text-white">
       <div className="mx-auto flex max-w-[210mm] flex-wrap items-center gap-x-5 gap-y-3 px-5 py-3">
@@ -158,6 +167,15 @@ export default function InvoiceToolbar({
           onSendWhatsApp={onSendWhatsApp}
           onSendEmail={onSendEmail}
         />
+
+        {syncMeta && (
+          <span className={`flex items-center gap-1.5 text-[11px] font-medium ${syncMeta.className}`} title={syncStatus === "error" ? syncError : undefined}>
+            <span className={`material-symbols-outlined text-[14px] ${syncStatus === "syncing" ? "animate-spin" : ""}`}>
+              {syncStatus === "syncing" ? "progress_activity" : syncStatus === "synced" ? "check_circle" : "warning"}
+            </span>
+            {syncMeta.label}
+          </span>
+        )}
       </div>
     </div>
   );

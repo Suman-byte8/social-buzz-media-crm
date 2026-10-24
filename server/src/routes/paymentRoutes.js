@@ -418,11 +418,28 @@ router.get("/invoices/:id", async (req, res) => {
 // or seeded from the client's billing config when billingConfigId is given
 // and lineItems is omitted. Always starts as "draft"; POST .../issue is a
 // separate, explicit step.
+// A non-transactional peek at the next sequential invoice number, for a
+// caller (the Invoice Builder) that wants to show a real, properly-
+// formatted number before the invoice itself actually exists yet. It's a
+// suggestion, not a reservation — POST /invoices still assigns the
+// authoritative number transactionally at creation time, and gracefully
+// handles the rare case where this peeked number was taken in the meantime
+// (see its own duplicate-number handling below).
+router.get("/invoices/next-number", async (req, res) => {
+  try {
+    const { Invoice } = req.app.locals.models;
+    const invoiceNumber = await generateInvoiceNumber(Invoice, null);
+    res.json({ success: true, data: { invoiceNumber } });
+  } catch (error) {
+    res.status(500).json({ success: false, message: "Error generating invoice number", error: error.message });
+  }
+});
+
 router.post("/invoices", async (req, res) => {
   try {
     const { Invoice, InvoiceLineItem, Client, ClientBillingConfig, ClientBillingPlanItem } = req.app.locals.models;
-    const { clientId, billingConfigId, invoiceDate, dueDate, billingPeriodStart, billingPeriodEnd, discountPaise, taxRateBasisPoints, notes, termsText } = req.body;
-    let { lineItems } = req.body;
+    const { clientId, billingConfigId, invoiceDate, dueDate, billingPeriodStart, billingPeriodEnd, discountPaise, taxRateBasisPoints, notes, termsText, issueImmediately } = req.body;
+    let { lineItems, invoiceNumber: requestedInvoiceNumber } = req.body;
 
     if (!clientId) return res.status(400).json({ success: false, message: "clientId is required" });
     const clientRecord = await Client.findByPk(parseInt(clientId));
@@ -449,42 +466,57 @@ router.post("/invoices", async (req, res) => {
 
     const totals = computeInvoiceTotals({ lineItems, discountPaise: discountPaise || 0, taxRateBasisPoints: resolvedTaxRate || 0 });
 
+    requestedInvoiceNumber = typeof requestedInvoiceNumber === "string" ? requestedInvoiceNumber.trim() : "";
+
     const sequelize = Invoice.sequelize;
-    const invoice = await sequelize.transaction(async (transaction) => {
-      const invoiceNumber = await generateInvoiceNumber(Invoice, transaction);
-      const created = await Invoice.create(
-        {
-          clientId: clientRecord.id,
-          billingConfigId: billingConfigId ? parseInt(billingConfigId) : null,
-          invoiceNumber,
-          status: "draft",
-          invoiceDate: invoiceDate || todayISO(),
-          dueDate: resolvedDueDate,
-          billingPeriodStart: billingPeriodStart || null,
-          billingPeriodEnd: billingPeriodEnd || null,
-          ...totals,
-          notes: notes || null,
-          termsText: termsText || null,
-          createdBy: req.user?.name || null,
-          updatedBy: req.user?.name || null,
-        },
-        { transaction }
-      );
-      for (const [index, item] of lineItems.entries()) {
-        await InvoiceLineItem.create(
+    let invoice;
+    try {
+      invoice = await sequelize.transaction(async (transaction) => {
+        // A caller (the Invoice Builder) that already displays its own
+        // number — likely the one this route itself suggested via
+        // GET /invoices/next-number — gets to keep it, so the PDF and the
+        // ledger agree on the same number. Anything else gets a freshly
+        // generated one, same as before.
+        const invoiceNumber = requestedInvoiceNumber || (await generateInvoiceNumber(Invoice, transaction));
+        const created = await Invoice.create(
           {
-            invoiceId: created.id,
-            description: item.description,
-            quantity: item.quantity,
-            unitPricePaise: item.unitPricePaise,
-            lineTotalPaise: item.quantity * item.unitPricePaise,
-            sortOrder: index,
+            clientId: clientRecord.id,
+            billingConfigId: billingConfigId ? parseInt(billingConfigId) : null,
+            invoiceNumber,
+            status: issueImmediately ? "issued" : "draft",
+            invoiceDate: invoiceDate || todayISO(),
+            dueDate: resolvedDueDate,
+            billingPeriodStart: billingPeriodStart || null,
+            billingPeriodEnd: billingPeriodEnd || null,
+            ...totals,
+            notes: notes || null,
+            termsText: termsText || null,
+            createdBy: req.user?.name || null,
+            updatedBy: req.user?.name || null,
           },
           { transaction }
         );
+        for (const [index, item] of lineItems.entries()) {
+          await InvoiceLineItem.create(
+            {
+              invoiceId: created.id,
+              description: item.description,
+              quantity: item.quantity,
+              unitPricePaise: item.unitPricePaise,
+              lineTotalPaise: item.quantity * item.unitPricePaise,
+              sortOrder: index,
+            },
+            { transaction }
+          );
+        }
+        return created;
+      });
+    } catch (txError) {
+      if (requestedInvoiceNumber && (txError.name === "SequelizeUniqueConstraintError" || /invoiceNumber/i.test(txError.message))) {
+        return res.status(409).json({ success: false, message: `An invoice numbered "${requestedInvoiceNumber}" already exists — change the number and try again.` });
       }
-      return created;
-    });
+      throw txError;
+    }
 
     await logActivity(req.app.locals.models, { clientId: clientRecord.id, invoiceId: invoice.id, action: "invoice_created", user: req.user, amountPaise: invoice.totalPaise });
     await invalidateCache("payments");
@@ -500,8 +532,13 @@ router.put("/invoices/:id", async (req, res) => {
     const { Invoice, InvoiceLineItem } = req.app.locals.models;
     const invoice = await Invoice.findByPk(req.params.id);
     if (!invoice) return res.status(404).json({ success: false, message: "Invoice not found" });
-    if (invoice.status !== "draft") {
-      return res.status(400).json({ success: false, message: "Only a draft invoice can be edited — void and duplicate it to correct an issued invoice." });
+    // Editable any time nothing has actually been paid against it yet
+    // (draft, issued, or overdue-but-unpaid) — once a payment or advance
+    // has touched it, the figures are locked (void + duplicate is the
+    // correction path). This is deliberately looser than "draft only": an
+    // issued-but-unpaid invoice is still just as safe to correct.
+    if (invoice.status === "void" || invoice.amountPaidPaise > 0) {
+      return res.status(400).json({ success: false, message: "This invoice has payments applied to it — void and duplicate it to correct it instead." });
     }
 
     const { expectedRevision, lineItems, discountPaise, taxRateBasisPoints, invoiceDate, dueDate, notes, termsText } = req.body;
@@ -520,10 +557,16 @@ router.put("/invoices/:id", async (req, res) => {
             { transaction }
           );
         }
+        // Falls back to the invoice's own current effective rate (derived
+        // from its stored tax/subtotal) when the caller changes line items
+        // without explicitly re-stating a rate — not just 0, which would
+        // silently zero out tax on an otherwise ordinary line-item edit.
+        const existingTaxableAmount = Math.max(invoice.subtotalPaise - invoice.discountPaise, 1);
+        const fallbackTaxRateBasisPoints = Math.round((invoice.taxPaise / existingTaxableAmount) * 10000);
         totals = computeInvoiceTotals({
           lineItems,
           discountPaise: discountPaise !== undefined ? discountPaise : invoice.discountPaise,
-          taxRateBasisPoints: taxRateBasisPoints !== undefined ? taxRateBasisPoints : 0,
+          taxRateBasisPoints: taxRateBasisPoints !== undefined ? taxRateBasisPoints : fallbackTaxRateBasisPoints,
         });
       }
       await invoice.update(

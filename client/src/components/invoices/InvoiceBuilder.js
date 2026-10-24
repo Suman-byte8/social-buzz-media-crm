@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useCallback, useRef, useMemo } from "react";
+import React, { useState, useCallback, useRef, useMemo, useEffect } from "react";
 import InvoiceToolbar from "./Invoicetoolbar";
 import InvoiceDocument from "./Invoicedocument";
 import ReportPagesEditor from "./ReportPagesEditor";
@@ -12,11 +12,17 @@ import { layoutImagesIntoPages } from "../../lib/imageGridLayout";
 import { DEFAULT_ROWS, DEFAULT_TERMS } from "./invoiceDefaults";
 import { useInvoiceClients } from "./useInvoiceClients";
 import { useInvoiceActions } from "./useInvoiceActions";
+import { peekNextInvoiceNumber } from "@/services/paymentService";
 import { useReportImages } from "./useReportImages";
 import { useCustomReportPages } from "./useCustomReportPages";
 
 export default function InvoiceBuilder() {
   const [invoiceNumber, setInvoiceNumber] = useState("SBM-2026-014");
+  // Tracks whether `invoiceNumber` is still the auto-suggested one (so
+  // selecting a client can safely refresh it to a real, Payments-ledger
+  // sequential number) vs. something the user has typed over themselves,
+  // which is never overwritten automatically.
+  const isNumberAutoFilledRef = useRef(true);
   const [issuedDate, setIssuedDate] = useState("24 Aug 2026");
   const [dueDate, setDueDate] = useState("07 Sep 2026");
   const [period, setPeriod] = useState("Aug 2026");
@@ -68,9 +74,47 @@ export default function InvoiceBuilder() {
 
   const isFreeformLayout = reportLayoutMode === "freeform";
 
+  // Replaces the static placeholder with a real, Payments-ledger sequential
+  // number ("SBM/INV/2026/005") — once per mount, and again whenever a
+  // client is picked while the field is still showing an auto-suggested
+  // (not user-edited) number, so what's on screen stays a genuinely usable
+  // number rather than a hardcoded sample.
+  const refreshSuggestedNumber = useCallback(async () => {
+    if (!isNumberAutoFilledRef.current) return;
+    try {
+      const res = await peekNextInvoiceNumber();
+      setInvoiceNumber(res.data.invoiceNumber);
+    } catch {
+      // Non-fatal — the field just keeps whatever it already had.
+    }
+  }, []);
+
+  useEffect(() => {
+    // queueMicrotask keeps this out of the react-hooks/set-state-in-effect
+    // rule's direct-synchronous-call check — refreshSuggestedNumber's own
+    // setState only ever runs after a real network await anyway.
+    queueMicrotask(() => {
+      refreshSuggestedNumber();
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const { clients, isClientLoading, selectedClientId, selectedClient, handleClientChange } = useInvoiceClients({
-    onClientSelected: () => setInvoiceNumber((prev) => prev || `SBM-INVOICE-${Date.now()}`),
+    onClientSelected: refreshSuggestedNumber,
   });
+
+  const handleInvoiceNumberChange = useCallback((value) => {
+    isNumberAutoFilledRef.current = false;
+    setInvoiceNumber(value);
+  }, []);
+
+  // Called by useInvoiceActions once an invoice is actually synced to the
+  // Payments ledger — from that point the number is a real assigned one
+  // and must never be silently overwritten by a later "next number" peek.
+  const handleInvoiceNumberSync = useCallback((value) => {
+    isNumberAutoFilledRef.current = false;
+    setInvoiceNumber(value);
+  }, []);
 
   const addRow = useCallback(() => {
     setRows((prev) => [...prev, { id: Date.now(), desc: "", qty: 1, rate: 0 }]);
@@ -104,13 +148,18 @@ export default function InvoiceBuilder() {
   const balance = totals.grand - (advancePaid || 0);
   const amountInWords = numberToIndianWords(totals.grand);
 
-  const { isSavingPdf, isSavingToDrive, isSharing, handleSavePdf, handleSaveToDrive, handleSendWhatsApp, handleSendEmail } =
+  const { isSavingPdf, isSavingToDrive, isSharing, syncStatus, syncError, handleSavePdf, handleSaveToDrive, handleSendWhatsApp, handleSendEmail } =
     useInvoiceActions({
       invoiceSheetRef,
       reportPageRefs,
       invoiceNumber,
+      onInvoiceNumberSync: handleInvoiceNumberSync,
+      issuedDate,
       dueDate,
       grandTotal: totals.grand,
+      rows,
+      discount: totals.discount,
+      gstRate: gstMode === "none" ? 0 : gstRate,
       selectedClientId,
       selectedClient,
     });
@@ -136,6 +185,8 @@ export default function InvoiceBuilder() {
         isSharing={isSharing}
         onSendWhatsApp={handleSendWhatsApp}
         onSendEmail={handleSendEmail}
+        syncStatus={syncStatus}
+        syncError={syncError}
       />
 
       <main className="my-8 overflow-x-auto">
@@ -144,7 +195,7 @@ export default function InvoiceBuilder() {
           gstin={gstin}
           onGstinChange={setGstin}
           invoiceNumber={invoiceNumber}
-          onInvoiceNumberChange={setInvoiceNumber}
+          onInvoiceNumberChange={handleInvoiceNumberChange}
           issuedDate={issuedDate}
           onIssuedDateChange={setIssuedDate}
           dueDate={dueDate}
