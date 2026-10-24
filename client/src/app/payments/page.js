@@ -16,14 +16,43 @@ import { formatRupees } from "@/lib/formatCurrency";
 
 const LIMIT = 24;
 
+// "2026-10" -> { from: "2026-10-01", to: "2026-10-31" }
+const monthToRange = (month) => {
+  const [y, m] = month.split("-").map(Number);
+  const lastDay = new Date(y, m, 0).getDate();
+  return { from: `${month}-01`, to: `${month}-${String(lastDay).padStart(2, "0")}` };
+};
+
 export default function PaymentsPage() {
   const dispatch = useDispatch();
   const { overview, loadingOverview, clients, loadingClients, pagination } = useSelector((s) => s.payments);
 
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
+  const [month, setMonth] = useState(""); // "" = all time, "YYYY-MM", or "custom"
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+
+  const handleMonthChange = (value) => {
+    setMonth(value);
+    setPage(1);
+    if (!value || value === "custom") {
+      if (!value) {
+        setDateFrom("");
+        setDateTo("");
+      }
+      return;
+    }
+    const { from, to } = monthToRange(value);
+    setDateFrom(from);
+    setDateTo(to);
+  };
+
+  const handleCustomDate = (setter) => (value) => {
+    setter(value);
+    setMonth("custom");
+    setPage(1);
+  };
   const [sortBy, setSortBy] = useState("name");
   const [sortDir, setSortDir] = useState("ASC");
   const [page, setPage] = useState(1);
@@ -39,16 +68,29 @@ export default function PaymentsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dateFrom, dateTo]);
 
+  const tableParams = {
+    search: search || undefined,
+    status: status || undefined,
+    dateFrom: dateFrom || undefined,
+    dateTo: dateTo || undefined,
+    sortBy,
+    sortDir,
+    page,
+    limit: LIMIT,
+  };
+
   useEffect(() => {
-    dispatch(fetchClientPayments({ search: search || undefined, status: status || undefined, sortBy, sortDir, page, limit: LIMIT }));
+    dispatch(fetchClientPayments(tableParams));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search, status, sortBy, sortDir, page]);
+  }, [search, status, dateFrom, dateTo, sortBy, sortDir, page]);
 
   const refreshTable = () => {
     invalidatePaymentsCaches();
-    dispatch(fetchClientPayments({ search: search || undefined, status: status || undefined, sortBy, sortDir, page, limit: LIMIT }));
+    dispatch(fetchClientPayments(tableParams));
     dispatch(fetchPaymentsOverview({ dateFrom, dateTo }));
   };
+
+  const periodLabel = month && month !== "custom" ? new Date(`${month}-01T00:00:00`).toLocaleDateString("en-IN", { month: "long", year: "numeric" }) : dateFrom || dateTo ? "Selected range" : null;
 
   const handleSort = (column) => {
     if (sortBy === column) {
@@ -68,8 +110,8 @@ export default function PaymentsPage() {
   const metrics = overview
     ? [
         { title: "Total Clients", value: String(overview.totalClients), icon: "group" },
-        { title: "Total Billed", value: formatRupees(overview.totalBilled), icon: "receipt_long" },
-        { title: "Total Collected", value: formatRupees(overview.totalCollected), icon: "payments" },
+        { title: "Total Billed", value: formatRupees(overview.totalBilled), icon: "receipt_long", change: periodLabel || "All time", changeType: "neutral" },
+        { title: "Total Collected", value: formatRupees(overview.totalCollected), icon: "payments", change: periodLabel || "All time", changeType: "neutral" },
         { title: "Outstanding", value: formatRupees(overview.totalOutstanding), icon: "pending_actions" },
         { title: "Overdue", value: formatRupees(overview.overdueAmount), icon: "warning", changeType: overview.overdueAmount > 0 ? "negative" : "neutral" },
         { title: "Advance Balance", value: formatRupees(overview.advanceBalance), icon: "account_balance_wallet" },
@@ -115,10 +157,12 @@ export default function PaymentsPage() {
           onSearchChange={(v) => { setSearch(v); setPage(1); }}
           status={status}
           onStatusChange={(v) => { setStatus(v); setPage(1); }}
+          month={month}
+          onMonthChange={handleMonthChange}
           dateFrom={dateFrom}
           dateTo={dateTo}
-          onDateFromChange={setDateFrom}
-          onDateToChange={setDateTo}
+          onDateFromChange={handleCustomDate(setDateFrom)}
+          onDateToChange={handleCustomDate(setDateTo)}
         />
 
         <ClientPaymentsTable

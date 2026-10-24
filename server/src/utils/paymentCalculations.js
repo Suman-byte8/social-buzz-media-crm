@@ -150,7 +150,10 @@ export async function getClientFinancialSummary(models, clientId) {
 
 // Three grouped aggregate queries total, regardless of how many clients are
 // on the current page — not one (or several) queries per client.
-export async function getBulkClientFinancialStats(models, clientIds) {
+// dateFrom/dateTo (optional, YYYY-MM-DD) scope only the period figures —
+// totalBilled by invoiceDate and totalCollected by paymentDate. Outstanding,
+// overdue, and advance stay as-of-today running balances regardless.
+export async function getBulkClientFinancialStats(models, clientIds, { dateFrom, dateTo } = {}) {
   const sequelize = models.Invoice.sequelize;
   const statsByClient = {};
   clientIds.forEach((id) => {
@@ -158,25 +161,29 @@ export async function getBulkClientFinancialStats(models, clientIds) {
   });
   if (clientIds.length === 0) return statsByClient;
 
+  const period = { dateFrom: dateFrom || null, dateTo: dateTo || null };
+  const inPeriod = (column) =>
+    `(CAST(:dateFrom AS DATE) IS NULL OR ${column} >= CAST(:dateFrom AS DATE)) AND (CAST(:dateTo AS DATE) IS NULL OR ${column} <= CAST(:dateTo AS DATE))`;
+
   const invoiceRows = await sequelize.query(
     `SELECT "clientId",
-            COALESCE(SUM("totalPaise"), 0) AS "totalBilled",
+            COALESCE(SUM(CASE WHEN ${inPeriod('"invoiceDate"')} THEN "totalPaise" ELSE 0 END), 0) AS "totalBilled",
             COALESCE(SUM(CASE WHEN status != 'draft' THEN GREATEST("totalPaise" - "amountPaidPaise", 0) ELSE 0 END), 0) AS "totalOutstanding",
             COALESCE(SUM(CASE WHEN status NOT IN ('draft') AND "dueDate" < CURRENT_DATE AND "totalPaise" > "amountPaidPaise" THEN ("totalPaise" - "amountPaidPaise") ELSE 0 END), 0) AS "totalOverdue"
      FROM invoices
      WHERE "clientId" IN (:clientIds) AND status != 'void'
      GROUP BY "clientId"`,
-    { replacements: { clientIds }, type: QueryTypes.SELECT }
+    { replacements: { clientIds, ...period }, type: QueryTypes.SELECT }
   );
 
   const paymentRows = await sequelize.query(
     `SELECT "clientId",
-            COALESCE(SUM("amountPaise"), 0) AS "totalCollected",
+            COALESCE(SUM(CASE WHEN ${inPeriod('"paymentDate"')} THEN "amountPaise" ELSE 0 END), 0) AS "totalCollected",
             MAX("paymentDate") AS "lastPaymentDate"
      FROM payments
      WHERE "clientId" IN (:clientIds) AND status = 'confirmed'
      GROUP BY "clientId"`,
-    { replacements: { clientIds }, type: QueryTypes.SELECT }
+    { replacements: { clientIds, ...period }, type: QueryTypes.SELECT }
   );
 
   const advanceRows = await sequelize.query(

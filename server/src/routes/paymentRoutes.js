@@ -78,7 +78,7 @@ router.get("/payments/overview", async (req, res) => {
 router.get("/payments/clients", async (req, res) => {
   try {
     const { Client, ClientBillingConfig, ClientBillingPlanItem, Invoice } = req.app.locals.models;
-    const { search, service, frequency, status, sortBy = "name", sortDir = "ASC", page = 1, limit = 24 } = req.query;
+    const { search, service, frequency, status, dateFrom, dateTo, sortBy = "name", sortDir = "ASC", page = 1, limit = 24 } = req.query;
 
     const where = {};
     if (search) {
@@ -100,8 +100,13 @@ router.get("/payments/clients", async (req, res) => {
     const candidates = await Client.findAll({ where, include, order: [["name", "ASC"]] });
     const clientIds = candidates.map((c) => c.id);
 
-    const [stats, invoiceCounts] = await Promise.all([
-      getBulkClientFinancialStats(req.app.locals.models, clientIds),
+    const hasPeriod = Boolean(dateFrom || dateTo);
+    // Status labels (Paid/Unpaid/...) always reflect lifetime figures — a
+    // month with no invoice shouldn't relabel a fully-paid client. Only the
+    // displayed Billed/Collected columns are scoped to the selected period.
+    const [stats, lifetimeStats, invoiceCounts] = await Promise.all([
+      getBulkClientFinancialStats(req.app.locals.models, clientIds, { dateFrom, dateTo }),
+      hasPeriod ? getBulkClientFinancialStats(req.app.locals.models, clientIds) : null,
       clientIds.length
         ? Invoice.findAll({ where: { clientId: { [Op.in]: clientIds } }, attributes: ["clientId"], group: ["clientId"], raw: true })
         : [],
@@ -111,7 +116,7 @@ router.get("/payments/clients", async (req, res) => {
     let rows = candidates.map((client) => {
       const json = client.toJSON();
       const clientStats = stats[client.id] || { totalBilled: 0, totalCollected: 0, totalOutstanding: 0, totalOverdue: 0, advanceBalance: 0, lastPaymentDate: null };
-      const statusInfo = computeClientStatus(clientStats, {
+      const statusInfo = computeClientStatus((lifetimeStats || stats)[client.id] || clientStats, {
         hasBillingConfig: Boolean(json.billingConfig),
         hasInvoices: clientsWithInvoices.has(client.id),
       });
