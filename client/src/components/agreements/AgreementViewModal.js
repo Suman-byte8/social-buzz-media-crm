@@ -2,12 +2,12 @@
 
 import React from "react";
 import AgreementEmailButton from "./AgreementEmailButton";
+import { getAssetUrl } from "@/services/apiClient";
 
 export default function AgreementViewModal({ open, onClose, agreement, clients = [] }) {
   if (!open || !agreement) return null;
 
-  const apiBase = process.env.NEXT_PUBLIC_API_URL || "";
-  const streamUrl = apiBase ? `${apiBase}/documents/${agreement.id}/stream` : `/api/documents/${agreement.id}/stream`;
+  const streamUrl = getAssetUrl(`/api/documents/${agreement.id}/stream`);
   const client = clients.find((c) => c.id === agreement.clientId) || null;
 
   return (

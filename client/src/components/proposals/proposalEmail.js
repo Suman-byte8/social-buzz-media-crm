@@ -1,12 +1,12 @@
 import { sendDocumentEmail } from "@/services/clientService";
-import { API_BASE_URL } from "@/services/apiClient";
+import { getApiBaseUrl } from "@/services/apiClient";
 
 // Mirrors agreementEmail.js exactly — duplicated only because its subject/
 // body copy says "agreement", which would be wrong wording in a proposal
 // email. The underlying mechanism (sendDocumentEmail by Document id, the
 // SMTP→mailto fallback) is unchanged.
 
-const getStreamUrl = (proposal) => `${API_BASE_URL}/documents/${proposal.id}/stream`;
+const getStreamUrl = (proposal) => `${getApiBaseUrl()}/documents/${proposal.id}/stream`;
 
 const buildMessage = (proposal, { attached, link } = {}) => {
   if (attached) {

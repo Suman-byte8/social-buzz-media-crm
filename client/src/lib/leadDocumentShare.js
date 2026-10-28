@@ -1,5 +1,5 @@
 import { sendDocumentEmail } from "@/services/clientService";
-import { API_BASE_URL } from "@/services/apiClient";
+import { getApiBaseUrl } from "@/services/apiClient";
 import { shareFileNatively, buildWhatsAppUrl } from "@/lib/documentShare";
 
 // Shares an already-uploaded lead document (any file type — proposal,
@@ -8,7 +8,7 @@ import { shareFileNatively, buildWhatsAppUrl } from "@/lib/documentShare";
 // already exists on Drive with a Document id — so this is closer to
 // agreementEmail.js, just with a WhatsApp path added too.
 
-const getStreamUrl = (document) => `${API_BASE_URL}/documents/${document.id}/stream`;
+const getStreamUrl = (document) => `${getApiBaseUrl()}/documents/${document.id}/stream`;
 
 /**
  * Emails the document to `toEmail`. Tries a real SMTP send with the file

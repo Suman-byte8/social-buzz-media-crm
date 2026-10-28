@@ -41,6 +41,7 @@ The app runs on `http://localhost:3000` by default. Log in with an account seede
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `NEXT_PUBLIC_API_URL` | Base URL of the API, including `/api` | `http://localhost:5000/api` |
+| `NEXT_PUBLIC_API_URL_FALLBACK` | Optional backup API (same format). Used automatically when the primary is unreachable or returns 502/503/504; both servers must share the same database and secrets | - |
 
 Set it in `.env` (or `.env.local`) at the client root. Every server-relative asset URL the API returns (e.g. Google Drive proxy links like `/api/settings/logo-proxy/:fileId`) gets this value's host prefixed via `getAssetUrl()` in `src/services/apiClient.js` before being used in an `<img src>` — the frontend and API are different origins (different ports in dev, likely different domains in production), so a raw relative path would otherwise resolve against the Next.js app itself.
 

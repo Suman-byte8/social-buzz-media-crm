@@ -4,7 +4,7 @@ import { createContext, useContext, useState, useEffect } from 'react';
 import { saveToStorage, getFromStorage, removeFromStorage } from '@/utils/storage';
 import { clearAllCache } from '@/utils/cache';
 import { disconnectSocket } from '@/lib/socket';
-import { apiClient } from '@/services/apiClient';
+import { apiClient, fetchWithFailover } from '@/services/apiClient';
 import { useRouter } from 'next/navigation';
 
 const AuthContext = createContext();
@@ -29,14 +29,11 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (email, password) => {
     try {
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'}/auth/login`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, password }),
-        },
-      );
+      const response = await fetchWithFailover('/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
       const data = await response.json();
       if (data.success && data.token) {
         saveToStorage('auth_token', data.token);

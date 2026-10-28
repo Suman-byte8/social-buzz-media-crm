@@ -4,7 +4,7 @@ import { useState, useCallback, useRef, useEffect } from "react";
 import { flushSync } from "react-dom";
 import { uploadInvoiceToDrive, sendDocumentEmail } from "@/services/clientService";
 import { exportInvoiceToPdf, getInvoicePdfBlob } from "@/lib/Pdfexport";
-import { API_BASE_URL } from "@/services/apiClient";
+import { getApiBaseUrl } from "@/services/apiClient";
 import { shareFileNatively, buildWhatsAppUrl } from "@/lib/documentShare";
 import { syncInvoice } from "@/services/paymentService";
 import { invalidatePaymentsCaches } from "@/redux/slices/paymentsSlice";
@@ -205,7 +205,7 @@ export function useInvoiceActions({
   // PUBLIC_ASSET_PATHS in server/index.js — specifically so links shared
   // with clients work without a login.
   const getDocumentPdfLink = (documentRecord) =>
-    documentRecord?.id ? `${API_BASE_URL}/documents/${documentRecord.id}/stream` : null;
+    documentRecord?.id ? `${getApiBaseUrl()}/documents/${documentRecord.id}/stream` : null;
 
   const buildShareMessage = useCallback(
     ({ attached, pdfLink, downloadedLocally, invoiceNumberOverride } = {}) => {

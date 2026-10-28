@@ -5,6 +5,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { fetchSettings, saveSettings, uploadLogo, clearMessages } from '@/redux/slices/settingsSlice';
 import LoginAccessCard from '@/components/settings/LoginAccessCard';
 import ServicesCard from '@/components/settings/ServicesCard';
+import { getAssetUrl } from '@/services/apiClient';
 import RequireAdmin from '@/components/auth/RequireAdmin';
 
 export default function SettingsPage() {
@@ -52,9 +53,7 @@ export default function SettingsPage() {
   const getFormattedImageUrl = (url) => {
     if (!url) return '';
     if (url.startsWith('/api')) {
-      const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
-      const host = apiBase.replace(/\/api\/?$/, '');
-      return `${host}${url}`;
+      return getAssetUrl(url);
     }
     return url;
   };

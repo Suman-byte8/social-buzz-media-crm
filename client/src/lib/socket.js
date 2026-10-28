@@ -1,6 +1,6 @@
 import { io } from "socket.io-client";
 import { getFromStorage } from "@/utils/storage";
-import { API_BASE_URL } from "@/services/apiClient";
+import { getApiHost } from "@/services/apiClient";
 
 let socket = null;
 
@@ -16,12 +16,15 @@ export const getSocket = () => {
 
   if (socket) return socket;
 
-  // API_BASE_URL is "http://.../api" — Socket.io connects to the bare
-  // host and handles its own /socket.io/ path.
-  const host = API_BASE_URL.replace(/\/api\/?$/, "");
-  socket = io(host, {
+  // Socket.io connects to the bare host and handles its own /socket.io/ path.
+  socket = io(getApiHost(), {
     auth: { token },
     transports: ["websocket", "polling"],
+  });
+  // If the API client failed over to the other server, follow it on the
+  // next reconnect instead of retrying the dead host forever.
+  socket.io.on("reconnect_attempt", () => {
+    socket.io.uri = getApiHost();
   });
 
   return socket;

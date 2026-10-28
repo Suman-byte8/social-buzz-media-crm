@@ -31,6 +31,9 @@ jobs:
           # Point the static export at the deployed API. Override by setting a
           # repository Variable named NEXT_PUBLIC_API_URL (GitHub → Settings → Variables).
           NEXT_PUBLIC_API_URL: ${{ secrets.NEXT_PUBLIC_API_URL }}
+          # Optional second Render server; the app switches to it automatically
+          # when the primary is unreachable (suspended, deploying, crashed).
+          NEXT_PUBLIC_API_URL_FALLBACK: ${{ secrets.NEXT_PUBLIC_API_URL_FALLBACK }}
         run: npm run build
 
       - name: Verify build output

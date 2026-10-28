@@ -1,11 +1,11 @@
 import { sendDocumentEmail } from "@/services/clientService";
-import { API_BASE_URL } from "@/services/apiClient";
+import { getApiBaseUrl } from "@/services/apiClient";
 
 // Agreements are shared by email only (no WhatsApp) — a real "attach the
 // file" WhatsApp send needs either browser file-share support (unreliable
 // on desktop) or the WhatsApp Business API, neither of which is in scope.
 
-const getStreamUrl = (agreement) => `${API_BASE_URL}/documents/${agreement.id}/stream`;
+const getStreamUrl = (agreement) => `${getApiBaseUrl()}/documents/${agreement.id}/stream`;
 
 const buildMessage = (agreement, { attached, link } = {}) => {
   if (attached) {
