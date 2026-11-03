@@ -73,3 +73,20 @@ export const formatTaskData = (formData) => ({
   dueDate: formData.dueDate || null,
   completedAt: formData.completedAt || null,
 });
+
+// Exact Dashboard/Team task figures counted in the database. Day/week
+// boundaries are sent from the browser so they follow local time.
+export const fetchTaskSummary = async () => {
+  // Rounded to the minute so repeated calls share the server's response cache.
+  const now = new Date(Math.floor(Date.now() / 60000) * 60000);
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const todayEnd = new Date(todayStart.getFullYear(), todayStart.getMonth(), todayStart.getDate() + 1);
+  const weekStart = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+  const params = new URLSearchParams({
+    todayStart: todayStart.toISOString(),
+    todayEnd: todayEnd.toISOString(),
+    weekStart: weekStart.toISOString(),
+    now: now.toISOString(),
+  });
+  return apiClient(`/tasks/summary?${params}`);
+};

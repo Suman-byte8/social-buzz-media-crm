@@ -10,14 +10,16 @@ import TaskViewModal from "@/components/tasks/TaskViewModal";
 import TasksToolbar from "@/components/tasks/TasksToolbar";
 import TasksFilters from "@/components/tasks/TasksFilters";
 import TasksTable from "@/components/tasks/TasksTable";
+import Pagination from "@/components/ui/Pagination";
 
 const SEARCH_DEBOUNCE_MS = 350;
+const PAGE_SIZE = 50; // tasks per page
 const PRIORITY_RANK = { urgent: 0, high: 1, medium: 2, low: 3 };
 const STATUS_RANK = { todo: 0, in_progress: 1, review: 2, completed: 3 };
 
 export default function TasksPageShell() {
   const dispatch = useDispatch();
-  const { tasks, loading } = useSelector((state) => state.tasks);
+  const { tasks, loading, statusCounts, pagination } = useSelector((state) => state.tasks);
   const { clients } = useSelector((state) => state.clients);
   const { teamMembers } = useSelector((state) => state.team);
 
@@ -65,9 +67,20 @@ export default function TasksPageShell() {
     dispatch(fetchTeamMembers());
   }, [dispatch]);
 
+  // The page number belongs to one filter combination — changing any filter
+  // drops back to page 1 without a separate reset effect.
+  const filterKey = JSON.stringify([searchTerm, statusFilter, priorityFilter, clientFilter, assigneeFilter, assignedDateFilter]);
+  const [pageState, setPageState] = useState({ key: filterKey, page: 1 });
+  const page = pageState.key === filterKey ? pageState.page : 1;
+  const setPage = (p) => {
+    setPageState({ key: filterKey, page: p });
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
   const currentFilters = useMemo(
     () => ({
-      limit: 200,
+      page,
+      limit: PAGE_SIZE,
       search: searchTerm,
       status: statusFilter !== "all" ? statusFilter : undefined,
       priority: priorityFilter !== "all" ? priorityFilter : undefined,
@@ -75,7 +88,7 @@ export default function TasksPageShell() {
       assigneeId: assigneeFilter !== "all" ? assigneeFilter : undefined,
       assignedDate: assignedDateFilter || undefined,
     }),
-    [searchTerm, statusFilter, priorityFilter, clientFilter, assigneeFilter, assignedDateFilter]
+    [page, searchTerm, statusFilter, priorityFilter, clientFilter, assigneeFilter, assignedDateFilter]
   );
 
   // Re-fetch tasks on mount and whenever a filter changes.
@@ -172,16 +185,23 @@ export default function TasksPageShell() {
     return arr;
   }, [tasks, sortBy, sortOrder]);
 
-  const stats = useMemo(
-    () => ({
-      totalTasks: tasks.length,
+  // Counts come from the server (every matching task in the database), not
+  // from the rows on this page — that's what kept them stuck at 200 before.
+  const stats = useMemo(() => {
+    const c = statusCounts || {
       todo: tasks.filter((t) => t.status === "todo").length,
       in_progress: tasks.filter((t) => t.status === "in_progress").length,
       review: tasks.filter((t) => t.status === "review").length,
       completed: tasks.filter((t) => t.status === "completed").length,
-    }),
-    [tasks]
-  );
+    };
+    return {
+      totalTasks: (c.todo || 0) + (c.in_progress || 0) + (c.review || 0) + (c.completed || 0),
+      todo: c.todo || 0,
+      in_progress: c.in_progress || 0,
+      review: c.review || 0,
+      completed: c.completed || 0,
+    };
+  }, [tasks, statusCounts]);
 
   return (
     <div className="flex-1 p-6 lg:p-8 w-full">
@@ -216,6 +236,10 @@ export default function TasksPageShell() {
         onDelete={handleDelete}
         onView={handleView}
       />
+
+      {pagination && (
+        <Pagination page={page} limit={PAGE_SIZE} totalItems={pagination.total} totalPages={pagination.totalPages} loading={loading} onPageChange={setPage} />
+      )}
 
       {viewingTask && (
         <TaskViewModal

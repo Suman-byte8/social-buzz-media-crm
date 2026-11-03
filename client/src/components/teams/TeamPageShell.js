@@ -3,7 +3,7 @@
 import React, { useEffect, useState, useMemo } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchTeamMembers, deleteTeamMember } from "@/redux/slices/teamSlice";
-import { fetchTasks } from "@/redux/slices/tasksSlice";
+import { fetchTaskSummary } from "@/redux/slices/tasksSlice";
 import { fetchClients } from "@/redux/slices/clientsSlice";
 import { parseArrayField } from "@/services/teamService";
 import TeamToolbar from "@/components/teams/TeamToolbar";
@@ -15,12 +15,12 @@ import AddTeamMemberModal from "@/components/teams/AddTeamMemberModal";
 import EditMemberModal from "@/components/teams/EditMemberModal";
 
 const ITEMS_PER_PAGE = 10;
-const MS_PER_DAY = 1000 * 60 * 60 * 24;
 
 export default function TeamPageShell() {
   const dispatch = useDispatch();
   const teamMembers = useSelector((state) => state.team.teamMembers);
-  const tasks = useSelector((state) => state.tasks.tasks);
+  // Exact counts from the database (GET /tasks/summary), not a capped task list.
+  const taskSummary = useSelector((state) => state.tasks.summary);
   const clients = useSelector((state) => state.clients.clients);
 
   const [searchTerm, setSearchTerm] = useState("");
@@ -34,7 +34,7 @@ export default function TeamPageShell() {
   // static export, so build-time SSR data would otherwise go stale.
   useEffect(() => {
     dispatch(fetchTeamMembers());
-    dispatch(fetchTasks({ limit: 500 }));
+    dispatch(fetchTaskSummary());
     dispatch(fetchClients({ limit: 100 }));
   }, [dispatch]);
 
@@ -87,17 +87,14 @@ export default function TeamPageShell() {
   // Real per-member open-task counts, derived from actual Task records
   // (not the fabricated `tasks*25 + clients*10` formula this used to show).
   const workloadById = useMemo(() => {
-    const openTasks = tasks.filter((t) => t.status !== "completed");
-    const counts = teamMembers.map((member) => ({
-      id: member.id,
-      count: openTasks.filter((t) => (t.assignees || []).map(Number).includes(member.id)).length,
-    }));
+    const openByMember = taskSummary?.openByMember || {};
+    const counts = teamMembers.map((member) => ({ id: member.id, count: openByMember[member.id] || 0 }));
     const maxCount = Math.max(1, ...counts.map((c) => c.count));
     return counts.reduce((acc, c) => {
       acc[c.id] = { openTaskCount: c.count, widthPercent: Math.round((c.count / maxCount) * 100) };
       return acc;
     }, {});
-  }, [teamMembers, tasks]);
+  }, [teamMembers, taskSummary]);
 
   // Real per-member client lists, combining live Client.clientManagedBy
   // assignments (set from the Clients page or the Assign Client modal)
@@ -121,14 +118,11 @@ export default function TeamPageShell() {
 
   const stats = useMemo(() => {
     const activeNow = teamMembers.filter((m) => (m.status || "").toLowerCase() === "active").length;
-    const openTasks = tasks.filter((t) => t.status !== "completed").length;
-    const now = new Date();
-    const completedThisWeek = tasks.filter(
-      (t) => t.status === "completed" && t.completedAt && now - new Date(t.completedAt) <= 7 * MS_PER_DAY
-    ).length;
+    const openTasks = taskSummary?.openCount ?? 0;
+    const completedThisWeek = taskSummary?.completedThisWeek ?? 0;
 
     return { totalMembers: teamMembers.length, activeNow, openTasks, completedThisWeek };
-  }, [teamMembers, tasks]);
+  }, [teamMembers, taskSummary]);
 
   return (
     <div className="flex-1 p-6 lg:p-8 max-w-[1600px] w-full mx-auto">

@@ -1,5 +1,5 @@
 import express from "express";
-import { Op } from "sequelize";
+import { Op, QueryTypes } from "sequelize";
 import { cacheRoute } from "../middleware/cacheRoute.js";
 import { invalidateCache } from "../utils/serverCache.js";
 import { notify } from "../utils/realtime.js";
@@ -128,9 +128,105 @@ router.post("/tasks", async (req, res) => {
   }
 });
 
+// Adds assignee ids/details, the assigning member, and the client name to
+// Task rows (loaded with the "client" include) — two batched queries total.
+async function enrichTasks(models, rows) {
+  const { TeamMember, TaskAssignee } = models;
+  const taskList = rows.map((t) => t.toJSON());
+  const taskIds = taskList.map((t) => t.id);
+
+  const assigneeLinks = await TaskAssignee.findAll({
+    where: { taskId: { [Op.in]: taskIds.length > 0 ? taskIds : [-1] } },
+  });
+  const assignedByIds = taskList.map((t) => t.assignedById).filter(Boolean);
+  const memberIds = [...new Set([...assigneeLinks.map((l) => l.teamMemberId), ...assignedByIds])];
+  const teamMembers = await TeamMember.findAll({
+    where: { id: { [Op.in]: memberIds.length > 0 ? memberIds : [-1] } },
+    attributes: ["id", "name", "avatar"],
+  });
+  const teamMemberById = new Map(teamMembers.map((m) => [m.id, m]));
+
+  const assigneeIdsByTask = new Map();
+  for (const link of assigneeLinks) {
+    if (!assigneeIdsByTask.has(link.taskId)) assigneeIdsByTask.set(link.taskId, []);
+    assigneeIdsByTask.get(link.taskId).push(link.teamMemberId);
+  }
+
+  return taskList.map((t) => {
+    const { client, ...taskFields } = t;
+    const assigneeIds = assigneeIdsByTask.get(t.id) || [];
+    const taskAssignees = assigneeIds.map((id) => teamMemberById.get(id)).filter(Boolean);
+    return {
+      ...taskFields,
+      assignees: assigneeIds,
+      assigneeDetails: taskAssignees,
+      assignedByMember: t.assignedById ? teamMemberById.get(t.assignedById) || null : null,
+      clientName: client ? client.name : null,
+    };
+  });
+}
+
+// Exact task figures for the Dashboard and Team pages, counted in the
+// database instead of from a capped list of rows. "Today" and "this week"
+// boundaries come from the browser (todayStart/todayEnd/weekStart as ISO
+// timestamps) so they follow the user's local timezone.
+router.get("/tasks/summary", cacheRoute("tasks", 30), async (req, res) => {
+  try {
+    const { Task, Client } = req.app.locals.models;
+    const parseDate = (v, fallback) => {
+      const d = v ? new Date(v) : null;
+      return d && !Number.isNaN(d.getTime()) ? d : fallback;
+    };
+    const now = new Date();
+    const todayStart = parseDate(req.query.todayStart, new Date(now.getFullYear(), now.getMonth(), now.getDate()));
+    const todayEnd = parseDate(req.query.todayEnd, new Date(todayStart.getTime() + 86400000));
+    const weekStart = parseDate(req.query.weekStart, new Date(now.getTime() - 7 * 86400000));
+    const fromNow = parseDate(req.query.now, now);
+
+    const open = { status: { [Op.ne]: "completed" } };
+    const dueTodayWhere = { ...open, dueDate: { [Op.gte]: todayStart, [Op.lt]: todayEnd } };
+    const listOptions = { include: [{ model: Client, as: "client", attributes: ["id", "name"] }], order: [["dueDate", "ASC"]], limit: 6 };
+
+    const [openCount, dueTodayCount, completedThisWeek, memberRows, dueTodayRows] = await Promise.all([
+      Task.count({ where: open }),
+      Task.count({ where: dueTodayWhere }),
+      Task.count({ where: { status: "completed", completedAt: { [Op.gte]: weekStart } } }),
+      Task.sequelize.query(
+        `SELECT ta."teamMemberId", COUNT(*) AS "count"
+         FROM task_assignees ta JOIN tasks t ON t.id = ta."taskId"
+         WHERE t.status <> 'completed'
+         GROUP BY ta."teamMemberId"`,
+        { type: QueryTypes.SELECT }
+      ),
+      Task.findAll({ where: dueTodayWhere, ...listOptions }),
+    ]);
+
+    // Nothing due today → show the next few upcoming open tasks instead.
+    const listRows = dueTodayRows.length > 0 ? dueTodayRows : await Task.findAll({ where: { ...open, dueDate: { [Op.gte]: fromNow } }, ...listOptions });
+
+    const openByMember = {};
+    for (const r of memberRows) openByMember[r.teamMemberId] = parseInt(r.count, 10);
+
+    res.json({
+      success: true,
+      data: {
+        openCount,
+        dueTodayCount,
+        completedThisWeek,
+        openByMember,
+        listType: dueTodayRows.length > 0 ? "due_today" : "upcoming",
+        tasks: await enrichTasks(req.app.locals.models, listRows),
+      },
+    });
+  } catch (error) {
+    console.error("Error fetching task summary:", error);
+    res.status(500).json({ success: false, message: "Error fetching task summary", error: error.message });
+  }
+});
+
 router.get("/tasks", cacheRoute("tasks", 30), async (req, res) => {
   try {
-    const { Task, Client, TeamMember, TaskAssignee } = req.app.locals.models;
+    const { Task, Client, TaskAssignee } = req.app.locals.models;
     const {
       page = 1,
       limit = 50,
@@ -185,50 +281,34 @@ router.get("/tasks", cacheRoute("tasks", 30), async (req, res) => {
       where.createdAt = { [Op.gte]: rangeStart, [Op.lt]: rangeEnd };
     }
 
-    const { count, rows } = await Task.findAndCountAll({
-      where,
-      include: [{ model: Client, as: "client", attributes: ["id", "name"] }],
-      order: [["createdAt", "DESC"]],
-      limit: parseInt(limit),
-      offset: parseInt(offset),
-    });
+    // Per-status totals for the toolbar cards, counted in the database across
+    // every matching task (not just this page). The status filter itself is
+    // left out so the cards always show the full breakdown.
+    const { status: _statusFilter, ...countWhere } = where;
+    const [{ count, rows }, statusRows] = await Promise.all([
+      Task.findAndCountAll({
+        where,
+        include: [{ model: Client, as: "client", attributes: ["id", "name"] }],
+        order: [["createdAt", "DESC"]],
+        limit: parseInt(limit),
+        offset: parseInt(offset),
+      }),
+      Task.findAll({
+        where: countWhere,
+        attributes: ["status", [Task.sequelize.fn("COUNT", Task.sequelize.col("id")), "count"]],
+        group: ["status"],
+        raw: true,
+      }),
+    ]);
+    const statusCounts = { todo: 0, in_progress: 0, review: 0, completed: 0 };
+    for (const r of statusRows) statusCounts[r.status] = parseInt(r.count, 10);
 
-    const taskList = rows.map((t) => t.toJSON());
-    const taskIds = taskList.map((t) => t.id);
-
-    const assigneeLinks = await TaskAssignee.findAll({
-      where: { taskId: { [Op.in]: taskIds.length > 0 ? taskIds : [-1] } },
-    });
-    const assignedByIds = taskList.map((t) => t.assignedById).filter(Boolean);
-    const memberIds = [...new Set([...assigneeLinks.map((l) => l.teamMemberId), ...assignedByIds])];
-    const teamMembers = await TeamMember.findAll({
-      where: { id: { [Op.in]: memberIds.length > 0 ? memberIds : [-1] } },
-      attributes: ["id", "name", "avatar"],
-    });
-    const teamMemberById = new Map(teamMembers.map((m) => [m.id, m]));
-
-    const assigneeIdsByTask = new Map();
-    for (const link of assigneeLinks) {
-      if (!assigneeIdsByTask.has(link.taskId)) assigneeIdsByTask.set(link.taskId, []);
-      assigneeIdsByTask.get(link.taskId).push(link.teamMemberId);
-    }
-
-    const enrichedTasks = taskList.map((t) => {
-      const { client, ...taskFields } = t;
-      const assigneeIds = assigneeIdsByTask.get(t.id) || [];
-      const taskAssignees = assigneeIds.map((id) => teamMemberById.get(id)).filter(Boolean);
-      return {
-        ...taskFields,
-        assignees: assigneeIds,
-        assigneeDetails: taskAssignees,
-        assignedByMember: t.assignedById ? teamMemberById.get(t.assignedById) || null : null,
-        clientName: client ? client.name : null,
-      };
-    });
+    const enrichedTasks = await enrichTasks(req.app.locals.models, rows);
 
     res.json({
       success: true,
       data: enrichedTasks,
+      statusCounts,
       pagination: {
         total: count,
         page: parseInt(page),

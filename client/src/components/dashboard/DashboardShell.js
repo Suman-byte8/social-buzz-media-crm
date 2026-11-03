@@ -3,7 +3,7 @@
 import React, { useEffect, useMemo } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchClients } from "@/redux/slices/clientsSlice";
-import { fetchTasks, updateTask, setTaskStatusLocal } from "@/redux/slices/tasksSlice";
+import { fetchTaskSummary, updateTask } from "@/redux/slices/tasksSlice";
 import { fetchTeamMembers } from "@/redux/slices/teamSlice";
 import { fetchAgreements } from "@/redux/slices/documentsSlice";
 import { fetchContentCalendarEntries } from "@/redux/slices/contentCalendarSlice";
@@ -12,15 +12,16 @@ import TeamWorkload from "./TeamWorkload";
 import TasksDueToday from "./TasksDueToday";
 import ClientHealthScore from "./ClientHealthScore";
 
-const isSameDay = (a, b) => a.toDateString() === b.toDateString();
-
 export default function DashboardShell() {
   const dispatch = useDispatch();
 
   const clients = useSelector((state) => state.clients.clients);
   const clientsLoading = useSelector((state) => state.clients.loading);
-  const tasks = useSelector((state) => state.tasks.tasks);
-  const tasksLoading = useSelector((state) => state.tasks.loading);
+  const clientsTotal = useSelector((state) => state.clients.totalItems);
+  // Exact task figures counted in the database (GET /tasks/summary) — not
+  // derived from a capped list of rows, so they never stop at 500.
+  const taskSummary = useSelector((state) => state.tasks.summary);
+  const tasksLoading = useSelector((state) => state.tasks.loadingSummary);
   const teamMembers = useSelector((state) => state.team.teamMembers);
   const teamLoading = useSelector((state) => state.team.loading);
   const agreements = useSelector((state) => state.documents.agreements);
@@ -37,7 +38,7 @@ export default function DashboardShell() {
 
   useEffect(() => {
     dispatch(fetchClients({ limit: 500 }));
-    dispatch(fetchTasks({ limit: 500 }));
+    dispatch(fetchTaskSummary());
     dispatch(fetchTeamMembers());
     dispatch(fetchAgreements());
     dispatch(fetchContentCalendarEntries({}));
@@ -45,12 +46,12 @@ export default function DashboardShell() {
 
   const handleToggleTaskComplete = async (task) => {
     const nextStatus = task.status === "completed" ? "todo" : "completed";
-    dispatch(setTaskStatusLocal({ id: task.id, status: nextStatus }));
     try {
       await dispatch(updateTask({ id: task.id, taskData: { status: nextStatus } })).unwrap();
+      // updateTask cleared the summary cache — refetch so every count updates.
+      dispatch(fetchTaskSummary());
     } catch (error) {
       console.error("Error updating task:", error);
-      dispatch(setTaskStatusLocal({ id: task.id, status: task.status }));
     }
   };
 
@@ -61,8 +62,8 @@ export default function DashboardShell() {
 
     const newClientsThisMonth = clients.filter((c) => c.createdAt && new Date(c.createdAt) >= startOfMonth).length;
 
-    const openTasks = tasks.filter((t) => t.status !== "completed");
-    const tasksDueToday = openTasks.filter((t) => t.dueDate && isSameDay(new Date(t.dueDate), now));
+    const openTaskCount = taskSummary?.openCount ?? 0;
+    const dueTodayCount = taskSummary?.dueTodayCount ?? 0;
 
     const thisMonthEntries = contentEntries.filter((e) => {
       if (!e.date) return false;
@@ -86,16 +87,16 @@ export default function DashboardShell() {
     return [
       {
         title: "Total Clients",
-        value: String(clients.length),
+        value: String(clientsTotal || clients.length),
         change: newClientsThisMonth > 0 ? `+${newClientsThisMonth} this month` : "No new clients this month",
         changeType: newClientsThisMonth > 0 ? "positive" : "neutral",
         icon: "domain",
       },
       {
         title: "Open Tasks",
-        value: String(openTasks.length),
-        change: tasksDueToday.length > 0 ? `${tasksDueToday.length} due today` : "None due today",
-        changeType: tasksDueToday.length > 0 ? "negative" : "positive",
+        value: String(openTaskCount),
+        change: dueTodayCount > 0 ? `${dueTodayCount} due today` : "None due today",
+        changeType: dueTodayCount > 0 ? "negative" : "positive",
         icon: "checklist",
       },
       {
@@ -120,40 +121,22 @@ export default function DashboardShell() {
         icon: "history_edu",
       },
     ];
-  }, [clients, tasks, contentEntries, agreements, now]);
+  }, [clients, clientsTotal, taskSummary, contentEntries, agreements, now]);
 
   const workloadMembers = useMemo(() => {
-    const openTasks = tasks.filter((t) => t.status !== "completed");
-    const withCounts = teamMembers.map((member) => {
-      const count = openTasks.filter((t) => (t.assignees || []).map(Number).includes(member.id)).length;
-      return { ...member, taskCount: count };
-    });
+    const openByMember = taskSummary?.openByMember || {};
+    const withCounts = teamMembers.map((member) => ({ ...member, taskCount: openByMember[member.id] || 0 }));
     const maxCount = Math.max(1, ...withCounts.map((m) => m.taskCount));
     return withCounts
       .sort((a, b) => b.taskCount - a.taskCount)
       .slice(0, 6)
       .map((m) => ({ ...m, widthPercent: Math.round((m.taskCount / maxCount) * 100) }));
-  }, [teamMembers, tasks]);
+  }, [teamMembers, taskSummary]);
 
-  const { headingLabel, dueTasks, remainingCount } = useMemo(() => {
-    const openTasks = tasks.filter((t) => t.status !== "completed");
-    const dueTodayTasks = openTasks.filter((t) => t.dueDate && isSameDay(new Date(t.dueDate), now));
-
-    if (dueTodayTasks.length > 0) {
-      return {
-        headingLabel: "Tasks Due Today",
-        dueTasks: dueTodayTasks.sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate)).slice(0, 6),
-        remainingCount: dueTodayTasks.length,
-      };
-    }
-
-    const upcoming = openTasks
-      .filter((t) => t.dueDate && new Date(t.dueDate) >= now)
-      .sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate))
-      .slice(0, 6);
-
-    return { headingLabel: "Upcoming Tasks", dueTasks: upcoming, remainingCount: openTasks.length };
-  }, [tasks, now]);
+  const dueToday = taskSummary?.listType === "due_today";
+  const headingLabel = dueToday ? "Tasks Due Today" : "Upcoming Tasks";
+  const dueTasks = taskSummary?.tasks || [];
+  const remainingCount = dueToday ? taskSummary?.dueTodayCount ?? 0 : taskSummary?.openCount ?? 0;
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-stack-md lg:gap-stack-lg">

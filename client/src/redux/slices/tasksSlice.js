@@ -5,6 +5,7 @@ import {
   fetchTasks as fetchTasksApi,
   fetchTasksByAssignee as fetchTasksByAssigneeApi,
   fetchTasksByClient as fetchTasksByClientApi,
+  fetchTaskSummary as fetchTaskSummaryApi,
   createTask as createTaskApi,
   updateTask as updateTaskApi,
   deleteTask as deleteTaskApi,
@@ -25,6 +26,9 @@ export const fetchTasksByClient = createCachedThunk("tasks/fetchTasksByClient", 
   ttlMs: TASKS_TTL_MS,
 });
 
+// Exact counts for Dashboard/Team (see GET /tasks/summary).
+export const fetchTaskSummary = createCachedThunk("tasks/fetchTaskSummary", fetchTaskSummaryApi, { ttlMs: TASKS_TTL_MS });
+
 // A task's status/assignees/client can shift which cached list it belongs
 // in, so a mutation invalidates all three task caches rather than trying
 // to guess which ones it affected.
@@ -32,6 +36,7 @@ const invalidateTaskCaches = () => {
   invalidateCache("tasks/fetchTasks");
   invalidateCache("tasks/fetchTasksByAssignee");
   invalidateCache("tasks/fetchTasksByClient");
+  invalidateCache("tasks/fetchTaskSummary");
 };
 
 export const createTask = createAsyncThunk(
@@ -82,6 +87,13 @@ const initialState = {
   // Populated by fetchTasksByClient — kept separate for the same reason
   // as memberTasks above (used by the client profile's Recent Activity).
   clientTasks: [],
+  // From the last fetchTasks: database-wide per-status totals and paging
+  // info, so the Tasks page counts aren't capped at one page of rows.
+  statusCounts: null,
+  pagination: null,
+  // From fetchTaskSummary: { openCount, dueTodayCount, completedThisWeek, openByMember, listType, tasks }
+  summary: null,
+  loadingSummary: false,
   loading: false,
   loadingMemberTasks: false,
   loadingClientTasks: false,
@@ -102,7 +114,12 @@ const tasksSlice = createSlice({
     setTaskStatusLocal: (state, action) => {
       const { id, status } = action.payload;
       const task = state.tasks.find((t) => t.id === id);
-      if (task) task.status = status;
+      if (!task || task.status === status) return;
+      if (state.statusCounts) {
+        state.statusCounts[task.status] = Math.max((state.statusCounts[task.status] || 0) - 1, 0);
+        state.statusCounts[status] = (state.statusCounts[status] || 0) + 1;
+      }
+      task.status = status;
     },
   },
   extraReducers: (builder) => {
@@ -114,10 +131,23 @@ const tasksSlice = createSlice({
       .addCase(fetchTasks.fulfilled, (state, action) => {
         state.loading = false;
         state.tasks = action.payload.data || [];
+        state.statusCounts = action.payload.statusCounts || null;
+        state.pagination = action.payload.pagination || null;
       })
       .addCase(fetchTasks.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload || "Failed to fetch tasks";
+      })
+      .addCase(fetchTaskSummary.pending, (state) => {
+        state.loadingSummary = true;
+      })
+      .addCase(fetchTaskSummary.fulfilled, (state, action) => {
+        state.loadingSummary = false;
+        state.summary = action.payload.data || null;
+      })
+      .addCase(fetchTaskSummary.rejected, (state, action) => {
+        state.loadingSummary = false;
+        state.error = action.payload || "Failed to fetch task summary";
       })
       .addCase(fetchTasksByAssignee.pending, (state) => {
         state.loadingMemberTasks = true;
