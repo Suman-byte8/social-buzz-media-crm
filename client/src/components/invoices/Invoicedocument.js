@@ -28,6 +28,7 @@ const InvoiceDocument = forwardRef(function InvoiceDocument(props, ref) {
     rows,
     onUpdateRow,
     onRemoveRow,
+    serviceOptions,
     totals,
     amountInWords,
     advancePaid,
@@ -81,7 +82,12 @@ const InvoiceDocument = forwardRef(function InvoiceDocument(props, ref) {
         onEngagementChange={onEngagementChange}
       />
 
-      <LineItemsTable rows={rows} onUpdateRow={onUpdateRow} onRemoveRow={onRemoveRow} />
+      <LineItemsTable
+        rows={rows}
+        onUpdateRow={onUpdateRow}
+        onRemoveRow={onRemoveRow}
+        serviceOptions={serviceOptions}
+      />
 
       <PaymentAndTotals
         totals={totals}
@@ -96,6 +102,7 @@ const InvoiceDocument = forwardRef(function InvoiceDocument(props, ref) {
         onUpdateTerm={onUpdateTerm}
         onAddTerm={onAddTerm}
         onRemoveTerm={onRemoveTerm}
+        showSeal={stampMode === "seal"}
       />
 
       <p className="mt-6 text-center font-display text-[8.5px] uppercase tracking-[.28em] text-[#6E6A65]">

@@ -6,9 +6,10 @@ export default function TermsAndSignature({
   onUpdateTerm,
   onAddTerm,
   onRemoveTerm,
+  showSeal = false,
 }) {
   return (
-    <section className="mt-9 grid grid-cols-[1fr_60mm] items-end gap-8 border-t border-[#DEDBD6] pt-5">
+    <section className="mt-6 grid grid-cols-[1fr_60mm] items-start gap-8 border-t border-[#DEDBD6] pt-4">
       <div>
         <div className="flex items-center justify-between">
           <p className="font-display text-[9.5px] font-700 uppercase tracking-[.24em] text-[#6E6A65]">
@@ -57,6 +58,15 @@ export default function TermsAndSignature({
           Authorised signatory
         </p>
         <p className="font-display text-[10.5px] font-700">Social Buzz Media</p>
+        {/* Small round company seal, under the signatory's name. */}
+        {showSeal && (
+          <img
+            src="/images/sbm_stamp_round.png"
+            alt="Social Buzz Media seal"
+            className="pointer-events-none mx-auto mt-2 h-[22mm] w-[22mm] select-none object-contain opacity-90"
+            style={{ transform: "rotate(-10deg)" }}
+          />
+        )}
       </div>
     </section>
   );

@@ -16,6 +16,8 @@ import { peekNextInvoiceNumber } from "@/services/paymentService";
 import { useReportImages } from "./useReportImages";
 import { useCustomReportPages } from "./useCustomReportPages";
 
+const EMPTY_SERVICES = [];
+
 export default function InvoiceBuilder() {
   const [invoiceNumber, setInvoiceNumber] = useState("SBM-2026-014");
   // Tracks whether `invoiceNumber` is still the auto-suggested one (so
@@ -213,6 +215,7 @@ export default function InvoiceBuilder() {
           rows={rows}
           onUpdateRow={updateRow}
           onRemoveRow={removeRow}
+          serviceOptions={selectedClient?.services || EMPTY_SERVICES}
           totals={totals}
           amountInWords={amountInWords}
           advancePaid={advancePaid}

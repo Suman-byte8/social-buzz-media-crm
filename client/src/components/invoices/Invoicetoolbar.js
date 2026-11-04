@@ -122,6 +122,7 @@ export default function InvoiceToolbar({
             <option value="due" className="bg-white text-ink">Payment due</option>
             <option value="advance" className="bg-white text-ink">Advance paid</option>
             <option value="paid" className="bg-white text-ink">Paid</option>
+            <option value="seal" className="bg-white text-ink">SBM round seal</option>
           </select>
         </label>
 

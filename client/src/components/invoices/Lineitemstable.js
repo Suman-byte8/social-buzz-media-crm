@@ -1,5 +1,6 @@
 "use client";
 import React from "react";
+import ServiceDescriptionInput from "./ServiceDescriptionInput";
 
 const formatRupees = (n) =>
   new Intl.NumberFormat("en-IN", {
@@ -9,7 +10,7 @@ const formatRupees = (n) =>
     maximumFractionDigits: 2,
   }).format(n || 0);
 
-export default function LineItemsTable({ rows, onUpdateRow, onRemoveRow }) {
+export default function LineItemsTable({ rows, onUpdateRow, onRemoveRow, serviceOptions = [] }) {
   return (
     <section className="mt-7">
       <table className="w-full border-collapse text-[11px]">
@@ -30,7 +31,10 @@ export default function LineItemsTable({ rows, onUpdateRow, onRemoveRow }) {
             <th className="w-[30mm] px-2 py-2.5 text-right font-display text-[9px] font-700 uppercase tracking-[.18em]">
               Amount
             </th>
-            <th className="no-print w-[8mm]" data-html2canvas-ignore="true"></th>
+            <th
+              className="no-print w-[8mm]"
+              data-html2canvas-ignore="true"
+            ></th>
           </tr>
         </thead>
         <tbody>
@@ -40,12 +44,10 @@ export default function LineItemsTable({ rows, onUpdateRow, onRemoveRow }) {
                 {String(i + 1).padStart(2, "0")}
               </td>
               <td className="px-2 py-2.5">
-                <input
-                  type="text"
+                <ServiceDescriptionInput
                   value={r.desc}
-                  onChange={(e) => onUpdateRow(r.id, "desc", e.target.value)}
-                  placeholder="Service / item description…"
-                  className="w-full bg-transparent leading-snug outline-none"
+                  onChange={(desc) => onUpdateRow(r.id, "desc", desc)}
+                  options={serviceOptions}
                 />
               </td>
               <td className="px-2 py-2.5 text-right">
@@ -54,7 +56,9 @@ export default function LineItemsTable({ rows, onUpdateRow, onRemoveRow }) {
                   step="0.01"
                   min="0"
                   value={r.qty}
-                  onChange={(e) => onUpdateRow(r.id, "qty", parseFloat(e.target.value) || 0)}
+                  onChange={(e) =>
+                    onUpdateRow(r.id, "qty", parseFloat(e.target.value) || 0)
+                  }
                   className="w-full bg-transparent text-right font-mono text-[10.5px] outline-none"
                 />
               </td>
@@ -64,14 +68,19 @@ export default function LineItemsTable({ rows, onUpdateRow, onRemoveRow }) {
                   step="0.01"
                   min="0"
                   value={r.rate}
-                  onChange={(e) => onUpdateRow(r.id, "rate", parseFloat(e.target.value) || 0)}
+                  onChange={(e) =>
+                    onUpdateRow(r.id, "rate", parseFloat(e.target.value) || 0)
+                  }
                   className="w-full bg-transparent text-right font-mono text-[10.5px] outline-none"
                 />
               </td>
               <td className="px-2 py-2.5 text-right font-mono">
                 {formatRupees((r.qty || 0) * (r.rate || 0))}
               </td>
-              <td className="no-print px-1 py-2.5 text-right" data-html2canvas-ignore="true">
+              <td
+                className="no-print px-1 py-2.5 text-right"
+                data-html2canvas-ignore="true"
+              >
                 <button
                   type="button"
                   onClick={() => onRemoveRow(r.id)}
@@ -92,8 +101,14 @@ export default function LineItemsTable({ rows, onUpdateRow, onRemoveRow }) {
           )}
         </tbody>
       </table>
-      <p className="no-print mt-2 text-[10px] text-[#6E6A65]" data-html2canvas-ignore="true">
+      <p
+        className="no-print mt-2 text-[10px] text-[#6E6A65]"
+        data-html2canvas-ignore="true"
+      >
         Click any field to edit. Amounts recalculate as you type.
+        {serviceOptions.length > 0
+          ? " Pick a description from the client’s services (▾) or type your own."
+          : " Select a client to pick from their services, or type your own."}
       </p>
     </section>
   );

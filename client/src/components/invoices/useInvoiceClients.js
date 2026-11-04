@@ -4,6 +4,11 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchClients } from "@/redux/slices/clientsSlice";
 
+function parseServices(value) {
+  const list = Array.isArray(value) ? value : String(value || "").split(",");
+  return [...new Set(list.map((s) => String(s).trim()).filter(Boolean))];
+}
+
 export function useInvoiceClients({ onClientSelected } = {}) {
   const dispatch = useDispatch();
   const rawClients = useSelector((state) => state.clients.clients);
@@ -27,6 +32,10 @@ export function useInvoiceClients({ onClientSelected } = {}) {
       whatsappNumber: c.whatsappNumber || "",
       phoneNumber: c.phoneNumber || "",
       address: c.address || c.billingAddress || "",
+      // Services ticked on the client profile — offered as line-item
+      // descriptions. Stored as a comma-separated string, but some API
+      // paths already hand back an array.
+      services: parseServices(c.servicesSelected),
     }));
   }, [rawClients]);
 
