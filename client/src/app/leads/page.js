@@ -18,7 +18,9 @@ import LeadsTable from "@/components/leads/LeadsTable";
 import LeadsPagination from "@/components/leads/LeadsPagination";
 import EditLeadModal from "@/components/leads/AddEditLeadModal";
 
-const SOURCE_OPTIONS = ["LinkedIn", "Website Organic", "Referral", "Cold Outreach", "Other"];
+// "Meta Lead Ad" / "Google Lead Form" are set automatically on leads
+// imported from ad lead forms (see server/src/utils/adsSync.js).
+const SOURCE_OPTIONS = ["LinkedIn", "Website Organic", "Referral", "Cold Outreach", "Meta Lead Ad", "Google Lead Form", "Other"];
 
 let draftIdCounter = 0;
 const nextDraftId = () => `draft-${Date.now()}-${draftIdCounter++}`;

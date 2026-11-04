@@ -15,6 +15,21 @@ export function formatRupees(paise) {
   return formatter.format((paise || 0) / 100);
 }
 
+// Ad accounts can bill in any currency, so ad spend is formatted with the
+// account's own currency code (still minor units in, like formatRupees).
+export function formatMoney(minor, currency = "INR", { compact = false } = {}) {
+  try {
+    return new Intl.NumberFormat("en-IN", {
+      style: "currency",
+      currency: currency || "INR",
+      notation: compact ? "compact" : "standard",
+      maximumFractionDigits: compact ? 1 : 2,
+    }).format((minor || 0) / 100);
+  } catch {
+    return `${currency || ""} ${((minor || 0) / 100).toFixed(2)}`.trim();
+  }
+}
+
 export function paiseToRupees(paise) {
   return (paise || 0) / 100;
 }

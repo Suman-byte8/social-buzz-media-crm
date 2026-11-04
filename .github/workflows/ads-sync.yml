@@ -1,0 +1,56 @@
+name: Sync ad platforms
+
+# Pulls Google Ads + Meta numbers into the CRM every 6 hours. Runs here
+# rather than inside the server so the two Render services never both sync
+# at once. Needs repository secrets ADS_SYNC_SECRET (same value as on
+# Render) plus the existing NEXT_PUBLIC_API_URL / NEXT_PUBLIC_API_URL_FALLBACK.
+
+on:
+  schedule:
+    - cron: "15 */6 * * *"
+  workflow_dispatch:
+    inputs:
+      days:
+        description: "How many days back to re-sync (1-90)"
+        required: false
+        default: "7"
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Trigger sync (primary server, then backup)
+        env:
+          ADS_SYNC_SECRET: ${{ secrets.ADS_SYNC_SECRET }}
+          PRIMARY: ${{ secrets.NEXT_PUBLIC_API_URL }}
+          FALLBACK: ${{ secrets.NEXT_PUBLIC_API_URL_FALLBACK }}
+          INPUT_DAYS: ${{ github.event.inputs.days }}
+        run: |
+          if [ -z "$ADS_SYNC_SECRET" ]; then
+            echo "ADS_SYNC_SECRET secret is not set - skipping."
+            exit 0
+          fi
+
+          # Conversions keep changing for weeks, so the first run each
+          # Sunday re-pulls 30 days; every other run re-pulls 7.
+          DAYS="${INPUT_DAYS:-7}"
+          if [ -z "$INPUT_DAYS" ] && [ "$(date -u +%u)" = "7" ] && [ "$(date -u +%H)" -lt 6 ]; then
+            DAYS=30
+          fi
+
+          for BASE in "$PRIMARY" "$FALLBACK"; do
+            [ -z "$BASE" ] && continue
+            BASE="${BASE%/}"
+            echo "Syncing $DAYS days via $BASE"
+            # The first request may wake a sleeping Render service.
+            if curl -fsS --retry 2 --retry-delay 20 --max-time 600 -X POST \
+                 -H "X-Sync-Secret: $ADS_SYNC_SECRET" \
+                 "$BASE/ads/cron-sync?days=$DAYS"; then
+              echo
+              exit 0
+            fi
+            echo "Server $BASE failed, trying the next one."
+          done
+          echo "All servers failed."
+          exit 1

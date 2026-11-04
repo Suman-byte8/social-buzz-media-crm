@@ -1,6 +1,6 @@
 import React from "react";
-import MetaAdsOverview from "@/components/clients/MetaAdsOverview";
+import PlatformAdsPanel from "@/components/ads/PlatformAdsPanel";
 
 export default function MetaAdsTab({ client }) {
-  return <MetaAdsOverview client={client} />;
+  return <PlatformAdsPanel client={client} platform="meta" />;
 }

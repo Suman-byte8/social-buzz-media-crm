@@ -1417,7 +1417,40 @@ Server will run on `http://localhost:5000` (or `PORT` from `.env`). Log in via `
 
 To apply a real schema change, prefer writing a new `server/scripts/*.js` migration and an `npm run migrate:*` script for it (see note 7 above and the existing `migrate:*` scripts in `package.json`); reach for `npm run db:sync` only when you can afford a destructive `alter: true` against the target database.
 
-Optional integrations that degrade gracefully when unconfigured: `REDIS_URL` (server response cache — falls back to in-process), `SMTP_*` (document/invoice emailing — fails with a clear error if unset, doesn't block anything else).
+Optional integrations that degrade gracefully when unconfigured: `REDIS_URL` (server response cache — falls back to in-process), `SMTP_*` (document/invoice emailing — fails with a clear error if unset, doesn't block anything else), and the Google Ads / Meta credentials below.
+
+---
+
+## Ads Integrations (Google Ads + Meta)
+
+Pulls campaign performance and ad-form leads from Google Ads and Meta into the CRM, using the free official APIs with one set of agency credentials per platform. Every variable is listed in [`.env.example`](.env.example) and must be set identically on both Render services. Each platform stays inactive until its credentials are set.
+
+**How data flows**
+
+- `POST /api/ads/cron-sync` runs every 6 hours from [`.github/workflows/ads-sync.yml`](../.github/workflows/ads-sync.yml). The **Sync now** button on the Ad Accounts page calls `POST /api/ads/sync`. Each run does three things:
+  1. Discovers ad accounts.
+  2. Upserts campaigns.
+  3. Re-pulls the last 7 days of per-campaign daily metrics; the first run each Sunday re-pulls 30. Upserts are keyed on (account, campaign, date), so re-running never duplicates rows.
+- A link from an ad account to a CRM client is set by an admin on `/ads`. A client's **Google Ads** and **Meta Ads** tabs show every linked account.
+- Leads:
+  - **Meta Lead Ads:** polled on each sync, or delivered instantly by the Page webhook.
+  - **Google lead forms:** delivered by webhook.
+  - Both land in `ad_leads`, and each new lead also creates a `leads` row (source "Meta Lead Ad" / "Google Lead Form").
+- Money is stored in account-currency minor units (`spendMinor`), like Payments. Ratios (CTR, CPC, cost per lead) are computed at read time.
+
+**Tables:** `ad_accounts`, `ad_campaigns`, `ad_daily_metrics`, `ad_leads`, `ad_sync_logs`. These are created automatically by `sequelize.sync()` on startup.
+
+| Endpoint | Auth | Purpose |
+|---|---|---|
+| `GET /api/ads/clients/:clientId/summary?platform=google_ads\|meta&from=&to=` | Any user | Totals per currency, daily series, campaigns and recent leads for one client |
+| `GET /api/ads/status` | Admin | Which platforms are configured, plus recent sync logs |
+| `GET /api/ads/accounts` / `PUT /api/ads/accounts/:id` | Admin | List accounts; set `clientId` / `syncEnabled` |
+| `POST /api/ads/sync` | Admin | Sync now (`{ days, platform }`) |
+| `GET /api/ads/overview?from=&to=` | Admin | Agency-wide totals by platform and client |
+| `POST /api/ads/meta/subscribe-pages` | Admin | Subscribe every Page to the `leadgen` webhook |
+| `POST /api/ads/cron-sync` | `X-Sync-Secret` header | Scheduled sync |
+| `POST /api/ads/webhooks/google-leads` | `google_key` in body | Google Ads lead form webhook |
+| `GET/POST /api/ads/webhooks/meta` | Verify token / `X-Hub-Signature-256` | Meta Page `leadgen` webhook |
 
 ---
 

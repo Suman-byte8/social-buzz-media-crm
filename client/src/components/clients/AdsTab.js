@@ -1,6 +1,6 @@
 import React from "react";
-import Ads from "@/components/clients/Ads";
+import PlatformAdsPanel from "@/components/ads/PlatformAdsPanel";
 
 export default function AdsTab({ client }) {
-  return <Ads client={client} />;
+  return <PlatformAdsPanel client={client} platform="google_ads" />;
 }

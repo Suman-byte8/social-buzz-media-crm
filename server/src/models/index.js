@@ -31,6 +31,11 @@ import paymentAllocationModel from "./PaymentAllocation.js";
 import refundModel from "./Refund.js";
 import paymentReminderModel from "./PaymentReminder.js";
 import paymentActivityLogModel from "./PaymentActivityLog.js";
+import adAccountModel from "./AdAccount.js";
+import adCampaignModel from "./AdCampaign.js";
+import adDailyMetricModel from "./AdDailyMetric.js";
+import adLeadModel from "./AdLead.js";
+import adSyncLogModel from "./AdSyncLog.js";
 
 export const initModels = (sequelize) => {
   const Client = clientModel(sequelize, DataTypes);
@@ -65,6 +70,11 @@ export const initModels = (sequelize) => {
   const Refund = refundModel(sequelize, DataTypes);
   const PaymentReminder = paymentReminderModel(sequelize, DataTypes);
   const PaymentActivityLog = paymentActivityLogModel(sequelize, DataTypes);
+  const AdAccount = adAccountModel(sequelize, DataTypes);
+  const AdCampaign = adCampaignModel(sequelize, DataTypes);
+  const AdDailyMetric = adDailyMetricModel(sequelize, DataTypes);
+  const AdLead = adLeadModel(sequelize, DataTypes);
+  const AdSyncLog = adSyncLogModel(sequelize, DataTypes);
 
   Client.hasMany(Document, { foreignKey: "clientId", as: "documents" });
   Document.belongsTo(Client, { foreignKey: "clientId", as: "client" });
@@ -220,6 +230,22 @@ export const initModels = (sequelize) => {
   Invoice.hasMany(Document, { foreignKey: "invoiceId", as: "exports", constraints: false });
   Document.belongsTo(Invoice, { foreignKey: "invoiceId", as: "invoiceRecord", constraints: false });
 
+  // ── Ads integrations (Google Ads / Meta) ────────────────────────────
+  // All soft references: ad rows are synced from outside, and an account
+  // can exist before (or without) being linked to a CRM client.
+  Client.hasMany(AdAccount, { foreignKey: "clientId", as: "adAccounts", constraints: false });
+  AdAccount.belongsTo(Client, { foreignKey: "clientId", as: "client", constraints: false });
+
+  AdAccount.hasMany(AdCampaign, { foreignKey: "adAccountId", as: "campaigns", constraints: false });
+  AdCampaign.belongsTo(AdAccount, { foreignKey: "adAccountId", as: "account", constraints: false });
+
+  AdAccount.hasMany(AdDailyMetric, { foreignKey: "adAccountId", as: "dailyMetrics", constraints: false });
+  AdDailyMetric.belongsTo(AdAccount, { foreignKey: "adAccountId", as: "account", constraints: false });
+
+  AdAccount.hasMany(AdLead, { foreignKey: "adAccountId", as: "leads", constraints: false });
+  AdLead.belongsTo(AdAccount, { foreignKey: "adAccountId", as: "account", constraints: false });
+  AdLead.belongsTo(Lead, { foreignKey: "leadId", as: "crmLead", constraints: false });
+
   return {
     Client,
     TeamMember,
@@ -253,5 +279,10 @@ export const initModels = (sequelize) => {
     Refund,
     PaymentReminder,
     PaymentActivityLog,
+    AdAccount,
+    AdCampaign,
+    AdDailyMetric,
+    AdLead,
+    AdSyncLog,
   };
 };

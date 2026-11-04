@@ -16,7 +16,16 @@ app.use(compression());
 // default same-origin CORP silently blocks the browser from rendering them
 // in an <img> tag even though the request itself succeeds with a 200.
 app.use(helmet({ crossOriginResourcePolicy: { policy: "cross-origin" } }));
-app.use(express.json({ limit: "10mb" }));
+// `verify` keeps the raw bytes alongside the parsed body — the Meta lead
+// webhook's signature is computed over the exact bytes Meta sent.
+app.use(
+  express.json({
+    limit: "10mb",
+    verify: (req, _res, buf) => {
+      req.rawBody = buf;
+    },
+  }),
+);
 app.use(express.urlencoded({ limit: "10mb", extended: true }));
 
 // Database setup
@@ -169,6 +178,8 @@ import agreementBuilderRoutes from "./src/routes/agreementBuilderRoutes.js";
 import proposalBuilderRoutes from "./src/routes/proposalBuilderRoutes.js";
 import paymentRoutes from "./src/routes/paymentRoutes.js";
 import authRoutes from "./src/routes/authRoutes.js";
+import adsRoutes from "./src/routes/adsRoutes.js";
+import adsPublicRoutes from "./src/routes/adsPublicRoutes.js";
 import { startKeepAlivePing } from "./src/utils/keepAlive.js";
 import { authenticate } from "./src/middleware/auth.js";
 
@@ -178,6 +189,10 @@ import { authenticate } from "./src/middleware/auth.js";
 // <img>/<a> tags, which can't send an Authorization header; those stay
 // public (the Drive file IDs they key off are long and unguessable).
 app.use("/api/auth", authRoutes);
+
+// Ads webhooks + scheduled sync: called by Google/Meta/GitHub Actions, which
+// can't send a JWT — each route checks its own shared secret instead.
+app.use("/api", adsPublicRoutes);
 
 const PUBLIC_ASSET_PATHS = [
   /^\/api\/settings\/logo-proxy\//,
@@ -203,6 +218,10 @@ app.use("/api", leadRoutes);
 app.use("/api", notificationRoutes);
 app.use("/api", serviceRoutes);
 app.use("/api", reportRoutes);
+// Before the three admin-only routers below: each of those applies
+// requireAdmin to every request that reaches it, which would block team
+// members from the (non-admin) client Ads tab endpoints.
+app.use("/api", adsRoutes);
 app.use("/api", agreementBuilderRoutes);
 app.use("/api", proposalBuilderRoutes);
 app.use("/api", paymentRoutes);
